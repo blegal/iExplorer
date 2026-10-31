@@ -13,6 +13,23 @@ enum MenuTint {
         NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [color]))
     }
+
+    /// Texte légèrement teinté de la couleur de la famille (un tiers), en clair comme en sombre.
+    static func text(_ tint: NSColor) -> NSColor {
+        NSColor(name: nil) { appearance in
+            var color = NSColor.labelColor
+            appearance.performAsCurrentDrawingAppearance {
+                color = NSColor.labelColor.usingColorSpace(.sRGB)?.blended(withFraction: 0.33, of: tint.usingColorSpace(.sRGB) ?? tint) ?? .labelColor
+            }
+            return color
+        }
+    }
+
+    /// Titre teinté ; « Organiser » garde la couleur normale du menu.
+    static func style(_ item: NSMenuItem, _ tint: NSColor) {
+        guard tint != organize else { return }
+        item.attributedTitle = NSAttributedString(string: item.title, attributes: [.foregroundColor: text(tint), .font: NSFont.menuFont(ofSize: 0)])
+    }
 }
 
 extension PanelViewController {
@@ -21,7 +38,10 @@ extension PanelViewController {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
         item.representedObject = represented
-        if let icon { item.image = MenuTint.icon(icon, tint) }
+        if let icon {
+            item.image = MenuTint.icon(icon, tint)
+            MenuTint.style(item, tint)
+        }
         if let hint { item.badge = NSMenuItemBadge(string: hint) }
         return item
     }
@@ -43,17 +63,19 @@ extension PanelViewController {
             items.append(compressMenuItem())
         }
 
-        if let verify = verificationTarget(for: files) {
+        // Somme de contrôle, chiffrement et découpage ne portent que sur des fichiers.
+        let onlyFiles = !files.isEmpty && files.count == selection.count
+        if let verify = verificationTarget(for: files), onlyFiles {
             items.append(menuItem("Vérifier la somme de contrôle", #selector(validateChecksumFile(_:)), icon: "checkmark.seal",
                                   tint: MenuTint.checksum, hint: verify.algorithm, represented: verify.list))
-        } else if !files.isEmpty {
+        } else if onlyFiles {
             items.append(checksumMenuItem())
         }
 
-        if !files.isEmpty, encryptedFiles.count == files.count, files.count == selection.count {
+        if onlyFiles, encryptedFiles.count == files.count {
             let cipher = FileCipher(encryptedFile: files[0].url)
             items.append(menuItem("Déchiffrer…", #selector(decryptFiles(_:)), icon: "lock.open", tint: MenuTint.encrypt, hint: cipher?.title))
-        } else if !selection.isEmpty {
+        } else if onlyFiles {
             items.append(encryptMenuItem(hasFiles: !encryptableFiles.isEmpty))
         }
 
@@ -62,9 +84,6 @@ extension PanelViewController {
         } else if let candidate = splitCandidate, (candidate.size ?? 0) > 50_000_000 {
             // Découper ne sert que pour les gros fichiers : le menu reste court pour les autres (toujours dans Fichier).
             items.append(menuItem("Découper le fichier…", #selector(splitFile(_:)), icon: "scissors", tint: MenuTint.compress))
-        }
-        if !selection.isEmpty, selection.allSatisfy({ Volumes.isDiskImage($0.url) }) {
-            items.append(menuItem("Monter l’image disque", #selector(mountDiskImages(_:)), icon: "opticaldiscdrive", tint: MenuTint.open))
         }
         return items
     }

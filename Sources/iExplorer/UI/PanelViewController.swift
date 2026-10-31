@@ -1280,6 +1280,21 @@ final class PanelViewController: NSViewController {
         }
     }
 
+    /// Comme le Finder : un nouveau dossier qui reçoit les éléments sélectionnés, puis son nom à saisir.
+    @objc func newFolderWithSelection(_ sender: Any?) {
+        let urls = selectedURLs
+        guard urls.count > 1, !currentURL.isRemote else { return }
+        do {
+            let folder = try FileOperationCenter.shared.createFolder(in: currentURL, undoManager: undoManager)
+            activate()
+            FileOperationCenter.shared.transfer(.move, sources: urls, to: folder, undoManager: undoManager) { [weak self] _ in
+                self?.reload(selecting: [folder]) { self?.renameSelection(nil) }
+            }
+        } catch {
+            presentErrorSheet(error)
+        }
+    }
+
     @objc func moveToTrash(_ sender: Any?) {
         let urls = selectedURLs
         guard !urls.isEmpty else { return }
@@ -1527,31 +1542,35 @@ final class PanelViewController: NSViewController {
             menu.addItem(.separator())
         }
 
-        // Groupes titrés, icônes colorées par famille : Ouvrir, Transformer, Organiser.
+        // Groupes titrés, icônes colorées par famille : Ouvrir, Transformer, Organiser
+        // (ordre inspiré du Finder, de l'Explorateur Windows et de Dolphin).
         func header(_ title: String) {
             if menu.items.last?.isSeparatorItem == false { menu.addItem(.separator()) }
             menu.addItem(.sectionHeader(title: title))
         }
+        func separator() {
+            if menu.items.last?.isSeparatorItem == false { menu.addItem(.separator()) }
+        }
         func tinted(_ title: String, _ action: Selector, _ symbol: String, _ tint: NSColor) {
             add(title, action)
             menu.items.last?.image = MenuTint.icon(symbol, tint)
+            if let item = menu.items.last { MenuTint.style(item, tint) }
         }
+        let files = selection.filter { !$0.isNavigableDirectory }
         if !selection.isEmpty {
             header("Ouvrir")
-            tinted("Ouvrir", #selector(openSelection(_:)), "arrow.up.forward.app", MenuTint.open)
+            if !files.isEmpty { tinted("Ouvrir", #selector(openSelection(_:)), "arrow.up.forward.app", MenuTint.open) }
+            if let first = files.first, files.count == selection.count, !first.url.isRemote {
+                let openWith = openWithMenu(for: first.url)
+                openWith.image = MenuTint.icon("square.grid.2x2", MenuTint.open)
+                MenuTint.style(openWith, MenuTint.open)
+                menu.addItem(openWith)
+            }
             if selection.contains(where: \.isNavigableDirectory) {
                 tinted("Ouvrir dans un nouvel onglet", #selector(openInNewTab(_:)), "plus.square.on.square", MenuTint.open)
             }
-            if let first = selection.first, !first.isNavigableDirectory, !first.url.isRemote {
-                let openWith = openWithMenu(for: first.url)
-                openWith.image = MenuTint.icon("square.grid.2x2", MenuTint.open)
-                menu.addItem(openWith)
-            }
             if selection.count == 1, selection[0].isPackage {
                 tinted("Afficher le contenu du paquet", #selector(showPackageContents(_:)), "shippingbox", MenuTint.open)
-            }
-            if selection.count == 1, selection[0].isNavigableDirectory, !currentURL.isRemote {
-                tinted("Analyser l’espace disque", #selector(analyzeDiskUsage(_:)), "chart.pie", MenuTint.open)
             }
             if !currentURL.isRemote {
                 let transform = transformMenuItems(for: selection)
@@ -1564,14 +1583,15 @@ final class PanelViewController: NSViewController {
 
         header("Organiser")
         if !selection.isEmpty {
+            if selection.count > 1, !currentURL.isRemote {
+                add("Nouveau dossier avec la sélection (\(selection.count) éléments)", #selector(newFolderWithSelection(_:)), "folder.badge.plus")
+            }
             let targets = host?.targetPanels(for: self) ?? []
             if !targets.isEmpty {
                 menu.addItem(panelSubmenu("Copier vers", #selector(copyToOtherPanel(_:)), targets, "arrow.right.doc.on.clipboard"))
                 menu.addItem(panelSubmenu("Déplacer vers", #selector(moveToOtherPanel(_:)), targets, "arrow.right.square"))
             }
             if !currentURL.isRemote {
-                menu.addItem(tagsMenuItem())
-                if let actions = customActionsMenuItem() { menu.addItem(actions) }
                 let links = NSMenuItem(title: "Créer un lien", action: nil, keyEquivalent: "")
                 links.image = NSImage(systemSymbolName: "link.badge.plus", accessibilityDescription: nil)
                 links.submenu = NSMenu()
@@ -1582,19 +1602,25 @@ final class PanelViewController: NSViewController {
                     links.submenu?.addItem(entry)
                 }
                 menu.addItem(links)
-                menu.addItem(shareMenuItem(for: selection.map(\.url)))
             }
             add("Copier le chemin", #selector(copyPath(_:)), "link")
-            add("Nouveau dossier", #selector(newFolder(_:)), "folder.badge.plus")
+            if !currentURL.isRemote {
+                menu.addItem(tagsMenuItem())
+                if let actions = customActionsMenuItem() { menu.addItem(actions) }
+                menu.addItem(shareMenuItem(for: selection.map(\.url)))
+            }
+            separator()
         }
-        if !currentURL.isRemote { menu.addItem(newDocumentMenuItem()) }
-        if !currentURL.isRemote { add("Ajouter aux favoris", #selector(addToFavorites(_:)), "star") }
+        add("Nouveau dossier", #selector(newFolder(_:)), "folder.badge.plus")
         if !currentURL.isRemote {
-            add("Afficher dans le Finder", #selector(revealInFinder(_:)), "macwindow")
+            menu.addItem(newDocumentMenuItem())
             add("Ouvrir dans le Terminal", #selector(openInTerminal(_:)), "terminal")
             if selection.isEmpty { add("Occupation du disque", #selector(toggleDiskUsage(_:)), "chart.pie") }
         }
-        if !selection.isEmpty { tinted("Placer dans la corbeille", #selector(moveToTrash(_:)), "trash", MenuTint.danger) }
+        if !selection.isEmpty {
+            separator()
+            tinted("Placer dans la corbeille", #selector(moveToTrash(_:)), "trash", MenuTint.danger)
+        }
         if selection.isEmpty, isFlatView || canShowFlatView {
             menu.addItem(.separator())
             menu.addItem(flatViewMenuItem())
