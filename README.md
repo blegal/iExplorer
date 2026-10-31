@@ -21,7 +21,7 @@ serveurs distants, analyse de l’espace disque et thèmes. Écrit en Swift / Ap
 **Pour les développeurs**
 - État Git dans les listes, comme dans VS Code ; indexer, valider, tirer et pousser depuis l’inspecteur.
 - Terminal intégré qui suit le dossier du panneau actif.
-- Éditeur à côté du panneau en disposition simple : aperçu Markdown, CSV et JSON en direct, compilation LaTeX ou Typst avec le PDF à côté, synchronisation texte ↔ PDF (SyncTeX) et texte ↔ aperçu Markdown par ⌘-clic, lignes modifiées depuis le dernier commit marquées dans la marge.
+- Éditeur à côté du panneau en disposition simple : aperçu Markdown, CSV et JSON en direct, compilation LaTeX ou Typst avec le PDF à côté, synchronisation texte ↔ PDF (SyncTeX) et texte ↔ aperçu Markdown par ⌘-clic, lignes modifiées depuis le dernier commit marquées dans la marge, coloration syntaxique d’une trentaine de langages (Makefile, CMake, VHDL, Verilog, Tcl et contraintes Vivado, YAML, Dockerfile…).
 - Actions personnalisées et actions par type de fichier (cibles d’un Makefile, compiler un .typ, convertir un .md…).
 - Serveurs SFTP, SMB, AFP, NFS et WebDAV.
 

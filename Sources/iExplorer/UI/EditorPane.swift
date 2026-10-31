@@ -513,7 +513,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let line = before.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }
         let lastNewline = (before as NSString).range(of: "\n", options: .backwards).location
         let column = lastNewline == NSNotFound ? location + 1 : location - lastNewline
-        let language = SyntaxHighlighter.language(for: document.url).map { "\($0)".capitalized } ?? "Texte"
+        let language = SyntaxHighlighter.language(for: document.url)?.title ?? "Texte"
         let endings = document.text.contains("\r\n") ? "CRLF" : "LF"
         let encoding = document.encoding == .utf8 ? "UTF-8" : "ISO Latin-1"
         statusLeft.stringValue = "\(language) · \(encoding) · \(endings) · Ligne \(line), colonne \(column)"
