@@ -40,7 +40,7 @@ serveurs distants, analyse de l’espace disque et thèmes. Écrit en Swift / Ap
 
 Nécessite **macOS 26** ou plus récent.
 
-1. Téléchargez `iExplorer-x.y.z.dmg` depuis la page [Releases](https://github.com/blegal/EnhancedFileManager/releases/latest).
+1. Téléchargez `iExplorer-x.y.z.dmg` depuis la page [Releases](https://github.com/blegal/iExplorer/releases/latest).
 2. Ouvrez l’image disque et glissez **iExplorer** dans **Applications**.
 3. L’app n’est pas notarisée par Apple : au premier lancement, faites **clic droit › Ouvrir**, puis confirmez.
    Vous pouvez aussi retirer l’attribut de quarantaine :
@@ -57,8 +57,8 @@ Les mises à jour sont ensuite automatiques. L’app vérifie les nouvelles vers
 Il faut Xcode avec Swift 6.
 
 ```bash
-git clone https://github.com/blegal/EnhancedFileManager.git
-cd EnhancedFileManager
+git clone https://github.com/blegal/iExplorer.git
+cd iExplorer
 ./build.sh
 open build/iExplorer.app
 ```

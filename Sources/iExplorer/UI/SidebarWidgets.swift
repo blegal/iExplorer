@@ -98,6 +98,9 @@ class SidebarWidget: NSView {
     /// Mise à jour périodique (par défaut : redessiner).
     func tick() { needsDisplay = true }
 
+    /// Entrées propres au widget, en tête de son menu contextuel.
+    func extraMenuItems() -> [NSMenuItem] { [] }
+
     var ink: NSColor { Theme.text }
     var faint: NSColor { Theme.secondaryText }
     var accent: NSColor { Theme.accent }
@@ -176,40 +179,216 @@ final class DigitalClockWidget: SidebarWidget {
 
 // MARK: - Yeux
 
+/// Styles des yeux, choisis au clic droit.
+enum EyeStyle: String, CaseIterable {
+    case classic, makeup, man, woman, child, cyclops, crowd, cat, alien, robot, sleepy
+
+    var title: String {
+        switch self {
+        case .classic: "Classiques (xeyes)"
+        case .makeup: "Maquillés"
+        case .man: "Homme"
+        case .woman: "Femme"
+        case .child: "Enfant"
+        case .cyclops: "Cyclope"
+        case .crowd: "Groupe d’yeux"
+        case .cat: "Chat"
+        case .alien: "Extraterrestre"
+        case .robot: "Robot"
+        case .sleepy: "Endormis"
+        }
+    }
+
+    static var current: EyeStyle {
+        get { EyeStyle(rawValue: UserDefaults.standard.string(forKey: "eyesStyle") ?? "") ?? .classic }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "eyesStyle") }
+    }
+}
+
 final class EyesWidget: SidebarWidget {
     override var kind: SidebarWidgetKind { .eyes }
     override var interval: TimeInterval { 1.0 / 30 }
     private var lastMouse = NSPoint.zero
+
+    private struct Look {
+        enum Pupil { case round, slit, led }
+        var sclera = NSColor.white
+        var iris: NSColor?
+        var pupil = Pupil.round
+        var square = false
+        var lid: CGFloat = 0
+        var lashes = false
+        var liner = false
+        var shadow: NSColor?
+        var brow: CGFloat = 0
+        var arched = false
+        var highlight = false
+        var outline: CGFloat = 2.5
+    }
 
     override func tick() {
         let mouse = NSEvent.mouseLocation
         if mouse != lastMouse { lastMouse = mouse; needsDisplay = true }
     }
 
+    override func extraMenuItems() -> [NSMenuItem] {
+        let style = NSMenuItem(title: "Style des yeux", action: nil, keyEquivalent: "")
+        style.image = NSImage(systemSymbolName: "eyes", accessibilityDescription: nil)
+        let menu = NSMenu()
+        for choice in EyeStyle.allCases {
+            let item = NSMenuItem(title: choice.title, action: #selector(chooseStyle(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = choice.rawValue
+            item.state = choice == EyeStyle.current ? .on : .off
+            menu.addItem(item)
+        }
+        style.submenu = menu
+        return [style]
+    }
+
+    @objc private func chooseStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let style = EyeStyle(rawValue: raw) else { return }
+        EyeStyle.current = style
+        needsDisplay = true
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard let window else { return }
-        let height = bounds.height - 10
-        let width = height * 0.75
-        let gap: CGFloat = 8
-        let originX = (bounds.width - 2 * width - gap) / 2
-        let mouseInView = convert(window.convertPoint(fromScreen: lastMouse), from: nil)
-        for index in 0..<2 {
-            let eye = NSRect(x: originX + CGFloat(index) * (width + gap), y: 5, width: width, height: height)
-            NSColor.white.setFill()
-            NSBezierPath(ovalIn: eye).fill()
-            ink.setStroke()
-            let outline = NSBezierPath(ovalIn: eye)
-            outline.lineWidth = 2.5
-            outline.stroke()
-            // La pupille va vers la souris, sans sortir de l'œil.
-            let center = NSPoint(x: eye.midX, y: eye.midY)
-            let dx = mouseInView.x - center.x, dy = mouseInView.y - center.y
-            let distance = max(1, hypot(dx, dy))
-            let reachX = eye.width / 2 - 9, reachY = eye.height / 2 - 9
-            let scale = min(1, distance / 60)
-            let pupil = NSPoint(x: center.x + dx / distance * reachX * scale, y: center.y + dy / distance * reachY * scale)
+        let mouse = convert(window.convertPoint(fromScreen: lastMouse), from: nil)
+        let height = bounds.height - 12
+        func pair(width: CGFloat, height: CGFloat, gap: CGFloat = 10, y: CGFloat = 8) -> [NSRect] {
+            let x = (bounds.width - 2 * width - gap) / 2
+            return [NSRect(x: x, y: y, width: width, height: height), NSRect(x: x + width + gap, y: y, width: width, height: height)]
+        }
+        switch EyeStyle.current {
+        case .classic:
+            pair(width: height * 0.75, height: height).forEach { eye($0, Look(), mouse) }
+        case .makeup:
+            let look = Look(iris: .systemBlue, lashes: true, liner: true, shadow: NSColor.systemPurple.withAlphaComponent(0.55), brow: 2, arched: true, highlight: true)
+            pair(width: height * 0.95, height: height * 0.62, gap: 14, y: 20).forEach { eye($0, look, mouse) }
+        case .man:
+            let look = Look(iris: NSColor(calibratedRed: 0.45, green: 0.3, blue: 0.15, alpha: 1), brow: 5)
+            pair(width: height * 0.95, height: height * 0.55, gap: 16, y: 22).forEach { eye($0, look, mouse) }
+        case .woman:
+            let look = Look(iris: NSColor(calibratedRed: 0.2, green: 0.6, blue: 0.4, alpha: 1), lashes: true,
+                            shadow: NSColor.systemPink.withAlphaComponent(0.35), brow: 1.5, arched: true, highlight: true)
+            pair(width: height * 0.9, height: height * 0.6, gap: 14, y: 20).forEach { eye($0, look, mouse) }
+        case .child:
+            let look = Look(iris: NSColor(calibratedRed: 0.35, green: 0.65, blue: 0.95, alpha: 1), highlight: true)
+            pair(width: height * 0.95, height: height * 0.95, gap: 6, y: 6).forEach { eye($0, look, mouse) }
+        case .cyclops:
+            let side = height
+            eye(NSRect(x: (bounds.width - side * 1.25) / 2, y: 6, width: side * 1.25, height: side),
+                Look(iris: .systemRed, brow: 4, highlight: true), mouse)
+        case .crowd:
+            // Des yeux de tailles différentes, disposés une fois pour toutes selon la largeur.
+            let spots: [(CGFloat, CGFloat, CGFloat)] = [(0.08, 0.15, 0.55), (0.3, 0.05, 0.85), (0.52, 0.35, 0.5), (0.66, 0.08, 0.7),
+                                                         (0.86, 0.3, 0.45), (0.2, 0.6, 0.35), (0.78, 0.65, 0.3)]
+            for (fx, fy, scale) in spots {
+                let size = height * scale
+                eye(NSRect(x: fx * (bounds.width - size), y: fy * (bounds.height - size) + 2, width: size * 0.8, height: size),
+                    Look(iris: scale > 0.6 ? .systemTeal : nil, outline: 1.5), mouse)
+            }
+        case .cat:
+            let look = Look(sclera: NSColor(calibratedRed: 0.85, green: 0.8, blue: 0.2, alpha: 1), iris: NSColor(calibratedRed: 0.55, green: 0.75, blue: 0.15, alpha: 1), pupil: .slit)
+            pair(width: height * 0.85, height: height * 0.8, gap: 18, y: 10).forEach { eye($0, look, mouse) }
+        case .alien:
+            let look = Look(sclera: NSColor(calibratedRed: 0.08, green: 0.12, blue: 0.08, alpha: 1), iris: NSColor(calibratedRed: 0.3, green: 1, blue: 0.4, alpha: 1), highlight: true, outline: 1)
+            pair(width: height * 0.7, height: height, gap: 16).forEach { eye($0, look, mouse) }
+        case .robot:
+            let look = Look(sclera: NSColor(calibratedWhite: 0.15, alpha: 1), iris: .systemRed, pupil: .led, square: true)
+            pair(width: height * 0.9, height: height * 0.75, gap: 12, y: 12).forEach { eye($0, look, mouse) }
+        case .sleepy:
+            pair(width: height * 0.85, height: height * 0.8, gap: 12, y: 12).forEach { eye($0, Look(iris: NSColor(calibratedRed: 0.45, green: 0.3, blue: 0.15, alpha: 1), lid: 0.45, lashes: true), mouse) }
+        }
+    }
+
+    private func eye(_ rect: NSRect, _ look: Look, _ mouse: NSPoint) {
+        let shape = look.square ? NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8) : NSBezierPath(ovalIn: rect)
+        if let shadow = look.shadow {
+            shadow.setFill()
+            NSBezierPath(ovalIn: NSRect(x: rect.minX - 4, y: rect.minY - rect.height * 0.35, width: rect.width + 8, height: rect.height * 0.9)).fill()
+        }
+        look.sclera.setFill()
+        shape.fill()
+        NSGraphicsContext.saveGraphicsState()
+        shape.addClip()
+        // L'iris et la pupille suivent la souris sans sortir de l'œil.
+        let center = NSPoint(x: rect.midX, y: rect.midY)
+        let dx = mouse.x - center.x, dy = mouse.y - center.y
+        let distance = max(1, hypot(dx, dy))
+        let pupilSize = min(rect.width, rect.height) * (look.iris == nil ? 0.32 : 0.28)
+        let irisSize = look.iris == nil ? pupilSize : min(rect.width, rect.height) * 0.62
+        let reachX = max(0, rect.width / 2 - irisSize / 2 - 2), reachY = max(0, rect.height / 2 - irisSize / 2 - 2)
+        let scale = min(1, distance / 60)
+        var at = NSPoint(x: center.x + dx / distance * reachX * scale, y: center.y + dy / distance * reachY * scale)
+        // Yeux endormis : le regard reste sous la paupière.
+        if look.lid > 0 { at.y = rect.minY + rect.height * (look.lid + (1 - look.lid) / 2) }
+        if let iris = look.iris, look.pupil != .led {
+            iris.setFill()
+            NSBezierPath(ovalIn: NSRect(x: at.x - irisSize / 2, y: at.y - irisSize / 2, width: irisSize, height: irisSize)).fill()
+        }
+        switch look.pupil {
+        case .round:
             NSColor.black.setFill()
-            NSBezierPath(ovalIn: NSRect(x: pupil.x - 6, y: pupil.y - 6, width: 12, height: 12)).fill()
+            NSBezierPath(ovalIn: NSRect(x: at.x - pupilSize / 2, y: at.y - pupilSize / 2, width: pupilSize, height: pupilSize)).fill()
+        case .slit:
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: NSRect(x: at.x - pupilSize / 5, y: at.y - irisSize / 2.2, width: pupilSize / 2.5, height: irisSize / 1.1)).fill()
+        case .led:
+            let glow = look.iris ?? .systemRed
+            glow.withAlphaComponent(0.35).setFill()
+            NSBezierPath(ovalIn: NSRect(x: at.x - pupilSize, y: at.y - pupilSize, width: pupilSize * 2, height: pupilSize * 2)).fill()
+            glow.setFill()
+            NSBezierPath(ovalIn: NSRect(x: at.x - pupilSize / 2, y: at.y - pupilSize / 2, width: pupilSize, height: pupilSize)).fill()
+        }
+        if look.highlight {
+            NSColor.white.withAlphaComponent(0.9).setFill()
+            NSBezierPath(ovalIn: NSRect(x: at.x - pupilSize * 0.45, y: at.y - pupilSize * 0.55, width: pupilSize * 0.35, height: pupilSize * 0.35)).fill()
+        }
+        if look.lid > 0 {
+            NSColor(calibratedRed: 0.93, green: 0.78, blue: 0.66, alpha: 1).setFill()
+            NSBezierPath(rect: NSRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height * look.lid)).fill()
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        ink.setStroke()
+        shape.lineWidth = look.liner ? 3.5 : look.outline
+        shape.stroke()
+        if look.lid > 0 {
+            let lidLine = NSBezierPath()
+            lidLine.move(to: NSPoint(x: rect.minX + 2, y: rect.minY + rect.height * look.lid))
+            lidLine.line(to: NSPoint(x: rect.maxX - 2, y: rect.minY + rect.height * look.lid))
+            lidLine.lineWidth = 2
+            lidLine.stroke()
+        }
+        if look.lashes {
+            // Cils sur le haut de l'œil (y vers le bas : le haut est minY).
+            let top = look.lid > 0 ? rect.minY + rect.height * look.lid : rect.minY
+            for index in 0..<5 {
+                let t = CGFloat(index + 1) / 6
+                let x = rect.minX + rect.width * t
+                let base = look.lid > 0 ? top : rect.midY - sqrt(max(0, 1 - pow((x - rect.midX) / (rect.width / 2), 2))) * rect.height / 2
+                let lash = NSBezierPath()
+                lash.move(to: NSPoint(x: x, y: base))
+                lash.line(to: NSPoint(x: x + (t - 0.5) * 6, y: look.lid > 0 ? base + 6 : base - 6))
+                lash.lineWidth = 1.5
+                lash.stroke()
+            }
+        }
+        if look.brow > 0 {
+            let brow = NSBezierPath()
+            brow.move(to: NSPoint(x: rect.minX, y: rect.minY - 4))
+            if look.arched {
+                brow.curve(to: NSPoint(x: rect.maxX, y: rect.minY - 4),
+                           controlPoint1: NSPoint(x: rect.minX + rect.width * 0.3, y: rect.minY - 14),
+                           controlPoint2: NSPoint(x: rect.minX + rect.width * 0.7, y: rect.minY - 14))
+            } else {
+                brow.line(to: NSPoint(x: rect.maxX, y: rect.minY - 6))
+            }
+            brow.lineWidth = look.brow
+            brow.lineCapStyle = .round
+            ink.setStroke()
+            brow.stroke()
         }
     }
 }
@@ -537,8 +716,14 @@ final class PomodoroWidget: SidebarWidget {
         needsDisplay = true
     }
 
-    override func rightMouseDown(with event: NSEvent) {
-        // Clic droit : remettre à zéro.
+    override func extraMenuItems() -> [NSMenuItem] {
+        let reset = NSMenuItem(title: "Remettre à zéro", action: #selector(reset), keyEquivalent: "")
+        reset.target = self
+        reset.image = NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: nil)
+        return [reset]
+    }
+
+    @objc private func reset() {
         endDate = nil
         remainingWhenPaused = nil
         button.title = "Démarrer"
@@ -564,7 +749,7 @@ final class PomodoroWidget: SidebarWidget {
         let label = text(String(format: "%02d:%02d", seconds / 60, seconds % 60), size: 15, weight: .medium, monospaced: true)
         label.draw(at: NSPoint(x: center.x - label.size().width / 2, y: center.y - label.size().height / 2))
         text("Pomodoro", size: 11, weight: .semibold).draw(at: NSPoint(x: ring.maxX + 10, y: 16))
-        text("clic droit : remise à zéro", size: 9.5, color: faint).draw(at: NSPoint(x: ring.maxX + 10, y: 32))
+        text("clic droit : options", size: 9.5, color: faint).draw(at: NSPoint(x: ring.maxX + 10, y: 32))
     }
 }
 
@@ -657,7 +842,7 @@ final class SidebarWidgetsView: NSView {
             let widget = kind.makeView()
             widget.translatesAutoresizingMaskIntoConstraints = false
             widget.heightAnchor.constraint(equalToConstant: kind.height).isActive = true
-            widget.menu = widgetMenu(for: kind)
+            widget.menu = widgetMenu(for: kind, widget: widget)
             stack.addArrangedSubview(widget)
             widget.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -20).isActive = true
         }
@@ -685,8 +870,13 @@ final class SidebarWidgetsView: NSView {
     }
 
     /// Clic droit sur un widget : monter, descendre, retirer.
-    private func widgetMenu(for kind: SidebarWidgetKind) -> NSMenu {
+    private func widgetMenu(for kind: SidebarWidgetKind, widget: SidebarWidget) -> NSMenu {
         let menu = NSMenu()
+        let extra = widget.extraMenuItems()
+        if !extra.isEmpty {
+            extra.forEach(menu.addItem)
+            menu.addItem(.separator())
+        }
         for (title, action, symbol) in [("Monter", #selector(moveWidgetUp(_:)), "arrow.up"), ("Descendre", #selector(moveWidgetDown(_:)), "arrow.down"),
                                         ("Retirer", #selector(remove(_:)), "minus.circle")] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
