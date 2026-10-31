@@ -306,7 +306,9 @@ final class AquariumWidget: SidebarWidget {
     private var time: CGFloat = 0
 
     override func tick() {
-        if fishes.isEmpty, bounds.width > 0 {
+        // Tant que le widget n'a pas sa taille (premier affichage), rien à animer.
+        guard bounds.width > 40, bounds.height > 50 else { return }
+        if fishes.isEmpty {
             let colors: [NSColor] = [.systemOrange, .systemYellow, .systemPink, .systemTeal, .systemRed]
             fishes = (0..<5).map { index in
                 Fish(x: .random(in: 0...bounds.width), y: .random(in: 14...(bounds.height - 24)),
