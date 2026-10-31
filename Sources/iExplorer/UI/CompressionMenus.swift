@@ -235,7 +235,6 @@ final class CompressionPanel: NSObject {
     private let password = NSSecureTextField()
     private let confirm = NSSecureTextField()
     private let hideNames = NSButton(checkboxWithTitle: "Masquer les noms des fichiers (7z)", target: nil, action: nil)
-    private let passwordInfo = NSTextField(labelWithString: "")
     private let destination = NSSegmentedControl(labels: ["Ce dossier", "Autre panneau"], trackingMode: .selectOne, target: nil, action: nil)
     private let excludeSystem = NSButton(checkboxWithTitle: "Exclure .DS_Store et fichiers système macOS", target: nil, action: nil)
     private let remember = NSButton(checkboxWithTitle: "Retenir ce format et ce niveau par défaut", target: nil, action: nil)
@@ -264,7 +263,7 @@ final class CompressionPanel: NSObject {
         }
         password.placeholderString = "Mot de passe"
         confirm.placeholderString = "Confirmer"
-        for label in [levelInfo, passwordInfo] {
+        for label in [levelInfo] {
             label.font = .systemFont(ofSize: 11)
             label.textColor = .secondaryLabelColor
         }
@@ -284,12 +283,11 @@ final class CompressionPanel: NSObject {
         let on = usePassword.state == .on
         password.isEnabled = on
         confirm.isEnabled = on
-        hideNames.isEnabled = on
-        hideNames.isHidden = format != .sevenZ
-        passwordInfo.stringValue = format.supportsPassword
-            ? (format == .sevenZ && FileOperationCenter.sevenZip == nil ? "Le 7z chiffré demande 7-Zip (brew install sevenzip)." : "")
-            : "Non disponible en .\(format.fileExtension) : choisissez zip ou 7z pour chiffrer."
-        passwordInfo.isHidden = passwordInfo.stringValue.isEmpty
+        // Un champ désactivé reste trop visible : il est estompé comme les cases.
+        password.alphaValue = on ? 1 : 0.4
+        confirm.alphaValue = on ? 1 : 0.4
+        // Format sans chiffrement (ou 7z sans 7-Zip) : les réglages du mot de passe sont simplement grisés.
+        hideNames.isEnabled = on && format == .sevenZ
     }
 
     private func row(_ title: String, _ views: [NSView]) -> [NSView] {
@@ -312,7 +310,7 @@ final class CompressionPanel: NSObject {
             row("Nom de l’archive", [nameLine]),
             row("Format", [formats]),
             row("Niveau", [levels, levelInfo]),
-            row("Mot de passe", [usePassword, passwords, hideNames, passwordInfo]),
+            row("Mot de passe", [usePassword, passwords, hideNames]),
             row("Destination", [destination]),
             row("", [excludeSystem, remember]),
         ])
