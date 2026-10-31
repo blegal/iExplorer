@@ -23,16 +23,21 @@ enum EditorPreviewKind: Equatable {
 }
 
 /// Volet d'aperçu de l'éditeur : rendu Markdown, PDF compilé (LaTeX, Typst), tableau CSV, arbre JSON.
-final class EditorPreviewView: NSView, WKNavigationDelegate, NSTableViewDataSource, NSOutlineViewDataSource, NSOutlineViewDelegate {
+final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHandler, NSTableViewDataSource, NSOutlineViewDataSource, NSOutlineViewDelegate {
     /// Lien vers un fichier local cliqué dans l'aperçu Markdown.
     var onOpenFile: ((URL) -> Void)?
     /// Clic sur « Aller à la ligne » dans le journal d'erreur.
     var onJumpToLine: ((Int) -> Void)?
+    /// ⌘-clic dans l'aperçu Markdown : ligne (1 = première) du bloc cliqué.
+    var onMarkdownClick: ((Int) -> Void)?
+    /// ⌘-clic dans le PDF : page (0 = première) et point, origine en haut à gauche.
+    var onPDFClick: ((Int, CGPoint) -> Void)?
 
     private var webView: WKWebView?
     private var webReady = false
     private var pendingHTML: String?
-    private var pdfView: PDFView?
+    private var pdfView: SyncPDFView?
+    private var syncMarks: [(PDFPage, PDFAnnotation)] = []
     private var shownPDF: URL?
     private var tableScroll: NSScrollView?
     private var tableView: NSTableView?
@@ -150,6 +155,19 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, NSTableViewDataSour
             configuration.setURLSchemeHandler(LocalFileSchemeHandler(), forURLScheme: LocalFileSchemeHandler.scheme)
             // Le contenu du fichier ne peut pas exécuter de scripts ; seule l'app met la page à jour.
             configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+            // Script de l'app, dans un monde à part : ⌘-clic sur un bloc → sa ligne dans le source.
+            let click = """
+            document.addEventListener('click', function (event) {
+                if (!event.metaKey) return;
+                var block = event.target.closest && event.target.closest('[data-line]');
+                if (!block) return;
+                event.preventDefault();
+                event.stopPropagation();
+                window.webkit.messageHandlers.sync.postMessage(Number(block.dataset.line));
+            }, true);
+            """
+            configuration.userContentController.addUserScript(WKUserScript(source: click, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient))
+            configuration.userContentController.add(WeakScriptHandler(self), contentWorld: .defaultClient, name: "sync")
             let web = WKWebView(frame: bounds, configuration: configuration)
             web.navigationDelegate = self
             web.setValue(false, forKey: "drawsBackground")
@@ -166,6 +184,38 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, NSTableViewDataSour
     private func inject(_ html: String) {
         guard let data = try? JSONSerialization.data(withJSONObject: [html]), let literal = String(data: data, encoding: .utf8) else { return }
         webView?.evaluateJavaScript("document.getElementById('content').innerHTML = \(literal)[0];")
+    }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let line = (message.body as? NSNumber)?.intValue { onMarkdownClick?(line) }
+    }
+
+    /// Fait défiler l'aperçu Markdown pour que la ligne `line` du source soit en haut (interpolée entre les blocs).
+    /// `flash` surligne brièvement le bloc ; `atEnd` colle au bas de la page quand le texte est en fin de fichier.
+    func scrollMarkdown(toLine line: Int, flash: Bool = false, atEnd: Bool = false) {
+        guard webReady, webView?.isHidden == false else { return }
+        webView?.evaluateJavaScript("""
+        (function (line, flash, atEnd) {
+            var root = document.scrollingElement;
+            if (atEnd) { root.scrollTop = root.scrollHeight; return; }
+            var blocks = document.querySelectorAll('[data-line]'), before = null, after = null;
+            for (var i = 0; i < blocks.length; i++) {
+                if (Number(blocks[i].dataset.line) <= line) before = blocks[i]; else { after = blocks[i]; break; }
+            }
+            if (!before) { root.scrollTop = 0; return; }
+            var top = function (element) { return element.getBoundingClientRect().top + root.scrollTop; };
+            var y = top(before), from = Number(before.dataset.line);
+            if (after) y += (top(after) - y) * (line - from) / (Number(after.dataset.line) - from);
+            if (flash) {
+                root.scrollTop = Math.max(0, y - root.clientHeight / 3);
+                before.classList.remove('sync-flash');
+                void before.offsetWidth;
+                before.classList.add('sync-flash');
+            } else {
+                root.scrollTop = Math.max(0, y - 18);
+            }
+        })(\(line), \(flash), \(atEnd));
+        """)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -194,7 +244,8 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, NSTableViewDataSour
     /// Montre le PDF en gardant la page, le point et le zoom quand il remplace la version précédente.
     func showPDF(_ url: URL) {
         if pdfView == nil {
-            let view = PDFView()
+            let view = SyncPDFView()
+            view.onCommandClick = { [weak self] page, point in self?.onPDFClick?(page, point) }
             view.autoScales = true
             view.displayMode = .singlePageContinuous
             view.backgroundColor = .clear
@@ -205,17 +256,47 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, NSTableViewDataSour
             showMessage("Le PDF « \(url.lastPathComponent) » est illisible.")
             return
         }
-        var restore: (page: Int, point: NSPoint, scale: CGFloat, auto: Bool)?
-        if shownPDF == url, let old = pdfView.document, let destination = pdfView.currentDestination, let page = destination.page {
-            restore = (old.index(for: page), destination.point, pdfView.scaleFactor, pdfView.autoScales)
-        }
-        pdfView.document = document
+        if shownPDF == url { pdfView.replaceDocument(document) } else { pdfView.document = document }
+        syncMarks = []
         shownPDF = url
-        if let restore, let page = document.page(at: min(restore.page, document.pageCount - 1)) {
-            if !restore.auto { pdfView.scaleFactor = restore.scale }
-            pdfView.go(to: PDFDestination(page: page, at: restore.point))
+        // PDF recompilé hors de l'app (terminal, latexmk -pvc…) : rechargé au même endroit.
+        pdfWatcher.onChange = { [weak self] in
+            guard let self, self.shownPDF == url, self.pdfView?.isHidden == false else { return }
+            self.showPDF(url)
         }
+        pdfWatcher.watch(url)
         activate(pdfView)
+    }
+
+    private let pdfWatcher = FileChangeWatcher()
+
+    /// Montre et surligne un instant les boîtes trouvées par SyncTeX (coordonnées origine en haut à gauche).
+    func showSyncTeX(_ boxes: [SyncTeX.Box]) {
+        guard let pdfView, let document = pdfView.document, let first = boxes.first, let page = document.page(at: first.page) else { return }
+        clearSyncMarks()
+        let media = page.bounds(for: .mediaBox)
+        let rects = boxes.map { CGRect(x: media.minX + $0.rect.minX, y: media.maxY - $0.rect.maxY, width: $0.rect.width, height: $0.rect.height) }
+        for rect in rects {
+            let mark = PDFAnnotation(bounds: rect.insetBy(dx: -2, dy: -2), forType: .highlight, withProperties: nil)
+            mark.color = NSColor.systemYellow.withAlphaComponent(0.55)
+            page.addAnnotation(mark)
+            syncMarks.append((page, mark))
+        }
+        let union = rects.dropFirst().reduce(rects[0]) { $0.union($1) }
+        // Le bloc est placé vers le tiers supérieur de la vue.
+        let visible = pdfView.convert(pdfView.bounds, to: page)
+        let top = min(media.maxY, union.maxY + visible.height / 3)
+        pdfView.go(to: PDFDestination(page: page, at: NSPoint(x: visible.minX, y: top)))
+        let marks = syncMarks.map(\.1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+            guard let self, self.syncMarks.map(\.1) == marks else { return }
+            self.clearSyncMarks()
+        }
+    }
+
+    private func clearSyncMarks() {
+        for (page, mark) in syncMarks { page.removeAnnotation(mark) }
+        syncMarks = []
     }
 
     // MARK: CSV
@@ -472,22 +553,28 @@ enum MarkdownHTML {
     a { color: LinkText; }
     hr { border: none; border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent); margin: 1.6em 0; }
     li.task { list-style: none; margin-left: -1.3em; }
+    .sync-flash { animation: sync-flash 1.6s ease-out; border-radius: 4px; }
+    @keyframes sync-flash { from { background: color-mix(in srgb, #ffd60a 45%, transparent); } to { background: transparent; } }
     </style></head><body><div id="content"></div></body></html>
     """
 
     static func render(_ text: String, base: URL) -> String {
         let lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
-        return blocks(lines[...], base: base)
+        return blocks(lines[...], base: base, annotate: true)
     }
 
-    private static func blocks(_ lines: ArraySlice<String>, base: URL) -> String {
+    /// `annotate` : les blocs de premier niveau portent leur ligne dans le source (data-line, 1 = première), pour la synchronisation.
+    private static func blocks(_ lines: ArraySlice<String>, base: URL, annotate: Bool = false) -> String {
         var html = ""
         var index = lines.startIndex
         var paragraph: [String] = []
+        var paragraphStart = index
+
+        func at(_ line: Int) -> String { annotate ? " data-line=\"\(line + 1)\"" : "" }
 
         func flush() {
             guard !paragraph.isEmpty else { return }
-            html += "<p>" + inline(paragraph.joined(separator: "\n"), base: base) + "</p>\n"
+            html += "<p\(at(paragraphStart))>" + inline(paragraph.joined(separator: "\n"), base: base) + "</p>\n"
             paragraph = []
         }
 
@@ -503,6 +590,7 @@ enum MarkdownHTML {
             // Bloc de code délimité.
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
                 flush()
+                let start = index
                 let fence = String(trimmed.prefix(3))
                 let language = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
                 var code: [String] = []
@@ -513,28 +601,28 @@ enum MarkdownHTML {
                 }
                 index += 1
                 let attribute = language.isEmpty ? "" : " class=\"language-\(escape(language))\""
-                html += "<pre><code\(attribute)>" + escape(code.joined(separator: "\n")) + "</code></pre>\n"
+                html += "<pre\(at(start))><code\(attribute)>" + escape(code.joined(separator: "\n")) + "</code></pre>\n"
                 continue
             }
             // Titre.
             if let match = trimmed.firstMatch(of: #/^(#{1,6})\s+(.*?)\s*#*$/#) {
                 flush()
                 let level = match.1.count
-                html += "<h\(level)>" + inline(String(match.2), base: base) + "</h\(level)>\n"
+                html += "<h\(level)\(at(index))>" + inline(String(match.2), base: base) + "</h\(level)>\n"
                 index += 1
                 continue
             }
             // Ligne horizontale.
             if trimmed.wholeMatch(of: #/([-*_])(\s*\1){2,}/#) != nil, paragraph.isEmpty || !trimmed.hasPrefix("-") {
                 flush()
-                html += "<hr>\n"
+                html += "<hr\(at(index))>\n"
                 index += 1
                 continue
             }
             // Titre souligné (=== ou --- sous un paragraphe).
             if !paragraph.isEmpty, trimmed.wholeMatch(of: #/=+|-+/#) != nil {
                 let level = trimmed.hasPrefix("=") ? 1 : 2
-                html += "<h\(level)>" + inline(paragraph.joined(separator: " "), base: base) + "</h\(level)>\n"
+                html += "<h\(level)\(at(paragraphStart))>" + inline(paragraph.joined(separator: " "), base: base) + "</h\(level)>\n"
                 paragraph = []
                 index += 1
                 continue
@@ -542,6 +630,7 @@ enum MarkdownHTML {
             // Citation.
             if trimmed.hasPrefix(">") {
                 flush()
+                let start = index
                 var quote: [String] = []
                 while index < lines.endIndex {
                     let current = lines[index].trimmingCharacters(in: .whitespaces)
@@ -551,7 +640,7 @@ enum MarkdownHTML {
                     quote.append(String(content))
                     index += 1
                 }
-                html += "<blockquote>" + blocks(quote[...], base: base) + "</blockquote>\n"
+                html += "<blockquote\(at(start))>" + blocks(quote[...], base: base) + "</blockquote>\n"
                 continue
             }
             // Tableau : ligne d'en-tête suivie de |---|---|.
@@ -562,14 +651,14 @@ enum MarkdownHTML {
                     let left = cell.hasPrefix(":"), right = cell.hasSuffix(":")
                     return left && right ? " style=\"text-align:center\"" : right ? " style=\"text-align:right\"" : ""
                 }
-                html += "<table><thead><tr>"
+                html += "<table\(at(index))><thead><tr>"
                 for (column, cell) in cells(line).enumerated() {
                     html += "<th\(alignments.indices.contains(column) ? alignments[column] : "")>" + inline(cell, base: base) + "</th>"
                 }
                 html += "</tr></thead><tbody>\n"
                 index += 2
                 while index < lines.endIndex, lines[index].contains("|"), !lines[index].trimmingCharacters(in: .whitespaces).isEmpty {
-                    html += "<tr>"
+                    html += "<tr\(at(index))>"
                     for (column, cell) in cells(lines[index]).enumerated() {
                         html += "<td\(alignments.indices.contains(column) ? alignments[column] : "")>" + inline(cell, base: base) + "</td>"
                     }
@@ -584,8 +673,9 @@ enum MarkdownHTML {
                 flush()
                 let ordered = marker.ordered
                 let indent = marker.indent
-                html += ordered ? "<ol>\n" : "<ul>\n"
+                html += (ordered ? "<ol" : "<ul") + at(index) + ">\n"
                 while index < lines.endIndex, let item = listMarker(lines[index]), item.indent == indent, item.ordered == ordered {
+                    let start = index
                     var content = [String(lines[index].dropFirst(item.width))]
                     index += 1
                     // Lignes suivantes plus indentées (suite de l'élément ou sous-liste).
@@ -613,7 +703,7 @@ enum MarkdownHTML {
                     if simple.hasPrefix("<p>"), let end = simple.range(of: "</p>\n") {
                         simple = String(simple[simple.index(simple.startIndex, offsetBy: 3)..<end.lowerBound]) + "\n" + simple[end.upperBound...]
                     }
-                    html += "<li\(task.isEmpty ? "" : " class=\"task\"")>" + task + simple + "</li>\n"
+                    html += "<li\(at(start))\(task.isEmpty ? "" : " class=\"task\"")>" + task + simple + "</li>\n"
                     while index < lines.endIndex, lines[index].trimmingCharacters(in: .whitespaces).isEmpty,
                           index + 1 < lines.endIndex, let next = listMarker(lines[index + 1]), next.indent == indent { index += 1 }
                 }
@@ -630,15 +720,17 @@ enum MarkdownHTML {
             }
             // Code indenté de quatre espaces.
             if paragraph.isEmpty, line.hasPrefix("    ") || line.hasPrefix("\t") {
+                let start = index
                 var code: [String] = []
                 while index < lines.endIndex, lines[index].hasPrefix("    ") || lines[index].hasPrefix("\t") || lines[index].trimmingCharacters(in: .whitespaces).isEmpty {
                     code.append(lines[index].hasPrefix("\t") ? String(lines[index].dropFirst()) : String(lines[index].dropFirst(min(4, lines[index].count))))
                     index += 1
                 }
                 while code.last?.isEmpty == true { code.removeLast() }
-                html += "<pre><code>" + escape(code.joined(separator: "\n")) + "</code></pre>\n"
+                html += "<pre\(at(start))><code>" + escape(code.joined(separator: "\n")) + "</code></pre>\n"
                 continue
             }
+            if paragraph.isEmpty { paragraphStart = index }
             paragraph.append(line)
             index += 1
         }
@@ -786,5 +878,121 @@ enum DocumentCompiler {
             return Failure(summary: String(error.1), log: log, line: nil)
         }
         return Failure(summary: "La compilation a échoué", log: log, line: nil)
+    }
+}
+
+/// Correspondance source ↔ PDF de LaTeX (outil synctex, fichier .synctex.gz écrit par la compilation).
+/// Coordonnées en points PDF, origine en haut à gauche de la page, pages numérotées à partir de 0.
+enum SyncTeX {
+    struct Box {
+        let page: Int
+        let rect: CGRect
+    }
+
+    private static var executable: URL? {
+        let directories: [String?] = [ExternalTool.latex.path?.deletingLastPathComponent().path, "/Library/TeX/texbin", "/opt/homebrew/bin", "/usr/local/bin"]
+        return directories.compactMap { $0 }.map { URL(fileURLWithPath: $0 + "/synctex") }
+            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    }
+
+    static func isAvailable(for pdf: URL) -> Bool {
+        let synctex = pdf.deletingPathExtension().appendingPathExtension("synctex.gz")
+        return executable != nil && FileManager.default.fileExists(atPath: synctex.path)
+    }
+
+    /// Boîtes du PDF produites par la ligne `line` (1 = première) de `source`.
+    static func forward(line: Int, source: URL, pdf: URL, completion: @escaping ([Box]) -> Void) {
+        let directory = pdf.deletingLastPathComponent().standardizedFileURL.path + "/"
+        let path = source.standardizedFileURL.path
+        // synctex retrouve le fichier sous le nom donné à la compilation, relatif au dossier du PDF.
+        let input = path.hasPrefix(directory) ? String(path.dropFirst(directory.count)) : path
+        run(["view", "-i", "\(line):0:\(input)", "-o", pdf.lastPathComponent], in: pdf) { output in
+            var boxes: [Box] = []
+            var page: Int?
+            var values: [String: Double] = [:]
+            func flush() {
+                if let page, let h = values["h"], let v = values["v"], let width = values["W"], let height = values["H"] {
+                    boxes.append(Box(page: page - 1, rect: CGRect(x: h, y: v - max(height, 8), width: max(width, 8), height: max(height, 8))))
+                }
+                values = [:]
+            }
+            for line in output.split(separator: "\n") {
+                guard let colon = line.firstIndex(of: ":") else { continue }
+                let key = String(line[..<colon]), value = String(line[line.index(after: colon)...])
+                if key == "Page" { flush(); page = Int(value) } else if let number = Double(value) { values[key] = number }
+            }
+            flush()
+            // Seulement la première page trouvée : une ligne n'en produit en général qu'une.
+            completion(boxes.filter { $0.page == boxes.first?.page })
+        }
+    }
+
+    /// Fichier source et ligne (1 = première) qui ont produit le point `point` de la page `page`.
+    static func inverse(page: Int, point: CGPoint, pdf: URL, completion: @escaping ((url: URL, line: Int)?) -> Void) {
+        run(["edit", "-o", "\(page + 1):\(point.x):\(point.y):\(pdf.lastPathComponent)"], in: pdf) { output in
+            let input = output.firstMatch(of: #/(?m)^Input:(.+)$/#).map { String($0.1) }
+            let line = output.firstMatch(of: #/(?m)^Line:(\d+)/#).flatMap { Int($0.1) }
+            guard let input, let line else { return completion(nil) }
+            let url = input.hasPrefix("/") ? URL(fileURLWithPath: input) : pdf.deletingLastPathComponent().appendingPathComponent(input)
+            completion((url.standardizedFileURL, max(1, line)))
+        }
+    }
+
+    private static func run(_ arguments: [String], in pdf: URL, completion: @escaping (String) -> Void) {
+        guard let executable else { return completion("") }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = executable
+            process.arguments = arguments
+            process.currentDirectoryURL = pdf.deletingLastPathComponent()
+            let output = Pipe()
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+            var text = ""
+            if (try? process.run()) != nil {
+                text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                process.waitUntilExit()
+            }
+            DispatchQueue.main.async { completion(text) }
+        }
+    }
+}
+
+/// PDF de l'aperçu : ⌘-clic renvoie la page et le point cliqués (origine en haut à gauche).
+private final class SyncPDFView: PDFView {
+    var onCommandClick: ((Int, CGPoint) -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        guard event.modifierFlags.contains(.command), let onCommandClick, let document else { return super.mouseDown(with: event) }
+        let point = convert(event.locationInWindow, from: nil)
+        guard let page = page(for: point, nearest: true) else { return }
+        let onPage = convert(point, to: page)
+        let box = page.bounds(for: .mediaBox)
+        onCommandClick(document.index(for: page), CGPoint(x: onPage.x - box.minX, y: box.maxY - onPage.y))
+    }
+}
+
+/// Relais des messages de la page Markdown (le contrôleur de contenu retient fortement son destinataire).
+private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
+    weak var target: WKScriptMessageHandler?
+
+    init(_ target: WKScriptMessageHandler) { self.target = target }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.userContentController(controller, didReceive: message)
+    }
+}
+
+extension PDFView {
+    /// Remplace le document (nouvelle version du même fichier) en gardant la page, le point et le zoom.
+    func replaceDocument(_ document: PDFDocument) {
+        var restore: (page: Int, point: NSPoint, scale: CGFloat, auto: Bool)?
+        if let old = self.document, let destination = currentDestination, let page = destination.page {
+            restore = (old.index(for: page), destination.point, scaleFactor, autoScales)
+        }
+        self.document = document
+        guard let restore, document.pageCount > 0, let page = document.page(at: min(restore.page, document.pageCount - 1)) else { return }
+        if !restore.auto { scaleFactor = restore.scale }
+        go(to: PDFDestination(page: page, at: restore.point))
     }
 }

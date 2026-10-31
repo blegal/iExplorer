@@ -17,6 +17,8 @@ final class PreviewPane: NSView {
     private var quickLookView: QLPreviewView?
     private var heightConstraint: NSLayoutConstraint!
     private var generation = 0
+    /// Le fichier affiché est rechargé quand il change sur le disque, à la même position.
+    private let watcher = FileChangeWatcher()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -45,6 +47,7 @@ final class PreviewPane: NSView {
 
     /// Affiche l'icône ou la miniature (cas par défaut).
     func showImage(_ image: NSImage?) {
+        watcher.watch(nil)
         activate(.image)
         imageView.image = image
     }
@@ -56,10 +59,14 @@ final class PreviewPane: NSView {
         guard url.isFileURL, let type = UTType(filenameExtension: url.pathExtension) ?? (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType else {
             return false
         }
+        watcher.watch(nil)
         if type.conforms(to: .pdf) {
             let view = pdfView ?? makePDFView()
             view.document = PDFDocument(url: url)
             activate(.pdf)
+            watch(url) { [weak self] in
+                if let document = PDFDocument(url: url) { self?.pdfView?.replaceDocument(document) }
+            }
             return true
         }
         if type.conforms(to: .audiovisualContent) || type.conforms(to: .audio) {
@@ -70,6 +77,7 @@ final class PreviewPane: NSView {
         }
         if SyntaxHighlighter.language(for: url) != nil || type.conforms(to: .text) || type.conforms(to: .sourceCode) {
             showText(url, type: type)
+            watch(url) { [weak self] in self?.showText(url, type: type, keepPosition: true) }
             return true
         }
         if type.conforms(to: .image) { return false }
@@ -77,16 +85,26 @@ final class PreviewPane: NSView {
         if let view = quickLookView ?? makeQuickLookView() {
             view.previewItem = url as NSURL
             activate(.quickLook)
+            watch(url) { [weak self] in self?.quickLookView?.refreshPreviewItem() }
             return true
         }
         return false
     }
 
-    private func showText(_ url: URL, type: UTType) {
+    private func watch(_ url: URL, reload: @escaping () -> Void) {
+        let current = generation
+        watcher.onChange = { [weak self] in
+            guard let self, current == self.generation else { return }
+            reload()
+        }
+        watcher.watch(url)
+    }
+
+    private func showText(_ url: URL, type: UTType, keepPosition: Bool = false) {
         let (scroll, textView) = textScroll.flatMap { scroll in self.textView.map { (scroll, $0) } } ?? makeTextView()
-        _ = scroll
+        let origin = scroll.contentView.bounds.origin
         activate(.text)
-        textView.string = ""
+        if !keepPosition { textView.string = "" }
         let current = generation
         let dark = Theme.isDark(effectiveAppearance)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -99,7 +117,7 @@ final class PreviewPane: NSView {
             DispatchQueue.main.async {
                 guard let self, current == self.generation else { return }
                 textView.textStorage?.setAttributedString(highlighted)
-                textView.scroll(.zero)
+                textView.scroll(keepPosition ? origin : .zero)
             }
         }
     }
@@ -107,6 +125,7 @@ final class PreviewPane: NSView {
     /// Arrête la lecture et libère les documents chargés.
     func reset() {
         generation += 1
+        watcher.watch(nil)
         playerView?.player?.pause()
         playerView?.player = nil
         pdfView?.document = nil

@@ -1,4 +1,5 @@
 import AppKit
+import PDFKit
 import Quartz
 import UniformTypeIdentifiers
 
@@ -6,6 +7,7 @@ import UniformTypeIdentifiers
 /// dans un onglet, se modifie et s'enregistre (⌘S) ; s'il est suivi par Git, « Enregistrer, commit et push ».
 /// Markdown, CSV et JSON ont un aperçu à côté, mis à jour à la frappe ; LaTeX et Typst sont compilés
 /// à l'enregistrement, PDF à côté. La marge signale les lignes modifiées depuis le dernier commit.
+/// ⌘-clic synchronise le texte et l'aperçu dans les deux sens (SyncTeX pour LaTeX) ; l'aperçu Markdown suit le défilement.
 /// Les autres fichiers (images, PDF, vidéos…) s'affichent en Coup d'œil.
 final class EditorViewController: NSViewController, NSTextViewDelegate {
     static let enabledChanged = Notification.Name("EditorEnabledChanged")
@@ -49,12 +51,19 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let commitButton = NSButton(title: "Enregistrer, commit et push", target: nil, action: nil)
     private let findButton = NSButton(title: "Rechercher", target: nil, action: nil)
     private let previewButton = NSButton(title: "Aperçu", target: nil, action: nil)
+    private let wrapButton = NSButton(title: "Retour à la ligne", target: nil, action: nil)
     private let split = NSSplitView()
     private let preview = EditorPreviewView()
     private let textScroll = NSScrollView()
     private var ruler: LineNumberRuler?
-    private let textView = NSTextView()
+    private let textView = SourceTextView()
+    /// Pas de suivi du défilement juste après un saut demandé depuis l'aperçu.
+    private var followScrollPaused = false
     private var quickLook: QLPreviewView?
+    /// PDF hors éditeur de texte : vue PDF plutôt que Coup d'œil, pour recharger sans perdre la position.
+    private var pdfViewer: PDFView?
+    /// Fichier affiché (texte ou Coup d'œil), rechargé quand il change sur le disque.
+    private let fileWatcher = FileChangeWatcher()
     private let placeholder = NSTextField(labelWithString: "Sélectionnez un fichier texte dans le panneau pour le modifier ici.")
     private let statusLeft = NSTextField(labelWithString: "")
     private let statusRight = NSTextField(labelWithString: "")
@@ -73,16 +82,31 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         tabScroll.hasHorizontalScroller = false
         tabs.translatesAutoresizingMaskIntoConstraints = false
 
-        for button in [previewButton, findButton, saveButton, commitButton] {
+        // Barre d'icônes : le nom de chaque bouton reste dans son infobulle et pour l'accessibilité.
+        let symbols: [(NSButton, String, NSColor?)] = [
+            (previewButton, "rectangle.righthalf.inset.filled", nil),
+            (wrapButton, "arrow.turn.down.left", nil),
+            (findButton, "magnifyingglass", nil),
+            (saveButton, "square.and.arrow.down", .controlAccentColor),
+            (commitButton, "arrow.trianglehead.branch", .systemOrange),
+        ]
+        for (button, symbol, tint) in symbols {
             button.bezelStyle = .accessoryBarAction
-            button.controlSize = .small
             button.target = self
+            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: button.title)?
+                .withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+            button.setAccessibilityLabel(button.title)
+            button.title = ""
+            button.imagePosition = .imageOnly
+            button.contentTintColor = tint
+            button.widthAnchor.constraint(equalToConstant: 30).isActive = true
         }
         previewButton.action = #selector(togglePreview(_:))
         previewButton.setButtonType(.pushOnPushOff)
-        previewButton.image = NSImage(systemSymbolName: "rectangle.righthalf.inset.filled", accessibilityDescription: nil)
-        previewButton.imagePosition = .imageLeading
-        previewButton.toolTip = "Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON)"
+        previewButton.toolTip = "Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON).\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)"
+        wrapButton.action = #selector(toggleWrap(_:))
+        wrapButton.setButtonType(.pushOnPushOff)
+        wrapButton.toolTip = "Retour à la ligne : couper les lignes longues à la largeur de l’éditeur"
         findButton.action = #selector(showSearch(_:))
         findButton.toolTip = "Rechercher et remplacer dans le fichier (⌘F)"
         saveButton.action = #selector(saveDocument(_:))
@@ -99,7 +123,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         close.isBordered = false
         close.contentTintColor = .secondaryLabelColor
         close.toolTip = "Fermer l’onglet"
-        let header = NSStackView(views: [tabScroll, previewButton, findButton, saveButton, commitButton, close])
+        let header = NSStackView(views: [tabScroll, previewButton, wrapButton, findButton, saveButton, commitButton, close])
         header.spacing = 8
         header.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 10)
         tabScroll.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -114,6 +138,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         preview.isHidden = true
         preview.onOpenFile = { [weak self] url in self?.open(url) }
         preview.onJumpToLine = { [weak self] line in self?.goToLine(line) }
+        preview.onMarkdownClick = { [weak self] line in self?.jumpFromPreview(to: line) }
+        preview.onPDFClick = { [weak self] page, point in self?.inverseSync(page: page, point: point) }
         placeholder.textColor = .secondaryLabelColor
         placeholder.alignment = .center
         placeholder.lineBreakMode = .byWordWrapping
@@ -186,12 +212,12 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.font = Self.font
         textView.textContainerInset = NSSize(width: 6, height: 8)
         textView.delegate = self
-        // Lignes longues : défilement horizontal plutôt que retour à la ligne (code).
-        textView.isHorizontallyResizable = true
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = false
-        textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.autoresizingMask = [.width, .height]
+        textView.onCommandClick = { [weak self] index in self?.forwardSync(at: index, flash: true) ?? false }
+        applyWrap()
+        textScroll.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(textDidScroll), name: NSView.boundsDidChangeNotification, object: textScroll.contentView)
         let ruler = LineNumberRuler(textView: textView)
         ruler.onRevert = { [weak self] change in self?.revert(change) }
         self.ruler = ruler
@@ -201,6 +227,35 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private static let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+
+    // MARK: Retour à la ligne
+
+    private static var wordWrap: Bool {
+        get { UserDefaults.standard.bool(forKey: "editorWordWrap") }
+        set { UserDefaults.standard.set(newValue, forKey: "editorWordWrap") }
+    }
+
+    @objc private func toggleWrap(_ sender: Any?) {
+        Self.wordWrap.toggle()
+        applyWrap()
+    }
+
+    /// Lignes longues coupées à la largeur de l'éditeur, ou défilement horizontal (code).
+    private func applyWrap() {
+        let wrap = Self.wordWrap
+        wrapButton.state = wrap ? .on : .off
+        textScroll.hasHorizontalScroller = !wrap
+        textView.isHorizontallyResizable = !wrap
+        textView.textContainer?.widthTracksTextView = wrap
+        if wrap {
+            textView.frame.size.width = textScroll.contentSize.width
+            textView.textContainer?.containerSize = NSSize(width: textScroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+        } else {
+            textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        }
+        textView.scrollRangeToVisible(textView.selectedRange())
+        ruler?.needsDisplay = true
+    }
 
     // MARK: Suivre la sélection du panneau
 
@@ -247,7 +302,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private func showQuickLook(_ url: URL) {
         storeSelection()
         current = nil
-        if quickLook == nil, let preview = QLPreviewView(frame: .zero, style: .normal) {
+        func place(_ preview: NSView) {
             preview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(preview)
             NSLayoutConstraint.activate([
@@ -256,10 +311,35 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 preview.trailingAnchor.constraint(equalTo: split.trailingAnchor),
                 preview.bottomAnchor.constraint(equalTo: split.bottomAnchor),
             ])
-            quickLook = preview
         }
-        quickLook?.previewItem = url as NSURL
-        quickLook?.isHidden = false
+        if UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) == true, let document = PDFDocument(url: url) {
+            if pdfViewer == nil {
+                let viewer = PDFView()
+                viewer.autoScales = true
+                viewer.displayMode = .singlePageContinuous
+                viewer.backgroundColor = .clear
+                place(viewer)
+                pdfViewer = viewer
+            }
+            pdfViewer?.document = document
+            pdfViewer?.isHidden = false
+            quickLook?.isHidden = true
+            quickLook?.previewItem = nil
+            fileWatcher.onChange = { [weak self] in
+                if let fresh = PDFDocument(url: url) { self?.pdfViewer?.replaceDocument(fresh) }
+            }
+        } else {
+            if quickLook == nil, let preview = QLPreviewView(frame: .zero, style: .normal) {
+                place(preview)
+                quickLook = preview
+            }
+            quickLook?.previewItem = url as NSURL
+            quickLook?.isHidden = false
+            pdfViewer?.isHidden = true
+            pdfViewer?.document = nil
+            fileWatcher.onChange = { [weak self] in self?.quickLook?.refreshPreviewItem() }
+        }
+        fileWatcher.watch(url)
         split.isHidden = true
         placeholder.isHidden = true
         previewButton.isHidden = true
@@ -276,6 +356,12 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         current = document
         quickLook?.isHidden = true
         quickLook?.previewItem = nil
+        pdfViewer?.isHidden = true
+        pdfViewer?.document = nil
+        fileWatcher.onChange = { [weak self] in
+            if let document, document === self?.current { self?.reloadFromDisk(document) }
+        }
+        fileWatcher.watch(document?.url)
         split.isHidden = document == nil
         placeholder.isHidden = document != nil
         previewButton.isHidden = document?.previewKind == nil
@@ -294,6 +380,29 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         updatePreview(compileIfMissing: true)
         updateState()
         rebuildTabs()
+    }
+
+    /// Le fichier a changé sur le disque (git, autre éditeur, script) : relu au même endroit, sauf modifications en cours.
+    private func reloadFromDisk(_ document: Document) {
+        guard let fresh = Self.load(document.url), fresh.text != document.text else { return }
+        if document.isModified {
+            statusRight.stringValue = "Modifié sur le disque · vos modifications sont conservées"
+            return
+        }
+        let selection = textView.selectedRange()
+        let origin = textScroll.contentView.bounds.origin
+        document.text = fresh.text
+        document.encoding = fresh.encoding
+        isLoading = true
+        textView.string = fresh.text
+        applyHighlight()
+        isLoading = false
+        let length = (fresh.text as NSString).length
+        textView.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
+        textView.scroll(origin)
+        updateGutter()
+        updatePreview()
+        updateState()
     }
 
     private func storeSelection() {
@@ -395,7 +504,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     private func updateStatus() {
         guard let document = current else {
-            if quickLook?.isHidden != false { statusLeft.stringValue = ""; statusRight.stringValue = "" }
+            if quickLook?.isHidden != false, pdfViewer?.isHidden != false { statusLeft.stringValue = ""; statusRight.stringValue = "" }
             return
         }
         let text = textView.string as NSString
@@ -428,6 +537,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             }
             try data.write(to: document.url, options: .atomic)
             document.isModified = false
+            // Sa propre écriture n'est pas un changement extérieur.
+            if document === current { fileWatcher.watch(document.url) }
             rebuildTabs()
             updateState()
             if document === current, document.previewKind?.isCompiled == true { compile(document) }
@@ -527,7 +638,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         if preview.isHidden == visible {
             preview.isHidden = !visible
             split.adjustSubviews()
-            if visible { split.setPosition(split.bounds.width / 2, ofDividerAt: 0) }
+            if visible {
+                // Juste après l'installation de l'éditeur, la vue partagée n'a pas encore sa largeur.
+                DispatchQueue.main.async { [split] in split.setPosition(split.bounds.width / 2, ofDividerAt: 0) }
+            }
         }
         guard visible, let document = current, let kind else { return }
         let text = textView.string
@@ -572,6 +686,97 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 self.preview.showBanner(failure.summary, error: true, log: failure.log.isEmpty ? nil : failure.log, line: failure.line)
             }
         }
+    }
+
+    // MARK: Synchronisation texte ↔ aperçu
+
+    /// Ligne (1 = première) du caractère `index`.
+    private func lineNumber(at index: Int) -> Int {
+        let text = textView.string as NSString
+        var line = 1
+        var location = 0
+        let end = min(index, text.length)
+        while location < end {
+            let found = text.range(of: "\n", options: .literal, range: NSRange(location: location, length: end - location))
+            guard found.location != NSNotFound else { break }
+            line += 1
+            location = NSMaxRange(found)
+        }
+        return line
+    }
+
+    /// Montre dans l'aperçu l'endroit produit par le caractère `index` ; `false` si l'aperçu ne sait pas faire.
+    @discardableResult
+    private func forwardSync(at index: Int, flash: Bool) -> Bool {
+        guard let document = current, let kind = document.previewKind, Self.previewVisible else { return false }
+        let line = lineNumber(at: index)
+        switch kind {
+        case .markdown:
+            preview.scrollMarkdown(toLine: line, flash: flash)
+            return true
+        case .latex:
+            let root = DocumentCompiler.root(for: document.url, text: textView.string)
+            let pdf = DocumentCompiler.pdf(for: root)
+            guard SyncTeX.isAvailable(for: pdf) else {
+                preview.showBanner("Pas de données SyncTeX : enregistrez (⌘S) pour recompiler", error: true)
+                return true
+            }
+            SyncTeX.forward(line: line, source: document.url, pdf: pdf) { [weak self] boxes in
+                if boxes.isEmpty { self?.preview.showBanner("Ligne \(line) introuvable dans le PDF", error: true) } else { self?.preview.showSyncTeX(boxes) }
+            }
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// ⌘-clic dans le PDF : ouvre le fichier source concerné et va à la ligne.
+    private func inverseSync(page: Int, point: CGPoint) {
+        guard let document = current, document.previewKind == .latex else { return }
+        let pdf = DocumentCompiler.pdf(for: DocumentCompiler.root(for: document.url, text: textView.string))
+        SyncTeX.inverse(page: page, point: point, pdf: pdf) { [weak self] found in
+            guard let self, let found else { NSSound.beep(); return }
+            if found.url != self.current?.url.standardizedFileURL {
+                guard FileManager.default.fileExists(atPath: found.url.path) else { NSSound.beep(); return }
+                // Le PDF reste celui du fichier principal : l'aperçu ne doit pas changer pour le fichier inclus.
+                self.open(found.url)
+            }
+            self.goToLine(found.line)
+        }
+    }
+
+    private func jumpFromPreview(to line: Int) {
+        followScrollPaused = true
+        goToLine(line)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.followScrollPaused = false }
+    }
+
+    /// L'aperçu Markdown suit le défilement du texte.
+    @objc private func textDidScroll() {
+        guard !followScrollPaused, !isLoading, current?.previewKind == .markdown, Self.previewVisible,
+              let layout = textView.layoutManager, let container = textView.textContainer else { return }
+        let visible = textView.visibleRect
+        if visible.maxY >= textView.bounds.maxY - 2, visible.minY > 0 {
+            preview.scrollMarkdown(toLine: 0, atEnd: true)
+            return
+        }
+        let point = NSPoint(x: 0, y: max(0, visible.minY - textView.textContainerInset.height))
+        let glyph = layout.glyphIndex(for: point, in: container)
+        preview.scrollMarkdown(toLine: lineNumber(at: layout.characterIndexForGlyph(at: glyph)))
+    }
+
+    func textView(_ view: NSTextView, menu: NSMenu, for event: NSEvent, at index: Int) -> NSMenu? {
+        guard let kind = current?.previewKind, kind == .markdown || kind == .latex, Self.previewVisible else { return menu }
+        let item = NSMenuItem(title: kind == .latex ? "Afficher dans le PDF" : "Afficher dans l’aperçu", action: #selector(showInPreview(_:)), keyEquivalent: "")
+        item.target = self
+        item.representedObject = index
+        menu.insertItem(item, at: 0)
+        menu.insertItem(.separator(), at: 1)
+        return menu
+    }
+
+    @objc private func showInPreview(_ sender: NSMenuItem) {
+        forwardSync(at: sender.representedObject as? Int ?? textView.selectedRange().location, flash: true)
     }
 
     private func goToLine(_ line: Int) {
@@ -764,7 +969,13 @@ private final class LineNumberRuler: NSRulerView {
             let label = "\(line)" as NSString
             let size = label.size(withAttributes: attributes)
             label.draw(at: NSPoint(x: ruleThickness - size.width - 10, y: rectLine.minY + (rectLine.height - size.height) / 2), withAttributes: attributes)
-            drawMarker(for: line - 1, in: rectLine)
+            // Ligne coupée (retour à la ligne) : la marque Git couvre tous ses fragments.
+            var marked = rectLine
+            if !atEnd, text.length > 0 {
+                let glyphs = layout.glyphRange(forCharacterRange: lineRange, actualCharacterRange: nil)
+                marked.size.height = max(rectLine.height, layout.boundingRect(forGlyphRange: glyphs, in: container).height)
+            }
+            drawMarker(for: line - 1, in: marked)
             if text.length == 0 || NSMaxRange(lineRange) <= index { break }
             index = NSMaxRange(lineRange)
             line += 1
@@ -868,5 +1079,18 @@ private final class LineNumberRuler: NSRulerView {
         popover?.close()
         if let change = pendingChange { onRevert?(change) }
         pendingChange = nil
+    }
+}
+
+/// Texte de l'éditeur : ⌘-clic place le curseur et demande la synchronisation avec l'aperçu.
+private final class SourceTextView: NSTextView {
+    /// Renvoie `false` pour garder le comportement habituel du ⌘-clic (sélection multiple).
+    var onCommandClick: ((Int) -> Bool)?
+
+    override func mouseDown(with event: NSEvent) {
+        guard event.modifierFlags.contains(.command), !event.modifierFlags.contains(.shift), let onCommandClick else { return super.mouseDown(with: event) }
+        let index = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
+        guard onCommandClick(index) else { return super.mouseDown(with: event) }
+        setSelectedRange(NSRange(location: index, length: 0))
     }
 }

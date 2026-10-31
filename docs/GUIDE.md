@@ -230,7 +230,19 @@ déplacement entre disques, l’original n’est supprimé qu’après vérifica
 
 Code et texte avec coloration syntaxique (Swift, C/C++, Python, JavaScript/TypeScript, Java/Kotlin, Go, Rust,
 shell, JSON, LaTeX, Markdown), PDF feuilletable (PDFKit), vidéo et audio (AVKit), images, et Coup d’œil
-intégré pour les autres documents.
+intégré pour les autres documents. Un fichier modifié sur le disque est rechargé à la même position.
+
+## Éditeur
+
+En disposition à un panneau, le fichier texte sélectionné s’ouvre dans un éditeur à côté. Barre d’icônes :
+aperçu, retour à la ligne, rechercher (⌘F), enregistrer (⌘S), enregistrer, commit et push (⌥⌘S).
+
+- Aperçu Markdown, CSV et JSON mis à jour à la frappe ; LaTeX et Typst compilés à l’enregistrement, PDF à côté.
+- Synchronisation texte ↔ aperçu par ⌘-clic, ou clic droit › Afficher dans le PDF / l’aperçu :
+  LaTeX par SyncTeX (y compris les fichiers inclus par `\input`), Markdown par blocs.
+  L’aperçu Markdown suit aussi le défilement du texte.
+- Un fichier ou un PDF modifié hors de l’app (git, terminal, `latexmk -pvc`) est rechargé au même endroit ;
+  le texte n’est pas rechargé s’il a des modifications non enregistrées.
 
 ## Occupation du disque
 
