@@ -74,13 +74,20 @@ final class SidebarViewController: NSViewController {
         scroll.autohidesScrollers = true
         scroll.drawsBackground = false
         let root = NSView()
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(scroll)
+        // Bas de la barre : widgets (horloges, charge, aquarium…), choisis par le bouton « + ».
+        let widgets = SidebarWidgetsView()
+        for view in [scroll, widgets] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            root.addSubview(view)
+        }
         NSLayoutConstraint.activate([
             scroll.topAnchor.constraint(equalTo: root.topAnchor),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            scroll.bottomAnchor.constraint(equalTo: widgets.topAnchor),
+            widgets.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            widgets.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            widgets.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
         ThemeBackgroundView.install(.sidebar, in: root)
         view = root

@@ -1,0 +1,714 @@
+import AppKit
+import Darwin
+
+/// Widgets du bas de la barre latérale : horloges, yeux, charge système, aquarium, pluie Matrix,
+/// espace disque, réseau, minuteur, calendrier. Ajoutés, retirés et réordonnés par le bouton « + ».
+enum SidebarWidgetKind: String, CaseIterable {
+    case analogClock, digitalClock, eyes, load, aquarium, matrix, disk, network, timer, calendar
+
+    var title: String {
+        switch self {
+        case .analogClock: "Horloge analogique"
+        case .digitalClock: "Horloge numérique"
+        case .eyes: "Yeux (xeyes)"
+        case .load: "Charge processeur et mémoire (xload)"
+        case .aquarium: "Aquarium (xfish)"
+        case .matrix: "Pluie Matrix (cmatrix)"
+        case .disk: "Espace disque"
+        case .network: "Débit réseau"
+        case .timer: "Minuteur Pomodoro"
+        case .calendar: "Calendrier du mois"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .analogClock: "clock"
+        case .digitalClock: "textformat.123"
+        case .eyes: "eyes"
+        case .load: "cpu"
+        case .aquarium: "fish"
+        case .matrix: "chevron.left.forwardslash.chevron.right"
+        case .disk: "internaldrive"
+        case .network: "network"
+        case .timer: "timer"
+        case .calendar: "calendar"
+        }
+    }
+
+    var height: CGFloat {
+        switch self {
+        case .analogClock: 120
+        case .digitalClock: 56
+        case .eyes: 70
+        case .load: 74
+        case .aquarium, .matrix: 96
+        case .disk: 46
+        case .network: 64
+        case .timer: 92
+        case .calendar: 132
+        }
+    }
+
+    func makeView() -> SidebarWidget {
+        switch self {
+        case .analogClock: AnalogClockWidget()
+        case .digitalClock: DigitalClockWidget()
+        case .eyes: EyesWidget()
+        case .load: LoadWidget()
+        case .aquarium: AquariumWidget()
+        case .matrix: MatrixWidget()
+        case .disk: DiskWidget()
+        case .network: NetworkWidget()
+        case .timer: PomodoroWidget()
+        case .calendar: CalendarWidget()
+        }
+    }
+
+    static let changed = Notification.Name("SidebarWidgetsChanged")
+
+    static var enabled: [SidebarWidgetKind] {
+        get { (UserDefaults.standard.stringArray(forKey: "sidebarWidgets") ?? []).compactMap(SidebarWidgetKind.init(rawValue:)) }
+        set {
+            UserDefaults.standard.set(newValue.map(\.rawValue), forKey: "sidebarWidgets")
+            NotificationCenter.default.post(name: changed, object: nil)
+        }
+    }
+}
+
+/// Base des widgets : un minuteur qui ne tourne que lorsque le widget est à l'écran.
+class SidebarWidget: NSView {
+    var kind: SidebarWidgetKind { .digitalClock }
+    var interval: TimeInterval { 1 }
+    private var timer: Timer?
+
+    override var isFlipped: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        timer?.invalidate()
+        timer = nil
+        guard window != nil else { return }
+        tick()
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    /// Mise à jour périodique (par défaut : redessiner).
+    func tick() { needsDisplay = true }
+
+    var ink: NSColor { Theme.text }
+    var faint: NSColor { Theme.secondaryText }
+    var accent: NSColor { Theme.accent }
+
+    func text(_ string: String, size: CGFloat, weight: NSFont.Weight = .regular, color: NSColor? = nil, monospaced: Bool = false) -> NSAttributedString {
+        let font = monospaced ? NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight) : NSFont.systemFont(ofSize: size, weight: weight)
+        return NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: color ?? ink])
+    }
+}
+
+// MARK: - Horloges
+
+final class AnalogClockWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .analogClock }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let side = min(bounds.width, bounds.height) - 12
+        let center = NSPoint(x: bounds.midX, y: bounds.midY)
+        let radius = side / 2
+        let face = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: side, height: side))
+        faint.withAlphaComponent(0.12).setFill()
+        face.fill()
+        faint.withAlphaComponent(0.5).setStroke()
+        face.lineWidth = 1
+        face.stroke()
+        for mark in 0..<12 {
+            let angle = CGFloat(mark) / 12 * 2 * .pi
+            let inner = radius * (mark % 3 == 0 ? 0.78 : 0.86)
+            let path = NSBezierPath()
+            path.move(to: point(center, angle, inner))
+            path.line(to: point(center, angle, radius * 0.94))
+            path.lineWidth = mark % 3 == 0 ? 2 : 1
+            faint.setStroke()
+            path.stroke()
+        }
+        let parts = Calendar.current.dateComponents([.hour, .minute, .second, .nanosecond], from: Date())
+        let seconds = CGFloat(parts.second ?? 0)
+        let minutes = CGFloat(parts.minute ?? 0) + seconds / 60
+        let hours = CGFloat((parts.hour ?? 0) % 12) + minutes / 60
+        hand(center, hours / 12, radius * 0.5, 3, ink)
+        hand(center, minutes / 60, radius * 0.75, 2, ink)
+        hand(center, seconds / 60, radius * 0.85, 1, .systemRed)
+        NSColor.systemRed.setFill()
+        NSBezierPath(ovalIn: NSRect(x: center.x - 2.5, y: center.y - 2.5, width: 5, height: 5)).fill()
+    }
+
+    /// Angle 0 en haut, sens horaire (vue retournée : y vers le bas).
+    private func point(_ center: NSPoint, _ angle: CGFloat, _ length: CGFloat) -> NSPoint {
+        NSPoint(x: center.x + sin(angle) * length, y: center.y - cos(angle) * length)
+    }
+
+    private func hand(_ center: NSPoint, _ fraction: CGFloat, _ length: CGFloat, _ width: CGFloat, _ color: NSColor) {
+        let path = NSBezierPath()
+        path.move(to: center)
+        path.line(to: point(center, fraction * 2 * .pi, length))
+        path.lineWidth = width
+        path.lineCapStyle = .round
+        color.setStroke()
+        path.stroke()
+    }
+}
+
+final class DigitalClockWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .digitalClock }
+    private static let time: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f }()
+    private static let day: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "EEEE d MMMM"; return f }()
+
+    override func draw(_ dirtyRect: NSRect) {
+        let now = Date()
+        let clock = text(Self.time.string(from: now), size: 26, weight: .light, monospaced: true)
+        clock.draw(at: NSPoint(x: (bounds.width - clock.size().width) / 2, y: 2))
+        let date = text(Self.day.string(from: now).capitalized, size: 11, color: faint)
+        date.draw(at: NSPoint(x: (bounds.width - date.size().width) / 2, y: 36))
+    }
+}
+
+// MARK: - Yeux
+
+final class EyesWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .eyes }
+    override var interval: TimeInterval { 1.0 / 30 }
+    private var lastMouse = NSPoint.zero
+
+    override func tick() {
+        let mouse = NSEvent.mouseLocation
+        if mouse != lastMouse { lastMouse = mouse; needsDisplay = true }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let window else { return }
+        let height = bounds.height - 10
+        let width = height * 0.75
+        let gap: CGFloat = 8
+        let originX = (bounds.width - 2 * width - gap) / 2
+        let mouseInView = convert(window.convertPoint(fromScreen: lastMouse), from: nil)
+        for index in 0..<2 {
+            let eye = NSRect(x: originX + CGFloat(index) * (width + gap), y: 5, width: width, height: height)
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: eye).fill()
+            ink.setStroke()
+            let outline = NSBezierPath(ovalIn: eye)
+            outline.lineWidth = 2.5
+            outline.stroke()
+            // La pupille va vers la souris, sans sortir de l'œil.
+            let center = NSPoint(x: eye.midX, y: eye.midY)
+            let dx = mouseInView.x - center.x, dy = mouseInView.y - center.y
+            let distance = max(1, hypot(dx, dy))
+            let reachX = eye.width / 2 - 9, reachY = eye.height / 2 - 9
+            let scale = min(1, distance / 60)
+            let pupil = NSPoint(x: center.x + dx / distance * reachX * scale, y: center.y + dy / distance * reachY * scale)
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: NSRect(x: pupil.x - 6, y: pupil.y - 6, width: 12, height: 12)).fill()
+        }
+    }
+}
+
+// MARK: - Charge système
+
+final class LoadWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .load }
+    private var cpuHistory: [Double] = []
+    private var memoryHistory: [Double] = []
+    private var previous: (busy: UInt64, total: UInt64)?
+
+    override func tick() {
+        if let cpu = Self.cpuTicks() {
+            if let previous, cpu.total > previous.total {
+                cpuHistory.append(Double(cpu.busy - previous.busy) / Double(cpu.total - previous.total))
+            }
+            previous = cpu
+        }
+        memoryHistory.append(Self.memoryUsage())
+        let capacity = Int(bounds.width / 3)
+        if cpuHistory.count > capacity { cpuHistory.removeFirst(cpuHistory.count - capacity) }
+        if memoryHistory.count > capacity { memoryHistory.removeFirst(memoryHistory.count - capacity) }
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let graph = NSRect(x: 0, y: 18, width: bounds.width, height: bounds.height - 18)
+        faint.withAlphaComponent(0.08).setFill()
+        NSBezierPath(roundedRect: graph, xRadius: 4, yRadius: 4).fill()
+        draw(memoryHistory, in: graph, color: .systemTeal, filled: true)
+        draw(cpuHistory, in: graph, color: .systemOrange, filled: false)
+        let cpu = Int((cpuHistory.last ?? 0) * 100), memory = Int((memoryHistory.last ?? 0) * 100)
+        text("Processeur \(cpu) %", size: 10.5, color: .systemOrange, monospaced: true).draw(at: NSPoint(x: 2, y: 1))
+        let mem = text("Mémoire \(memory) %", size: 10.5, color: .systemTeal, monospaced: true)
+        mem.draw(at: NSPoint(x: bounds.width - mem.size().width - 2, y: 1))
+    }
+
+    private func draw(_ values: [Double], in rect: NSRect, color: NSColor, filled: Bool) {
+        guard values.count > 1 else { return }
+        let step = rect.width / CGFloat(max(1, Int(rect.width / 3) - 1))
+        let path = NSBezierPath()
+        for (index, value) in values.enumerated() {
+            let point = NSPoint(x: rect.maxX - CGFloat(values.count - 1 - index) * step, y: rect.maxY - CGFloat(value) * (rect.height - 4) - 2)
+            if index == 0 { path.move(to: point) } else { path.line(to: point) }
+        }
+        if filled {
+            let area = path.copy() as! NSBezierPath
+            area.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
+            area.line(to: NSPoint(x: rect.maxX - CGFloat(values.count - 1) * step, y: rect.maxY))
+            area.close()
+            color.withAlphaComponent(0.25).setFill()
+            area.fill()
+        }
+        color.setStroke()
+        path.lineWidth = 1.5
+        path.stroke()
+    }
+
+    static func cpuTicks() -> (busy: UInt64, total: UInt64)? {
+        var info = host_cpu_load_info()
+        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count) }
+        }
+        guard result == KERN_SUCCESS else { return nil }
+        let ticks = info.cpu_ticks
+        let user = UInt64(ticks.0), system = UInt64(ticks.1), idle = UInt64(ticks.2), nice = UInt64(ticks.3)
+        return (user + system + nice, user + system + idle + nice)
+    }
+
+    static func memoryUsage() -> Double {
+        var stats = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &stats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count) }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        let used = UInt64(stats.active_count + stats.wire_count + stats.compressor_page_count) * UInt64(vm_kernel_page_size)
+        return min(1, Double(used) / Double(ProcessInfo.processInfo.physicalMemory))
+    }
+}
+
+// MARK: - Aquarium
+
+final class AquariumWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .aquarium }
+    override var interval: TimeInterval { 1.0 / 30 }
+
+    private struct Fish { var x: CGFloat; var y: CGFloat; var speed: CGFloat; var size: CGFloat; var color: NSColor; var phase: CGFloat }
+    private struct Bubble { var x: CGFloat; var y: CGFloat; var radius: CGFloat }
+    private var fishes: [Fish] = []
+    private var bubbles: [Bubble] = []
+    private var time: CGFloat = 0
+
+    override func tick() {
+        if fishes.isEmpty, bounds.width > 0 {
+            let colors: [NSColor] = [.systemOrange, .systemYellow, .systemPink, .systemTeal, .systemRed]
+            fishes = (0..<5).map { index in
+                Fish(x: .random(in: 0...bounds.width), y: .random(in: 14...(bounds.height - 24)),
+                     speed: .random(in: 0.4...1.2) * (index % 2 == 0 ? 1 : -1), size: .random(in: 9...15),
+                     color: colors[index % colors.count], phase: .random(in: 0...6))
+            }
+        }
+        time += 0.05
+        for index in fishes.indices {
+            fishes[index].x += fishes[index].speed
+            if fishes[index].x > bounds.width + 20 || fishes[index].x < -20 { fishes[index].speed *= -1 }
+        }
+        if Int.random(in: 0..<14) == 0 { bubbles.append(Bubble(x: .random(in: 8...(bounds.width - 8)), y: bounds.height - 6, radius: .random(in: 1.5...3.5))) }
+        for index in bubbles.indices { bubbles[index].y -= 0.8; bubbles[index].x += sin(time + bubbles[index].y / 9) * 0.3 }
+        bubbles.removeAll { $0.y < 4 }
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let tank = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
+        NSGradient(starting: NSColor(calibratedRed: 0.1, green: 0.45, blue: 0.75, alpha: 1),
+                   ending: NSColor(calibratedRed: 0.02, green: 0.12, blue: 0.3, alpha: 1))?.draw(in: tank, angle: -90)
+        // Les poissons qui font demi-tour au bord restent dans le bocal.
+        tank.addClip()
+        NSColor(calibratedRed: 0.85, green: 0.75, blue: 0.5, alpha: 1).setFill()
+        NSBezierPath(rect: NSRect(x: 1, y: bounds.height - 9, width: bounds.width - 2, height: 8)).fill()
+        for plant in stride(from: CGFloat(14), to: bounds.width, by: 46) {
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: plant, y: bounds.height - 8))
+            path.curve(to: NSPoint(x: plant + sin(time) * 4, y: bounds.height - 40),
+                       controlPoint1: NSPoint(x: plant - 8, y: bounds.height - 20), controlPoint2: NSPoint(x: plant + 8, y: bounds.height - 30))
+            path.lineWidth = 3
+            NSColor.systemGreen.withAlphaComponent(0.8).setStroke()
+            path.stroke()
+        }
+        for fish in fishes {
+            let direction: CGFloat = fish.speed > 0 ? 1 : -1
+            let y = fish.y + sin(time * 2 + fish.phase) * 2
+            fish.color.setFill()
+            NSBezierPath(ovalIn: NSRect(x: fish.x - fish.size, y: y - fish.size / 2.4, width: fish.size * 2, height: fish.size / 1.2)).fill()
+            let tail = NSBezierPath()
+            tail.move(to: NSPoint(x: fish.x - direction * fish.size * 0.9, y: y))
+            tail.line(to: NSPoint(x: fish.x - direction * fish.size * 1.6, y: y - fish.size / 2))
+            tail.line(to: NSPoint(x: fish.x - direction * fish.size * 1.6, y: y + fish.size / 2))
+            tail.close()
+            tail.fill()
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: NSRect(x: fish.x + direction * fish.size * 0.5 - 1.5, y: y - 3, width: 3, height: 3)).fill()
+        }
+        NSColor.white.withAlphaComponent(0.6).setStroke()
+        for bubble in bubbles {
+            NSBezierPath(ovalIn: NSRect(x: bubble.x - bubble.radius, y: bubble.y - bubble.radius, width: bubble.radius * 2, height: bubble.radius * 2)).stroke()
+        }
+    }
+}
+
+// MARK: - Pluie Matrix
+
+final class MatrixWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .matrix }
+    override var interval: TimeInterval { 1.0 / 14 }
+    private let glyphs = Array("ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ0123456789ABCDEFﾊﾋﾌﾍﾎ")
+    private var drops: [CGFloat] = []
+    private var speeds: [CGFloat] = []
+    private let cell: CGFloat = 11
+
+    override func tick() {
+        let columns = Int(bounds.width / cell)
+        if drops.count != columns {
+            drops = (0..<columns).map { _ in .random(in: -20...0) }
+            speeds = (0..<columns).map { _ in .random(in: 0.5...1.2) }
+        }
+        for index in drops.indices {
+            drops[index] += speeds[index]
+            if drops[index] * cell > bounds.height + 80 { drops[index] = .random(in: -12...0) }
+        }
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let screen = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
+        NSColor.black.setFill()
+        screen.fill()
+        screen.addClip()
+        let font = NSFont.monospacedSystemFont(ofSize: 10, weight: .medium)
+        for (column, head) in drops.enumerated() {
+            for trail in 0..<9 {
+                let row = Int(head) - trail
+                guard row >= 0, CGFloat(row) * cell < bounds.height else { continue }
+                let color = trail == 0 ? NSColor(calibratedRed: 0.8, green: 1, blue: 0.8, alpha: 1)
+                    : NSColor(calibratedRed: 0, green: 0.9, blue: 0.3, alpha: 1 - CGFloat(trail) / 9)
+                let glyph = String(glyphs[(column * 7 + row * 13) % glyphs.count])
+                NSAttributedString(string: glyph, attributes: [.font: font, .foregroundColor: color])
+                    .draw(at: NSPoint(x: CGFloat(column) * cell + 1, y: CGFloat(row) * cell))
+            }
+        }
+    }
+}
+
+// MARK: - Espace disque, réseau
+
+final class DiskWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .disk }
+    override var interval: TimeInterval { 30 }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey, .volumeLocalizedNameKey])
+        let total = Double(values?.volumeTotalCapacity ?? 0)
+        let free = Double(values?.volumeAvailableCapacityForImportantUsage ?? 0)
+        let used = total > 0 ? 1 - free / total : 0
+        text(values?.volumeLocalizedName ?? "Disque", size: 11, weight: .semibold).draw(at: NSPoint(x: 2, y: 2))
+        let free​Text = text("\(Format.size(Int64(free))) libres", size: 10.5, color: faint, monospaced: true)
+        free​Text.draw(at: NSPoint(x: bounds.width - free​Text.size().width - 2, y: 3))
+        let bar = NSRect(x: 2, y: 24, width: bounds.width - 4, height: 10)
+        faint.withAlphaComponent(0.2).setFill()
+        NSBezierPath(roundedRect: bar, xRadius: 5, yRadius: 5).fill()
+        (used > 0.9 ? NSColor.systemRed : used > 0.75 ? NSColor.systemOrange : accent).setFill()
+        NSBezierPath(roundedRect: NSRect(x: bar.minX, y: bar.minY, width: bar.width * used, height: bar.height), xRadius: 5, yRadius: 5).fill()
+    }
+}
+
+final class NetworkWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .network }
+    private var previous: (input: UInt64, output: UInt64, time: Date)?
+    private var downHistory: [Double] = []
+    private var upHistory: [Double] = []
+
+    override func tick() {
+        let counters = Self.counters()
+        let now = Date()
+        if let previous {
+            let seconds = max(0.1, now.timeIntervalSince(previous.time))
+            // Les compteurs 32 bits peuvent repartir de zéro : un écart négatif est ignoré.
+            downHistory.append(counters.input >= previous.input ? Double(counters.input - previous.input) / seconds : 0)
+            upHistory.append(counters.output >= previous.output ? Double(counters.output - previous.output) / seconds : 0)
+        }
+        previous = (counters.input, counters.output, now)
+        let capacity = Int(bounds.width / 3)
+        if downHistory.count > capacity { downHistory.removeFirst(downHistory.count - capacity) }
+        if upHistory.count > capacity { upHistory.removeFirst(upHistory.count - capacity) }
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let graph = NSRect(x: 0, y: 18, width: bounds.width, height: bounds.height - 18)
+        faint.withAlphaComponent(0.08).setFill()
+        NSBezierPath(roundedRect: graph, xRadius: 4, yRadius: 4).fill()
+        let peak = max(1, (downHistory + upHistory).max() ?? 1)
+        for (values, color) in [(downHistory, NSColor.systemBlue), (upHistory, NSColor.systemPink)] where values.count > 1 {
+            let path = NSBezierPath()
+            for (index, value) in values.enumerated() {
+                let point = NSPoint(x: graph.maxX - CGFloat(values.count - 1 - index) * 3, y: graph.maxY - CGFloat(value / peak) * (graph.height - 4) - 2)
+                if index == 0 { path.move(to: point) } else { path.line(to: point) }
+            }
+            color.setStroke()
+            path.lineWidth = 1.5
+            path.stroke()
+        }
+        text("↓ \(Format.size(Int64(downHistory.last ?? 0)))/s", size: 10.5, color: .systemBlue, monospaced: true).draw(at: NSPoint(x: 2, y: 1))
+        let up = text("↑ \(Format.size(Int64(upHistory.last ?? 0)))/s", size: 10.5, color: .systemPink, monospaced: true)
+        up.draw(at: NSPoint(x: bounds.width - up.size().width - 2, y: 1))
+    }
+
+    static func counters() -> (input: UInt64, output: UInt64) {
+        var input: UInt64 = 0, output: UInt64 = 0
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return (0, 0) }
+        defer { freeifaddrs(list) }
+        for pointer in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let entry = pointer.pointee
+            guard let address = entry.ifa_addr, address.pointee.sa_family == UInt8(AF_LINK), let data = entry.ifa_data,
+                  String(cString: entry.ifa_name) != "lo0" else { continue }
+            let stats = data.assumingMemoryBound(to: if_data.self).pointee
+            input += UInt64(stats.ifi_ibytes)
+            output += UInt64(stats.ifi_obytes)
+        }
+        return (input, output)
+    }
+}
+
+// MARK: - Minuteur, calendrier
+
+final class PomodoroWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .timer }
+    private var duration: TimeInterval = 25 * 60
+    private var endDate: Date?
+    private var remainingWhenPaused: TimeInterval?
+    private lazy var button: NSButton = {
+        let button = NSButton(title: "Démarrer", target: self, action: #selector(toggle))
+        button.controlSize = .small
+        button.bezelStyle = .accessoryBarAction
+        button.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(button)
+        NSLayoutConstraint.activate([button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+                                     button.centerYAnchor.constraint(equalTo: centerYAnchor)])
+        return button
+    }()
+
+    private var remaining: TimeInterval {
+        if let endDate { return max(0, endDate.timeIntervalSinceNow) }
+        return remainingWhenPaused ?? duration
+    }
+
+    override func tick() {
+        _ = button
+        if endDate != nil, remaining <= 0 {
+            endDate = nil
+            remainingWhenPaused = nil
+            button.title = "Démarrer"
+            NSSound(named: "Glass")?.play()
+            NSApp.requestUserAttention(.informationalRequest)
+        }
+        needsDisplay = true
+    }
+
+    @objc private func toggle() {
+        if endDate != nil {
+            remainingWhenPaused = remaining
+            endDate = nil
+            button.title = "Reprendre"
+        } else {
+            endDate = Date().addingTimeInterval(remaining > 0 ? remaining : duration)
+            remainingWhenPaused = nil
+            button.title = "Pause"
+        }
+        needsDisplay = true
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        // Clic droit : remettre à zéro.
+        endDate = nil
+        remainingWhenPaused = nil
+        button.title = "Démarrer"
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let side = bounds.height - 12
+        let ring = NSRect(x: 8, y: 6, width: side, height: side)
+        let center = NSPoint(x: ring.midX, y: ring.midY)
+        let track = NSBezierPath(ovalIn: ring.insetBy(dx: 3, dy: 3))
+        track.lineWidth = 5
+        faint.withAlphaComponent(0.2).setStroke()
+        track.stroke()
+        let progress = 1 - remaining / duration
+        let arc = NSBezierPath()
+        arc.appendArc(withCenter: center, radius: side / 2 - 3, startAngle: -90, endAngle: -90 + 360 * progress, clockwise: false)
+        arc.lineWidth = 5
+        arc.lineCapStyle = .round
+        NSColor.systemRed.setStroke()
+        arc.stroke()
+        let seconds = Int(remaining.rounded(.up))
+        let label = text(String(format: "%02d:%02d", seconds / 60, seconds % 60), size: 15, weight: .medium, monospaced: true)
+        label.draw(at: NSPoint(x: center.x - label.size().width / 2, y: center.y - label.size().height / 2))
+        text("Pomodoro", size: 11, weight: .semibold).draw(at: NSPoint(x: ring.maxX + 10, y: 16))
+        text("clic droit : remise à zéro", size: 9.5, color: faint).draw(at: NSPoint(x: ring.maxX + 10, y: 32))
+    }
+}
+
+final class CalendarWidget: SidebarWidget {
+    override var kind: SidebarWidgetKind { .calendar }
+    override var interval: TimeInterval { 300 }
+
+    override func draw(_ dirtyRect: NSRect) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "fr_FR")
+        calendar.firstWeekday = 2
+        let today = Date()
+        let month = DateFormatter()
+        month.locale = calendar.locale
+        month.dateFormat = "LLLL yyyy"
+        let title = text(month.string(from: today).capitalized, size: 11.5, weight: .semibold)
+        title.draw(at: NSPoint(x: (bounds.width - title.size().width) / 2, y: 0))
+        let cellWidth = bounds.width / 7
+        for (index, letter) in ["L", "M", "M", "J", "V", "S", "D"].enumerated() {
+            let label = text(letter, size: 9.5, weight: .medium, color: faint)
+            label.draw(at: NSPoint(x: CGFloat(index) * cellWidth + (cellWidth - label.size().width) / 2, y: 18))
+        }
+        guard let start = calendar.date(from: calendar.dateComponents([.year, .month], from: today)),
+              let days = calendar.range(of: .day, in: .month, for: start) else { return }
+        let offset = (calendar.component(.weekday, from: start) + 5) % 7
+        let current = calendar.component(.day, from: today)
+        for day in days {
+            let slot = offset + day - 1
+            let x = CGFloat(slot % 7) * cellWidth, y = 34 + CGFloat(slot / 7) * 16
+            if day == current {
+                accent.setFill()
+                NSBezierPath(ovalIn: NSRect(x: x + cellWidth / 2 - 8, y: y - 1, width: 16, height: 16)).fill()
+            }
+            let label = text("\(day)", size: 10, weight: day == current ? .bold : .regular,
+                             color: day == current ? .white : (slot % 7 >= 5 ? faint : ink), monospaced: true)
+            label.draw(at: NSPoint(x: x + (cellWidth - label.size().width) / 2, y: y))
+        }
+    }
+}
+
+// MARK: - Zone des widgets
+
+/// Bas de la barre latérale : titre « Widgets » avec « + », puis les widgets choisis.
+final class SidebarWidgetsView: NSView {
+    private let stack = NSStackView()
+    private let header = NSStackView()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        let title = NSTextField(labelWithString: "Widgets")
+        title.font = .systemFont(ofSize: 11, weight: .semibold)
+        title.textColor = Theme.secondaryText
+        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Ajouter un widget")!, target: self, action: #selector(showMenu(_:)))
+        add.isBordered = false
+        add.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
+        add.contentTintColor = Theme.secondaryText
+        add.toolTip = "Ajouter, retirer ou réordonner les widgets"
+        header.setViews([title, NSView(), add], in: .leading)
+        header.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 12)
+        stack.orientation = .vertical
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 6, left: 10, bottom: 10, right: 10)
+        let separator = NSBox()
+        separator.boxType = .separator
+        for view in [separator, header, stack] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            separator.topAnchor.constraint(equalTo: topAnchor),
+            separator.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            separator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            header.topAnchor.constraint(equalTo: separator.bottomAnchor, constant: 6),
+            header.leadingAnchor.constraint(equalTo: leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.topAnchor.constraint(equalTo: header.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        NotificationCenter.default.addObserver(forName: SidebarWidgetKind.changed, object: nil, queue: .main) { [weak self] _ in self?.rebuild() }
+        rebuild()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    private func rebuild() {
+        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for kind in SidebarWidgetKind.enabled {
+            let widget = kind.makeView()
+            widget.translatesAutoresizingMaskIntoConstraints = false
+            widget.heightAnchor.constraint(equalToConstant: kind.height).isActive = true
+            widget.menu = widgetMenu(for: kind)
+            stack.addArrangedSubview(widget)
+            widget.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -20).isActive = true
+        }
+    }
+
+    @objc private func showMenu(_ sender: NSButton) {
+        let menu = NSMenu()
+        let enabled = SidebarWidgetKind.enabled
+        for kind in SidebarWidgetKind.allCases {
+            let item = NSMenuItem(title: kind.title, action: #selector(toggleWidget(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = kind.rawValue
+            item.state = enabled.contains(kind) ? .on : .off
+            item.image = NSImage(systemSymbolName: kind.symbol, accessibilityDescription: nil)
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    @objc private func toggleWidget(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let kind = SidebarWidgetKind(rawValue: raw) else { return }
+        var enabled = SidebarWidgetKind.enabled
+        if let index = enabled.firstIndex(of: kind) { enabled.remove(at: index) } else { enabled.append(kind) }
+        SidebarWidgetKind.enabled = enabled
+    }
+
+    /// Clic droit sur un widget : monter, descendre, retirer.
+    private func widgetMenu(for kind: SidebarWidgetKind) -> NSMenu {
+        let menu = NSMenu()
+        for (title, action, symbol) in [("Monter", #selector(moveWidgetUp(_:)), "arrow.up"), ("Descendre", #selector(moveWidgetDown(_:)), "arrow.down"),
+                                        ("Retirer", #selector(remove(_:)), "minus.circle")] {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = self
+            item.representedObject = kind.rawValue
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    private func move(_ sender: NSMenuItem, by offset: Int) {
+        guard let raw = sender.representedObject as? String, let kind = SidebarWidgetKind(rawValue: raw) else { return }
+        var enabled = SidebarWidgetKind.enabled
+        guard let index = enabled.firstIndex(of: kind), enabled.indices.contains(index + offset) else { return }
+        enabled.swapAt(index, index + offset)
+        SidebarWidgetKind.enabled = enabled
+    }
+
+    @objc private func moveWidgetUp(_ sender: NSMenuItem) { move(sender, by: -1) }
+    @objc private func moveWidgetDown(_ sender: NSMenuItem) { move(sender, by: 1) }
+
+    @objc private func remove(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let kind = SidebarWidgetKind(rawValue: raw) else { return }
+        SidebarWidgetKind.enabled = SidebarWidgetKind.enabled.filter { $0 != kind }
+    }
+}
