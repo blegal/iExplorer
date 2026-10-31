@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 /// Éditeur à côté du panneau quand un seul panneau est affiché : le fichier texte sélectionné s'ouvre
 /// dans un onglet, se modifie et s'enregistre (⌘S) ; s'il est suivi par Git, « Enregistrer, commit et push ».
+/// Markdown, CSV et JSON ont un aperçu à côté, mis à jour à la frappe ; LaTeX et Typst sont compilés
+/// à l'enregistrement, PDF à côté. La marge signale les lignes modifiées depuis le dernier commit.
 /// Les autres fichiers (images, PDF, vidéos…) s'affichent en Coup d'œil.
 final class EditorViewController: NSViewController, NSTextViewDelegate {
     static let enabledChanged = Notification.Name("EditorEnabledChanged")
@@ -27,7 +29,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         var isModified = false
         /// `nil` tant que la question n'a pas été posée à Git ; puis la racine du dépôt si le fichier est suivi.
         var gitRoot: URL??
+        /// Lignes du fichier au dernier commit, pour les marques de la marge.
+        var committedLines: [String]?
         var selection = NSRange(location: 0, length: 0)
+        var previewKind: EditorPreviewKind? { EditorPreviewKind(url: url) }
 
         init(url: URL, text: String, encoding: String.Encoding) {
             self.url = url
@@ -43,7 +48,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let saveButton = NSButton(title: "Enregistrer", target: nil, action: nil)
     private let commitButton = NSButton(title: "Enregistrer, commit et push", target: nil, action: nil)
     private let findButton = NSButton(title: "Rechercher", target: nil, action: nil)
+    private let previewButton = NSButton(title: "Aperçu", target: nil, action: nil)
+    private let split = NSSplitView()
+    private let preview = EditorPreviewView()
     private let textScroll = NSScrollView()
+    private var ruler: LineNumberRuler?
     private let textView = NSTextView()
     private var quickLook: QLPreviewView?
     private let placeholder = NSTextField(labelWithString: "Sélectionnez un fichier texte dans le panneau pour le modifier ici.")
@@ -64,11 +73,16 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         tabScroll.hasHorizontalScroller = false
         tabs.translatesAutoresizingMaskIntoConstraints = false
 
-        for button in [findButton, saveButton, commitButton] {
+        for button in [previewButton, findButton, saveButton, commitButton] {
             button.bezelStyle = .accessoryBarAction
             button.controlSize = .small
             button.target = self
         }
+        previewButton.action = #selector(togglePreview(_:))
+        previewButton.setButtonType(.pushOnPushOff)
+        previewButton.image = NSImage(systemSymbolName: "rectangle.righthalf.inset.filled", accessibilityDescription: nil)
+        previewButton.imagePosition = .imageLeading
+        previewButton.toolTip = "Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON)"
         findButton.action = #selector(showSearch(_:))
         findButton.toolTip = "Rechercher et remplacer dans le fichier (⌘F)"
         saveButton.action = #selector(saveDocument(_:))
@@ -85,13 +99,21 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         close.isBordered = false
         close.contentTintColor = .secondaryLabelColor
         close.toolTip = "Fermer l’onglet"
-        let header = NSStackView(views: [tabScroll, findButton, saveButton, commitButton, close])
+        let header = NSStackView(views: [tabScroll, previewButton, findButton, saveButton, commitButton, close])
         header.spacing = 8
         header.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 10)
         tabScroll.setContentHuggingPriority(.defaultLow, for: .horizontal)
         tabScroll.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         configureTextView()
+        split.isVertical = true
+        split.dividerStyle = .thin
+        split.addArrangedSubview(textScroll)
+        split.addArrangedSubview(preview)
+        split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 0)
+        preview.isHidden = true
+        preview.onOpenFile = { [weak self] url in self?.open(url) }
+        preview.onJumpToLine = { [weak self] line in self?.goToLine(line) }
         placeholder.textColor = .secondaryLabelColor
         placeholder.alignment = .center
         placeholder.lineBreakMode = .byWordWrapping
@@ -108,7 +130,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let topLine = NSBox(), bottomLine = NSBox()
         topLine.boxType = .separator
         bottomLine.boxType = .separator
-        for view in [header, topLine, textScroll, placeholder, bottomLine, status] as [NSView] {
+        for view in [header, topLine, split, placeholder, bottomLine, status] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(view)
         }
@@ -124,13 +146,13 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             topLine.topAnchor.constraint(equalTo: header.bottomAnchor),
             topLine.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             topLine.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            textScroll.topAnchor.constraint(equalTo: topLine.bottomAnchor),
-            textScroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            textScroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            textScroll.bottomAnchor.constraint(equalTo: bottomLine.topAnchor),
-            placeholder.centerXAnchor.constraint(equalTo: textScroll.centerXAnchor),
-            placeholder.centerYAnchor.constraint(equalTo: textScroll.centerYAnchor),
-            placeholder.widthAnchor.constraint(lessThanOrEqualTo: textScroll.widthAnchor, constant: -40),
+            split.topAnchor.constraint(equalTo: topLine.bottomAnchor),
+            split.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            split.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            split.bottomAnchor.constraint(equalTo: bottomLine.topAnchor),
+            placeholder.centerXAnchor.constraint(equalTo: split.centerXAnchor),
+            placeholder.centerYAnchor.constraint(equalTo: split.centerYAnchor),
+            placeholder.widthAnchor.constraint(lessThanOrEqualTo: split.widthAnchor, constant: -40),
             bottomLine.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             bottomLine.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             bottomLine.bottomAnchor.constraint(equalTo: status.topAnchor),
@@ -171,6 +193,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.autoresizingMask = [.width, .height]
         let ruler = LineNumberRuler(textView: textView)
+        ruler.onRevert = { [weak self] change in self?.revert(change) }
+        self.ruler = ruler
         textScroll.verticalRulerView = ruler
         textScroll.hasVerticalRuler = true
         textScroll.rulersVisible = true
@@ -190,6 +214,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         if let existing = documents.first(where: { $0.url == url }) {
             if !existing.isModified, let fresh = Self.load(url) { existing.text = fresh.text; existing.encoding = fresh.encoding }
             showDocument(existing)
+            loadCommittedLines(existing)
             return
         }
         guard let loaded = Self.load(url) else {
@@ -226,17 +251,18 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             preview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(preview)
             NSLayoutConstraint.activate([
-                preview.topAnchor.constraint(equalTo: textScroll.topAnchor),
-                preview.leadingAnchor.constraint(equalTo: textScroll.leadingAnchor),
-                preview.trailingAnchor.constraint(equalTo: textScroll.trailingAnchor),
-                preview.bottomAnchor.constraint(equalTo: textScroll.bottomAnchor),
+                preview.topAnchor.constraint(equalTo: split.topAnchor),
+                preview.leadingAnchor.constraint(equalTo: split.leadingAnchor),
+                preview.trailingAnchor.constraint(equalTo: split.trailingAnchor),
+                preview.bottomAnchor.constraint(equalTo: split.bottomAnchor),
             ])
             quickLook = preview
         }
         quickLook?.previewItem = url as NSURL
         quickLook?.isHidden = false
-        textScroll.isHidden = true
+        split.isHidden = true
         placeholder.isHidden = true
+        previewButton.isHidden = true
         saveButton.isHidden = true
         commitButton.isHidden = true
         findButton.isHidden = true
@@ -250,8 +276,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         current = document
         quickLook?.isHidden = true
         quickLook?.previewItem = nil
-        textScroll.isHidden = document == nil
+        split.isHidden = document == nil
         placeholder.isHidden = document != nil
+        previewButton.isHidden = document?.previewKind == nil
         saveButton.isHidden = document == nil
         findButton.isHidden = document == nil
         if let document {
@@ -263,6 +290,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             textView.setSelectedRange(NSRange(location: min(document.selection.location, (document.text as NSString).length), length: 0))
             textView.scrollRangeToVisible(textView.selectedRange())
         }
+        updateGutter()
+        updatePreview(compileIfMissing: true)
         updateState()
         rebuildTabs()
     }
@@ -326,7 +355,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         }
         updateState()
         highlightWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.applyHighlight() }
+        let work = DispatchWorkItem { [weak self] in
+            self?.applyHighlight()
+            self?.updateGutter()
+            if self?.current?.previewKind?.isCompiled == false { self?.updatePreview() }
+        }
         highlightWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
     }
@@ -397,6 +430,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             document.isModified = false
             rebuildTabs()
             updateState()
+            if document === current, document.previewKind?.isCompiled == true { compile(document) }
             return true
         } catch {
             NSAlert(error: error).runModal()
@@ -417,6 +451,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             DispatchQueue.main.async {
                 document.gitRoot = .some(tracked ? root : nil)
                 if document === self?.current { self?.updateState() }
+                self?.loadCommittedLines(document)
             }
         }
     }
@@ -466,8 +501,158 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 } else if pushed {
                     self.statusRight.stringValue = "Commit et push effectués"
                 }
+                self.loadCommittedLines(document)
             }
         }
+    }
+
+    // MARK: Aperçu à côté
+
+    private static var previewVisible: Bool {
+        get { UserDefaults.standard.object(forKey: "editorPreviewVisible") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "editorPreviewVisible") }
+    }
+
+    @objc private func togglePreview(_ sender: Any?) {
+        Self.previewVisible.toggle()
+        updatePreview(compileIfMissing: true)
+    }
+
+    /// Montre ou cache l'aperçu selon le fichier, puis le met à jour (sauf PDF compilé : seulement s'il manque).
+    private func updatePreview(compileIfMissing: Bool = false) {
+        guard isViewLoaded else { return }
+        let kind = current?.previewKind
+        let visible = kind != nil && Self.previewVisible
+        previewButton.state = visible ? .on : .off
+        if preview.isHidden == visible {
+            preview.isHidden = !visible
+            split.adjustSubviews()
+            if visible { split.setPosition(split.bounds.width / 2, ofDividerAt: 0) }
+        }
+        guard visible, let document = current, let kind else { return }
+        let text = textView.string
+        switch kind {
+        case .markdown: preview.showMarkdown(text, base: document.url)
+        case .csv: preview.showCSV(text)
+        case .json: preview.showJSON(text)
+        case .latex, .typst:
+            let root = DocumentCompiler.root(for: document.url, text: text)
+            let pdf = DocumentCompiler.pdf(for: root)
+            let pdfDate = (try? pdf.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let pdfDate {
+                preview.showPDF(pdf)
+                let sourceDate = (try? root.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                if compileIfMissing, sourceDate > pdfDate { compile(document) }
+            } else {
+                preview.showMessage("Enregistrez (⌘S) pour compiler et voir le PDF ici.")
+                if compileIfMissing, (kind == .latex ? ExternalTool.latex : .typst).isInstalled { compile(document) }
+            }
+        }
+    }
+
+    private var compiling = false
+
+    private func compile(_ document: Document) {
+        guard let kind = document.previewKind, kind.isCompiled, Self.previewVisible, !compiling else { return }
+        let root = DocumentCompiler.root(for: document.url, text: document.text)
+        compiling = true
+        let start = Date()
+        statusRight.stringValue = "Compilation de \(root.lastPathComponent)…"
+        DocumentCompiler.compile(root, kind: kind) { [weak self] result in
+            guard let self else { return }
+            self.compiling = false
+            self.updateStatus()
+            guard document === self.current else { return }
+            switch result {
+            case .success(let pdf):
+                self.preview.showPDF(pdf)
+                let seconds = Date().timeIntervalSince(start).formatted(.number.precision(.fractionLength(1)))
+                self.preview.showBanner("Compilé en \(seconds) s", error: false)
+            case .failure(let failure):
+                self.preview.showBanner(failure.summary, error: true, log: failure.log.isEmpty ? nil : failure.log, line: failure.line)
+            }
+        }
+    }
+
+    private func goToLine(_ line: Int) {
+        let text = textView.string as NSString
+        var location = 0
+        for _ in 1..<max(1, line) {
+            let range = text.lineRange(for: NSRange(location: location, length: 0))
+            guard NSMaxRange(range) < text.length else { break }
+            location = NSMaxRange(range)
+        }
+        let range = text.lineRange(for: NSRange(location: min(location, text.length), length: 0))
+        view.window?.makeFirstResponder(textView)
+        textView.setSelectedRange(range)
+        textView.scrollRangeToVisible(range)
+        textView.showFindIndicator(for: range)
+    }
+
+    // MARK: Marques Git dans la marge
+
+    /// Version du dernier commit (git show HEAD:chemin), lue en arrière-plan.
+    private func loadCommittedLines(_ document: Document) {
+        guard let root = document.gitRoot ?? nil else {
+            document.committedLines = nil
+            if document === current { updateGutter() }
+            return
+        }
+        let file = document.url.resolvingSymlinksInPath().path
+        let base = root.resolvingSymlinksInPath().path
+        guard file.hasPrefix(base + "/") else { return }
+        let relative = String(file.dropFirst(base.count + 1))
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let show = GitCommand.run(["show", "HEAD:" + relative], in: root)
+            DispatchQueue.main.async {
+                document.committedLines = show.succeeded ? Self.lines(show.output) : nil
+                if document === self?.current { self?.updateGutter() }
+            }
+        }
+    }
+
+    private static func lines(_ text: String) -> [String] {
+        var lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        if lines.last == "" { lines.removeLast() }
+        return lines
+    }
+
+    private func updateGutter() {
+        guard let ruler else { return }
+        guard let document = current, let committed = document.committedLines else {
+            ruler.changes = [:]
+            return
+        }
+        let lines = Self.lines(textView.string)
+        guard lines.count + committed.count < 40_000 else {
+            ruler.changes = [:]
+            return
+        }
+        ruler.changes = GitLineChange.compute(old: committed, new: lines)
+    }
+
+    /// Rétablit les lignes du dernier commit à la place des lignes modifiées (annulable par ⌘Z).
+    private func revert(_ change: GitLineChange) {
+        let text = textView.string as NSString
+        var location = 0
+        var line = 0
+        while line < change.line, location < text.length {
+            location = NSMaxRange(text.lineRange(for: NSRange(location: location, length: 0)))
+            line += 1
+        }
+        var end = location
+        for _ in 0..<change.count where end < text.length {
+            end = NSMaxRange(text.lineRange(for: NSRange(location: end, length: 0)))
+        }
+        var replacement = change.oldLines.map { $0 + "\n" }.joined()
+        if end == text.length, !text.hasSuffix("\n"), change.count > 0 { replacement = String(replacement.dropLast()) }
+        if location == text.length, location > 0, !text.hasSuffix("\n") { replacement = "\n" + String(replacement.dropLast()) }
+        let range = NSRange(location: location, length: end - location)
+        guard textView.shouldChangeText(in: range, replacementString: replacement) else { return }
+        textView.replaceCharacters(in: range, with: replacement)
+        textView.didChangeText()
+        applyHighlight()
+        updateGutter()
     }
 
     /// ⌘F dans l'éditeur : barre de recherche du texte (et non la recherche du panneau).
@@ -480,15 +665,72 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 }
 
-/// Numéros de ligne dans la marge de l'éditeur.
+/// Lignes changées depuis le dernier commit : ajoutées, modifiées, ou supprimées (marque entre deux lignes).
+struct GitLineChange {
+    enum Kind { case added, modified, deleted }
+    let kind: Kind
+    /// Première ligne concernée (0 = première ligne du texte actuel).
+    let line: Int
+    /// Nombre de lignes actuelles concernées (0 pour une suppression).
+    let count: Int
+    let oldLines: [String]
+
+    var color: NSColor {
+        switch kind {
+        case .added: .systemGreen
+        case .modified: .systemBlue
+        case .deleted: .systemRed
+        }
+    }
+
+    /// Changements indexés par ligne actuelle (chaque ligne d'un bloc pointe vers le même changement).
+    static func compute(old: [String], new: [String]) -> [Int: GitLineChange] {
+        let difference = new.difference(from: old)
+        var removed = Set<Int>(), inserted = Set<Int>()
+        for change in difference {
+            switch change {
+            case .remove(let offset, _, _): removed.insert(offset)
+            case .insert(let offset, _, _): inserted.insert(offset)
+            }
+        }
+        var result: [Int: GitLineChange] = [:]
+        var i = 0, j = 0
+        while i < old.count || j < new.count {
+            let startOld = i, startNew = j
+            while i < old.count, removed.contains(i) { i += 1 }
+            while j < new.count, inserted.contains(j) { j += 1 }
+            if i == startOld, j == startNew {
+                i += 1
+                j += 1
+                continue
+            }
+            let oldLines = Array(old[startOld..<i])
+            let count = j - startNew
+            let kind: Kind = count == 0 ? .deleted : (oldLines.isEmpty ? .added : .modified)
+            let change = GitLineChange(kind: kind, line: startNew, count: count, oldLines: oldLines)
+            if count == 0 {
+                // Une suppression se dessine en haut de la ligne qui suit (ou en bas de la dernière).
+                if result[startNew] == nil { result[startNew] = change }
+            } else {
+                for line in startNew..<j { result[line] = change }
+            }
+        }
+        return result
+    }
+}
+
+/// Numéros de ligne dans la marge de l'éditeur, avec les marques Git (clic : voir et rétablir l'ancienne version).
 private final class LineNumberRuler: NSRulerView {
     private weak var textView: NSTextView?
+    var changes: [Int: GitLineChange] = [:] { didSet { needsDisplay = true } }
+    var onRevert: ((GitLineChange) -> Void)?
+    private var popover: NSPopover?
 
     init(textView: NSTextView) {
         self.textView = textView
         super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
         clientView = textView
-        ruleThickness = 44
+        ruleThickness = 48
         NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: NSText.didChangeNotification, object: textView)
         NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: NSView.boundsDidChangeNotification,
                                                object: textView.enclosingScrollView?.contentView)
@@ -509,18 +751,122 @@ private final class LineNumberRuler: NSRulerView {
         var line = text.substring(to: characters.location).reduce(1) { $1 == "\n" ? $0 + 1 : $0 }
         var index = characters.location
         let inset = textView.textContainerInset.height
+        var lastRect = NSRect.zero
         while index <= NSMaxRange(characters) && index <= text.length {
             let lineRange = text.lineRange(for: NSRange(location: min(index, max(0, text.length - 1)), length: 0))
             let glyph = layout.glyphIndexForCharacter(at: min(index, max(0, text.length - 1)))
-            var rectLine = text.length == 0 ? .zero : layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+            // Ligne vide après le dernier retour à la ligne : fragment « supplémentaire » du gestionnaire de mise en page.
+            let atEnd = index == text.length && text.length > 0
+            var rectLine = text.length == 0 ? layout.extraLineFragmentRect
+                : atEnd ? layout.extraLineFragmentRect : layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
             rectLine.origin.y += inset - visible.minY
+            lastRect = rectLine
             let label = "\(line)" as NSString
             let size = label.size(withAttributes: attributes)
-            label.draw(at: NSPoint(x: ruleThickness - size.width - 6, y: rectLine.minY + (rectLine.height - size.height) / 2), withAttributes: attributes)
+            label.draw(at: NSPoint(x: ruleThickness - size.width - 10, y: rectLine.minY + (rectLine.height - size.height) / 2), withAttributes: attributes)
+            drawMarker(for: line - 1, in: rectLine)
             if text.length == 0 || NSMaxRange(lineRange) <= index { break }
             index = NSMaxRange(lineRange)
             line += 1
             if index == text.length, !text.hasSuffix("\n") { break }
         }
+        // Lignes supprimées à la toute fin du fichier.
+        if let change = changes[line], change.kind == .deleted, index >= text.length {
+            drawDeletion(change, at: lastRect.maxY)
+        }
+    }
+
+    private func drawMarker(for line: Int, in rect: NSRect) {
+        guard let change = changes[line] else { return }
+        if change.kind == .deleted {
+            drawDeletion(change, at: rect.minY)
+        } else {
+            change.color.setFill()
+            NSBezierPath(rect: NSRect(x: ruleThickness - 5, y: rect.minY, width: 3, height: rect.height)).fill()
+        }
+    }
+
+    private func drawDeletion(_ change: GitLineChange, at y: CGFloat) {
+        let triangle = NSBezierPath()
+        triangle.move(to: NSPoint(x: ruleThickness - 7, y: y - 4))
+        triangle.line(to: NSPoint(x: ruleThickness - 1, y: y))
+        triangle.line(to: NSPoint(x: ruleThickness - 7, y: y + 4))
+        triangle.close()
+        change.color.setFill()
+        triangle.fill()
+    }
+
+    /// Ligne (0 = première) sous le point cliqué.
+    private func line(at point: NSPoint) -> Int? {
+        guard let textView, let layout = textView.layoutManager, let container = textView.textContainer else { return nil }
+        let text = textView.string as NSString
+        guard text.length > 0 else { return 0 }
+        let y = point.y + textView.visibleRect.minY - textView.textContainerInset.height
+        let glyph = layout.glyphIndex(for: NSPoint(x: 0, y: y), in: container)
+        let character = min(layout.characterIndexForGlyph(at: glyph), text.length)
+        let lineCount = text.substring(to: character).reduce(0) { $1 == "\n" ? $0 + 1 : $0 }
+        let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        return y > fragment.maxY ? lineCount + 1 : lineCount
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        guard point.x > ruleThickness - 12, let line = line(at: point),
+              let change = changes[line] ?? changes[line + 1].flatMap({ $0.kind == .deleted ? $0 : nil }) else {
+            super.mouseDown(with: event)
+            return
+        }
+        showPopover(for: change, at: point)
+    }
+
+    private func showPopover(for change: GitLineChange, at point: NSPoint) {
+        let title: String
+        switch change.kind {
+        case .added: title = change.count > 1 ? "\(change.count) lignes ajoutées depuis le dernier commit" : "Ligne ajoutée depuis le dernier commit"
+        case .modified: title = "Version du dernier commit"
+        case .deleted: title = change.oldLines.count > 1 ? "\(change.oldLines.count) lignes supprimées" : "Ligne supprimée"
+        }
+        let label = NSTextField(labelWithString: title)
+        label.font = .systemFont(ofSize: 11.5, weight: .semibold)
+        var views: [NSView] = [label]
+        if !change.oldLines.isEmpty {
+            let scroll = NSTextView.scrollableTextView()
+            scroll.hasHorizontalScroller = true
+            if let text = scroll.documentView as? NSTextView {
+                text.string = change.oldLines.joined(separator: "\n")
+                text.isEditable = false
+                text.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
+                text.textColor = change.kind == .deleted ? .systemRed : .labelColor
+                text.backgroundColor = change.color.withAlphaComponent(0.08)
+            }
+            let height = min(220, CGFloat(change.oldLines.count) * 15 + 12)
+            scroll.translatesAutoresizingMaskIntoConstraints = false
+            scroll.widthAnchor.constraint(equalToConstant: 460).isActive = true
+            scroll.heightAnchor.constraint(equalToConstant: height).isActive = true
+            views.append(scroll)
+        }
+        let button = NSButton(title: change.kind == .added ? "Supprimer ces lignes" : "Rétablir la version du commit", target: self, action: #selector(revertFromPopover(_:)))
+        button.controlSize = .small
+        views.append(button)
+        let stack = NSStackView(views: views)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+        let controller = NSViewController()
+        controller.view = stack
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = controller
+        pendingChange = change
+        self.popover = popover
+        popover.show(relativeTo: NSRect(x: ruleThickness - 4, y: point.y - 2, width: 4, height: 4), of: self, preferredEdge: .maxX)
+    }
+
+    private var pendingChange: GitLineChange?
+
+    @objc private func revertFromPopover(_ sender: Any?) {
+        popover?.close()
+        if let change = pendingChange { onRevert?(change) }
+        pendingChange = nil
     }
 }

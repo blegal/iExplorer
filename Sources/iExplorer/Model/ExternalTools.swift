@@ -8,6 +8,7 @@ enum ExternalTool: String, CaseIterable {
     case ripgrep, fd, fclones
     case age, gnupg
     case rsync
+    case latex, typst
     case developerTools
 
     enum Category: String, CaseIterable {
@@ -16,6 +17,7 @@ enum ExternalTool: String, CaseIterable {
         case search = "Recherche et doublons"
         case crypto = "Chiffrement"
         case sync = "Copie et synchronisation"
+        case writing = "Rédaction"
         case development = "Développement"
     }
 
@@ -26,6 +28,7 @@ enum ExternalTool: String, CaseIterable {
         case .ripgrep, .fd, .fclones: .search
         case .age, .gnupg: .crypto
         case .rsync: .sync
+        case .latex, .typst: .writing
         case .developerTools: .development
         }
     }
@@ -50,6 +53,8 @@ enum ExternalTool: String, CaseIterable {
         case .age: "age"
         case .gnupg: "GnuPG"
         case .rsync: "rsync 3"
+        case .latex: "LaTeX (BasicTeX)"
+        case .typst: "Typst"
         case .developerTools: "Outils de développement Apple"
         }
     }
@@ -74,6 +79,8 @@ enum ExternalTool: String, CaseIterable {
         case .age: "Chiffrement moderne de fichiers (.age), lisible sur Linux et Windows"
         case .gnupg: "Fichiers .gpg et .asc : chiffrement, déchiffrement, signatures"
         case .rsync: "Synchronisation plus rapide et plus complète que l’rsync de macOS"
+        case .latex: "Compilation des .tex dans l’éditeur, avec l’aperçu PDF à côté"
+        case .typst: "Compilation des .typ dans l’éditeur, avec l’aperçu PDF à côté"
         case .developerTools: "git : état Git des fichiers, commit et push depuis l’éditeur"
         }
     }
@@ -99,6 +106,8 @@ enum ExternalTool: String, CaseIterable {
         case .age: ["age"]
         case .gnupg: ["gpg"]
         case .rsync: ["rsync"]
+        case .latex: ["latexmk", "pdflatex"]
+        case .typst: ["typst"]
         case .developerTools: ["git"]
         }
     }
@@ -124,13 +133,19 @@ enum ExternalTool: String, CaseIterable {
         case .age: ("age", false)
         case .gnupg: ("gnupg", false)
         case .rsync: ("rsync", false)
+        case .latex: ("basictex", true)
+        case .typst: ("typst", false)
         case .developerTools: nil
         }
     }
 
     /// rsync existe déjà dans macOS (ancienne version) : seule celle de Homebrew compte.
     private var searchPaths: [String] {
-        self == .rsync ? ["/opt/homebrew/bin", "/usr/local/bin"] : Self.searchPaths
+        switch self {
+        case .rsync: ["/opt/homebrew/bin", "/usr/local/bin"]
+        case .latex: ["/Library/TeX/texbin"] + Self.searchPaths
+        default: Self.searchPaths
+        }
     }
 
     private static let searchPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
@@ -154,7 +169,7 @@ enum ExternalTool: String, CaseIterable {
     /// Outil déjà utilisé par une fonction d'iExplorer (les autres sont signalés « intégration à venir »).
     var isUsed: Bool {
         switch self {
-        case .sevenZip, .rar, .unar, .bzip3, .lzip, .brotli, .pigz, .developerTools: true
+        case .sevenZip, .rar, .unar, .bzip3, .lzip, .brotli, .pigz, .latex, .typst, .developerTools: true
         default: false
         }
     }
