@@ -1,7 +1,10 @@
 import AppKit
 
 enum ArchiveFormat: Int, CaseIterable {
-    case zip, tarGz, tarBz2, tarXz, tarZst, tarLz4
+    case zip, tarGz, tarBz2, tarXz, tarZst, tarLz4, sevenZ
+
+    /// Ordre des menus (tar.bz2 reste lisible mais n'est plus proposé à la création).
+    static let menuOrder: [ArchiveFormat] = [.zip, .sevenZ, .tarGz, .tarXz, .tarZst, .tarLz4]
 
     var fileExtension: String {
         switch self {
@@ -11,6 +14,7 @@ enum ArchiveFormat: Int, CaseIterable {
         case .tarXz: "tar.xz"
         case .tarZst: "tar.zst"
         case .tarLz4: "tar.lz4"
+        case .sevenZ: "7z"
         }
     }
 
@@ -21,6 +25,89 @@ enum ArchiveFormat: Int, CaseIterable {
         case .tarLz4: .lz4
         default: nil
         }
+    }
+
+    /// Seuls zip et 7z savent chiffrer (AES-256).
+    var supportsPassword: Bool { self == .zip || self == .sevenZ }
+
+    /// Nom du filtre pour l'option « compression-level » du tar du système.
+    fileprivate var libarchiveOption: String? {
+        switch self {
+        case .zip: "zip"
+        case .tarGz: "gzip"
+        case .tarBz2: "bzip2"
+        case .tarXz: "xz"
+        case .sevenZ: "7zip"
+        case .tarZst, .tarLz4: nil
+        }
+    }
+
+    /// Niveau réel de l'outil pour Légère / Normale / Forte.
+    func level(_ level: CompressionLevel) -> Int {
+        switch (self, level) {
+        case (.tarZst, .light): 3
+        case (.tarZst, .normal): 6
+        case (.tarZst, .strong): 19
+        case (.tarLz4, .light): 0
+        case (.tarLz4, .normal): 3
+        case (.tarLz4, .strong): 12
+        case (_, .light): 1
+        case (_, .normal): 6
+        case (_, .strong): 9
+        }
+    }
+
+    func levelDescription(_ level: CompressionLevel) -> String {
+        switch self {
+        case .tarZst: "zstd niveau \(self.level(level))"
+        case .tarLz4: level == .light ? "LZ4 rapide" : "LZ4 HC niveau \(self.level(level))"
+        default: "niveau \(self.level(level))"
+        }
+    }
+
+    /// Dernier niveau choisi pour ce format (coché dans le menu).
+    var lastLevel: CompressionLevel {
+        get { CompressionLevel(rawValue: UserDefaults.standard.integer(forKey: "compressionLevel.\(fileExtension)") - 1) ?? .normal }
+        nonmutating set { UserDefaults.standard.set(newValue.rawValue + 1, forKey: "compressionLevel.\(fileExtension)") }
+    }
+
+    /// Format de ⌥⌘K (le dernier utilisé).
+    static var lastUsed: ArchiveFormat {
+        get { ArchiveFormat(rawValue: UserDefaults.standard.integer(forKey: "compressionFormat")) ?? .zip }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "compressionFormat") }
+    }
+}
+
+enum CompressionLevel: Int, CaseIterable {
+    case light, normal, strong
+
+    var title: String {
+        switch self {
+        case .light: "Légère"
+        case .normal: "Normale"
+        case .strong: "Forte"
+        }
+    }
+}
+
+/// Une compression à faire : quoi, en quel format, à quel niveau, où et sous quel nom.
+struct CompressionRequest {
+    var urls: [URL]
+    var format: ArchiveFormat
+    var level: CompressionLevel
+    /// Nom sans extension.
+    var name: String
+    var destination: URL
+    var password: String?
+    /// 7z chiffré : noms des fichiers masqués.
+    var hideNames = true
+    /// Sans .DS_Store ni fichiers « ._ » de macOS.
+    var excludeSystemFiles = true
+
+    /// Nom proposé : celui de l'élément, ou du dossier quand il y en a plusieurs.
+    static func defaultName(for urls: [URL]) -> String {
+        guard let first = urls.first else { return "Archive" }
+        return urls.count == 1 ? first.lastPathComponent : first.deletingLastPathComponent().lastPathComponent
     }
 }
 
@@ -34,35 +121,59 @@ extension FileOperationCenter {
         return archiveSuffixes.contains { name.hasSuffix("." + $0) }
     }
 
-    /// Compresse les éléments (tous dans le même dossier) en une archive à côté d'eux.
-    func compress(_ urls: [URL], format: ArchiveFormat, undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
-        guard let first = urls.first else { return }
-        let directory = first.deletingLastPathComponent()
-        let base = urls.count == 1 ? first.lastPathComponent : "Archive"
-        let target = uniqueURL(for: directory.appendingPathComponent("\(base).\(format.fileExtension)"), suffix: "")
-        let arguments = ["-a", "-c", "--no-mac-metadata", "-f", target.path, "-C", directory.path, "--"] + urls.map(\.lastPathComponent)
-        let title = "Compression de « \(urls.count == 1 ? first.lastPathComponent : "\(urls.count) éléments") »"
+    /// Compresse selon la demande (format, niveau, nom, destination, mot de passe éventuel).
+    func compress(_ request: CompressionRequest, undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
+        guard let first = request.urls.first else { return }
+        let source = first.deletingLastPathComponent()
+        let names = request.urls.map(\.lastPathComponent)
+        let format = request.format
+        let target = uniqueURL(for: request.destination.appendingPathComponent("\(request.name).\(format.fileExtension)"), suffix: "")
+        let what = request.urls.count == 1 ? first.lastPathComponent : "\(request.urls.count) éléments"
+        let title = (request.password == nil ? "Compression" : "Compression chiffrée") + " de « \(what) »"
+        let level = format.level(request.level)
+        format.lastLevel = request.level
+        ArchiveFormat.lastUsed = format
+        let systemFiles = [".DS_Store", "._*", "__MACOSX"]
+
         if let codec = format.codec {
-            compressStreamed(urls, codec: codec, target: target, title: title, undoManager: undoManager, completion: completion)
+            compressStreamed(names, in: source, codec: codec, level: level, exclude: request.excludeSystemFiles ? systemFiles : [],
+                             target: target, total: request.urls.reduce(Int64(0)) { $0 + Self.allocatedSize(of: $1) },
+                             title: title, undoManager: undoManager, completion: completion)
             return
         }
+        if format == .sevenZ, let password = request.password {
+            guard let tool = Self.sevenZip else { showError("Le 7z chiffré demande 7-Zip (brew install sevenzip)."); return }
+            var arguments = ["a", "-t7z", "-y", "-mx=\(level)", "-p" + password] + (request.hideNames ? ["-mhe=on"] : [])
+            if request.excludeSystemFiles { arguments += systemFiles.map { "-xr!" + $0 } }
+            runArchiveTool(tool.path, arguments + ["--", target.path] + names, title: title, output: target, currentDirectory: source,
+                           undoManager: undoManager, completion: completion)
+            return
+        }
+        var options = format.libarchiveOption.map { ["\($0):compression-level=\(level)"] } ?? []
+        var arguments = ["-a", "-c", "--no-mac-metadata"]
+        if let password = request.password, format == .zip {
+            options.append("zip:encryption=aes256")
+            arguments += ["--passphrase", password]
+        }
+        if !options.isEmpty { arguments += ["--options", options.joined(separator: ",")] }
+        if request.excludeSystemFiles { arguments += systemFiles.flatMap { ["--exclude", $0] } }
+        arguments += ["-f", target.path, "-C", source.path, "--"] + names
         runArchiveTool("/usr/bin/tar", arguments, title: title, output: target, undoManager: undoManager, completion: completion)
     }
 
     // MARK: zstd et LZ4 (embarqués)
 
-    private func compressStreamed(_ urls: [URL], codec: StreamCodec, target: URL, title: String, undoManager: UndoManager?,
-                                  completion: @escaping (URL?) -> Void) {
+    private func compressStreamed(_ names: [String], in directory: URL, codec: StreamCodec, level: Int, exclude: [String], target: URL,
+                                  total: Int64, title: String, undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
         let job = FileJob(title: title)
         job.setStatus(target.lastPathComponent)
-        job.setTotal(urls.reduce(Int64(0)) { $0 + Self.allocatedSize(of: $1) })
+        job.setTotal(total)
         addJob(job)
-        let directory = target.deletingLastPathComponent()
         DispatchQueue.global(qos: .userInitiated).async {
             var failure: String?
             do {
                 job.waitIfPaused()
-                try codec.createTar(urls.map(\.lastPathComponent), in: directory, to: target, job: job)
+                try codec.createTar(names, in: directory, to: target, level: level, exclude: exclude, job: job)
             } catch is CancellationError {
             } catch {
                 if !job.isCancelled { failure = error.localizedDescription }
@@ -149,24 +260,6 @@ extension FileOperationCenter {
         ["/opt/homebrew/bin/7zz", "/opt/homebrew/bin/7z", "/usr/local/bin/7zz", "/usr/local/bin/7z"]
             .first { FileManager.default.isExecutableFile(atPath: $0) }
             .map { URL(fileURLWithPath: $0) }
-    }
-
-    /// Archive protégée par mot de passe : zip AES-256 (bsdtar du système) ou 7z AES-256 (7-Zip, noms masqués au choix).
-    func compressEncrypted(_ urls: [URL], sevenZ: Bool, hideNames: Bool, password: String, undoManager: UndoManager?,
-                           completion: @escaping (URL?) -> Void) {
-        guard let first = urls.first else { return }
-        let directory = first.deletingLastPathComponent()
-        let base = urls.count == 1 ? first.lastPathComponent : "Archive"
-        let target = uniqueURL(for: directory.appendingPathComponent("\(base).\(sevenZ ? "7z" : "zip")"), suffix: "")
-        let title = "Compression chiffrée de « \(urls.count == 1 ? first.lastPathComponent : "\(urls.count) éléments") »"
-        if sevenZ, let tool = Self.sevenZip {
-            let arguments = ["a", "-t7z", "-y", "-p" + password] + (hideNames ? ["-mhe=on"] : []) + ["--", target.path] + urls.map(\.lastPathComponent)
-            runArchiveTool(tool.path, arguments, title: title, output: target, currentDirectory: directory, undoManager: undoManager, completion: completion)
-        } else {
-            let arguments = ["-a", "-c", "--no-mac-metadata", "--options", "zip:encryption=aes256", "--passphrase", password,
-                             "-f", target.path, "-C", directory.path, "--"] + urls.map(\.lastPathComponent)
-            runArchiveTool("/usr/bin/tar", arguments, title: title, output: target, undoManager: undoManager, completion: completion)
-        }
     }
 
     /// Demande le mot de passe d'une archive ; `nil` si l'utilisateur renonce.

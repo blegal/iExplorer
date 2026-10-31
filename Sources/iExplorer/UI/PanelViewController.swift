@@ -1402,57 +1402,6 @@ final class PanelViewController: NSViewController {
 
     // MARK: Archives
 
-    @objc func compressSelection(_ sender: Any?) {
-        let urls = selectedURLs
-        guard !urls.isEmpty, !currentURL.isRemote else { return }
-        let format = ArchiveFormat(rawValue: (sender as? NSMenuItem)?.tag ?? 0) ?? .zip
-        FileOperationCenter.shared.compress(urls, format: format, undoManager: undoManager) { [weak self] archive in
-            if let archive { self?.reload(selecting: [archive]) }
-        }
-    }
-
-    /// Archive protégée : zip AES-256 toujours possible, 7z AES-256 (noms masqués) si 7-Zip est installé.
-    @objc func compressWithPassword(_ sender: Any?) {
-        let urls = selectedURLs
-        guard !urls.isEmpty, !currentURL.isRemote, let window = view.window else { return }
-        let hasSevenZip = FileOperationCenter.sevenZip != nil
-        let alert = NSAlert()
-        alert.messageText = "Compresser avec un mot de passe"
-        alert.informativeText = hasSevenZip
-            ? "zip : s’ouvre avec 7-Zip, WinRAR, Keka ou The Unarchiver. 7z : 7-Zip peut aussi masquer les noms des fichiers."
-            : "Le zip chiffré s’ouvre avec 7-Zip, WinRAR, Keka ou The Unarchiver. Installez 7-Zip (brew install sevenzip) pour le format 7z."
-        let format = NSPopUpButton(frame: NSRect(x: 0, y: 86, width: 300, height: 26))
-        format.addItems(withTitles: ["zip chiffré (AES-256)", "7z chiffré (AES-256)"])
-        format.autoenablesItems = false
-        format.item(at: 1)?.isEnabled = hasSevenZip
-        let password = NSSecureTextField(frame: NSRect(x: 0, y: 56, width: 300, height: 24))
-        password.placeholderString = "Mot de passe"
-        let confirm = NSSecureTextField(frame: NSRect(x: 0, y: 26, width: 300, height: 24))
-        confirm.placeholderString = "Confirmer le mot de passe"
-        let hideNames = NSButton(checkboxWithTitle: "Masquer les noms des fichiers (7z)", target: nil, action: nil)
-        hideNames.frame = NSRect(x: 0, y: 0, width: 300, height: 20)
-        hideNames.state = .on
-        hideNames.isEnabled = hasSevenZip
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 114))
-        [format, password, confirm, hideNames].forEach(accessory.addSubview)
-        alert.accessoryView = accessory
-        alert.addButton(withTitle: "Compresser")
-        alert.addButton(withTitle: "Annuler")
-        alert.window.initialFirstResponder = password
-        alert.beginSheetModal(for: window) { [weak self] response in
-            guard let self, response == .alertFirstButtonReturn else { return }
-            guard !password.stringValue.isEmpty, password.stringValue == confirm.stringValue else {
-                FileOperationCenter.shared.showError(password.stringValue.isEmpty ? "Le mot de passe est vide." : "Les deux mots de passe ne correspondent pas.")
-                return
-            }
-            let sevenZ = format.indexOfSelectedItem == 1
-            FileOperationCenter.shared.compressEncrypted(urls, sevenZ: sevenZ, hideNames: sevenZ && hideNames.state == .on,
-                                                         password: password.stringValue, undoManager: undoManager) { [weak self] archive in
-                if let archive { self?.reload(selecting: [archive]) }
-            }
-        }
-    }
-
     @objc func extractHere(_ sender: Any?) { extract(into: self) }
 
     @objc func extractToOtherPanel(_ sender: Any?) {
@@ -1578,27 +1527,49 @@ final class PanelViewController: NSViewController {
             menu.addItem(.separator())
         }
 
+        // Groupes titrés, icônes colorées par famille : Ouvrir, Transformer, Organiser.
+        func header(_ title: String) {
+            if menu.items.last?.isSeparatorItem == false { menu.addItem(.separator()) }
+            menu.addItem(.sectionHeader(title: title))
+        }
+        func tinted(_ title: String, _ action: Selector, _ symbol: String, _ tint: NSColor) {
+            add(title, action)
+            menu.items.last?.image = MenuTint.icon(symbol, tint)
+        }
         if !selection.isEmpty {
-            add("Ouvrir", #selector(openSelection(_:)), "arrow.up.forward.app")
+            header("Ouvrir")
+            tinted("Ouvrir", #selector(openSelection(_:)), "arrow.up.forward.app", MenuTint.open)
             if selection.contains(where: \.isNavigableDirectory) {
-                add("Ouvrir dans un nouvel onglet", #selector(openInNewTab(_:)), "plus.square.on.square")
-            }
-            if selection.count == 1, selection[0].isNavigableDirectory, !currentURL.isRemote {
-                add("Analyser l’espace disque", #selector(analyzeDiskUsage(_:)), "chart.pie")
-            }
-            if selection.count == 1, selection[0].isPackage {
-                add("Afficher le contenu du paquet", #selector(showPackageContents(_:)), "shippingbox")
+                tinted("Ouvrir dans un nouvel onglet", #selector(openInNewTab(_:)), "plus.square.on.square", MenuTint.open)
             }
             if let first = selection.first, !first.isNavigableDirectory, !first.url.isRemote {
-                menu.addItem(openWithMenu(for: first.url))
+                let openWith = openWithMenu(for: first.url)
+                openWith.image = MenuTint.icon("square.grid.2x2", MenuTint.open)
+                menu.addItem(openWith)
             }
+            if selection.count == 1, selection[0].isPackage {
+                tinted("Afficher le contenu du paquet", #selector(showPackageContents(_:)), "shippingbox", MenuTint.open)
+            }
+            if selection.count == 1, selection[0].isNavigableDirectory, !currentURL.isRemote {
+                tinted("Analyser l’espace disque", #selector(analyzeDiskUsage(_:)), "chart.pie", MenuTint.open)
+            }
+            if !currentURL.isRemote {
+                let transform = transformMenuItems(for: selection)
+                if !transform.isEmpty {
+                    header("Transformer")
+                    transform.forEach(menu.addItem)
+                }
+            }
+        }
+
+        header("Organiser")
+        if !selection.isEmpty {
             let targets = host?.targetPanels(for: self) ?? []
             if !targets.isEmpty {
                 menu.addItem(panelSubmenu("Copier vers", #selector(copyToOtherPanel(_:)), targets, "arrow.right.doc.on.clipboard"))
                 menu.addItem(panelSubmenu("Déplacer vers", #selector(moveToOtherPanel(_:)), targets, "arrow.right.square"))
             }
             if !currentURL.isRemote {
-                menu.addItem(.separator())
                 menu.addItem(tagsMenuItem())
                 if let actions = customActionsMenuItem() { menu.addItem(actions) }
                 let links = NSMenuItem(title: "Créer un lien", action: nil, keyEquivalent: "")
@@ -1612,56 +1583,18 @@ final class PanelViewController: NSViewController {
                 }
                 menu.addItem(links)
                 menu.addItem(shareMenuItem(for: selection.map(\.url)))
-                if joinCandidate != nil {
-                    add("Réassembler les morceaux…", #selector(joinFiles(_:)), "square.stack.3d.up")
-                } else if splitCandidate != nil {
-                    add("Découper le fichier…", #selector(splitFile(_:)), "scissors")
-                }
-                checksumMenuItems(for: selection).forEach(menu.addItem)
-                if !encryptedFiles.isEmpty {
-                    add("Déchiffrer…", #selector(decryptFiles(_:)), "lock.open")
-                } else if !encryptableFiles.isEmpty {
-                    add("Chiffrer…", #selector(encryptFiles(_:)), "lock.shield")
-                }
-                if selection.contains(where: { !$0.isNavigableDirectory }) {
-                    let isList = selection.count == 1 && Checksums.listExtensions.contains(selection[0].url.pathExtension.lowercased())
-                    add(isList ? "Vérifier les sommes de contrôle" : "Sommes de contrôle…", #selector(showChecksums(_:)), "number")
-                }
-                let name = selection.count == 1 ? "« \(selection[0].name) »" : "\(selection.count) éléments"
-                add("Compresser \(name)", #selector(compressSelection(_:)), "archivebox")
-                add("Compresser avec un mot de passe…", #selector(compressWithPassword(_:)), "lock")
-                let formats = NSMenuItem(title: "Compresser au format", action: nil, keyEquivalent: "")
-                formats.image = NSImage(systemSymbolName: "archivebox", accessibilityDescription: nil)
-                formats.submenu = NSMenu()
-                for format in ArchiveFormat.allCases {
-                    let entry = NSMenuItem(title: "." + format.fileExtension, action: #selector(compressSelection(_:)), keyEquivalent: "")
-                    entry.target = self
-                    entry.image = NSImage(systemSymbolName: "doc.zipper", accessibilityDescription: nil)
-                    entry.tag = format.rawValue
-                    formats.submenu?.addItem(entry)
-                }
-                menu.addItem(formats)
-                if selection.allSatisfy({ Volumes.isDiskImage($0.url) }) {
-                    add("Monter l’image disque", #selector(mountDiskImages(_:)), "opticaldiscdrive")
-                }
-                if selection.contains(where: { FileOperationCenter.isArchive($0.url) }) {
-                    add("Décompresser ici", #selector(extractHere(_:)), "archivebox.circle")
-                    if !(host?.targetPanels(for: self).isEmpty ?? true) {
-                        add("Décompresser vers l’autre panneau", #selector(extractToOtherPanel(_:)), "arrow.right.circle")
-                    }
-                }
             }
+            add("Copier le chemin", #selector(copyPath(_:)), "link")
+            add("Nouveau dossier", #selector(newFolder(_:)), "folder.badge.plus")
         }
-        menu.addItem(.separator())
-        if !selection.isEmpty { add("Nouveau dossier", #selector(newFolder(_:)), "folder.badge.plus") }
         if !currentURL.isRemote { menu.addItem(newDocumentMenuItem()) }
         if !currentURL.isRemote { add("Ajouter aux favoris", #selector(addToFavorites(_:)), "star") }
-        if !selection.isEmpty { add("Copier le chemin", #selector(copyPath(_:)), "link") }
         if !currentURL.isRemote {
             add("Afficher dans le Finder", #selector(revealInFinder(_:)), "macwindow")
             add("Ouvrir dans le Terminal", #selector(openInTerminal(_:)), "terminal")
             if selection.isEmpty { add("Occupation du disque", #selector(toggleDiskUsage(_:)), "chart.pie") }
         }
+        if !selection.isEmpty { tinted("Placer dans la corbeille", #selector(moveToTrash(_:)), "trash", MenuTint.danger) }
         if selection.isEmpty, isFlatView || canShowFlatView {
             menu.addItem(.separator())
             menu.addItem(flatViewMenuItem())
@@ -1725,7 +1658,8 @@ extension PanelViewController: NSMenuItemValidation {
         let hasSelection = !selectionIndexes.isEmpty
         let localOnly: [Selector?] = [#selector(revealInFinder(_:)), #selector(openInTerminal(_:)), #selector(addToFavorites(_:)),
                                       #selector(runCustomAction(_:)),
-                                      #selector(compressSelection(_:)), #selector(extractHere(_:)), #selector(extractToOtherPanel(_:)),
+                                      #selector(compressSelection(_:)), #selector(compressQuick(_:)), #selector(compressCustom(_:)),
+                                      #selector(extractHere(_:)), #selector(extractToOtherPanel(_:)),
                                       #selector(quickLook(_:)), #selector(showPackageContents(_:)), #selector(newDocument(_:)),
                                       #selector(shareSelection(_:)), #selector(showChecksums(_:)), #selector(splitFile(_:)), #selector(joinFiles(_:)),
                                       #selector(compressWithPassword(_:)), #selector(encryptFiles(_:)), #selector(decryptFiles(_:))]
@@ -1748,7 +1682,7 @@ extension PanelViewController: NSMenuItemValidation {
         case #selector(copy(_:)), #selector(cut(_:)), #selector(duplicate(_:)), #selector(moveToTrash(_:)),
              #selector(openSelection(_:)), #selector(quickLook(_:)), #selector(shareSelection(_:)), #selector(selectSameType(_:)):
             return hasSelection
-        case #selector(compressSelection(_:)), #selector(compressWithPassword(_:)):
+        case #selector(compressSelection(_:)), #selector(compressWithPassword(_:)), #selector(compressQuick(_:)), #selector(compressCustom(_:)):
             return hasSelection
         case #selector(extractHere(_:)):
             return selectedURLs.contains(where: FileOperationCenter.isArchive)

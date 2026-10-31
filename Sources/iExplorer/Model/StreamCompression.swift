@@ -24,10 +24,11 @@ enum StreamCodec {
 
     // MARK: Compression
 
-    func compress(from input: FileHandle, to output: FileHandle, progress: (Int64) -> Void, isCancelled: () -> Bool) throws {
+    /// `level` : niveau zstd (1…19), ou niveau LZ4 (0 = rapide, 3…12 = HC).
+    func compress(from input: FileHandle, to output: FileHandle, level: Int, progress: (Int64) -> Void, isCancelled: () -> Bool) throws {
         switch self {
-        case .zstd: try Self.zstdCompress(input, output, progress, isCancelled)
-        case .lz4: try Self.lz4Compress(input, output, progress, isCancelled)
+        case .zstd: try Self.zstdCompress(input, output, level, progress, isCancelled)
+        case .lz4: try Self.lz4Compress(input, output, level, progress, isCancelled)
         }
     }
 
@@ -38,10 +39,10 @@ enum StreamCodec {
         }
     }
 
-    private static func zstdCompress(_ input: FileHandle, _ output: FileHandle, _ progress: (Int64) -> Void, _ isCancelled: () -> Bool) throws {
+    private static func zstdCompress(_ input: FileHandle, _ output: FileHandle, _ level: Int, _ progress: (Int64) -> Void, _ isCancelled: () -> Bool) throws {
         guard let context = ZSTD_createCCtx() else { throw Failure(message: "zstd : mémoire insuffisante") }
         defer { ZSTD_freeCCtx(context) }
-        ZSTD_CCtx_setParameter(context, ZSTD_c_compressionLevel, 6)
+        ZSTD_CCtx_setParameter(context, ZSTD_c_compressionLevel, Int32(level))
         ZSTD_CCtx_setParameter(context, ZSTD_c_checksumFlag, 1)
         var buffer = [UInt8](repeating: 0, count: ZSTD_CStreamOutSize())
         var done: Int64 = 0
@@ -97,13 +98,14 @@ enum StreamCodec {
         return code
     }
 
-    private static func lz4Compress(_ input: FileHandle, _ output: FileHandle, _ progress: (Int64) -> Void, _ isCancelled: () -> Bool) throws {
+    private static func lz4Compress(_ input: FileHandle, _ output: FileHandle, _ level: Int, _ progress: (Int64) -> Void, _ isCancelled: () -> Bool) throws {
         var context: OpaquePointer?
         _ = try lz4Check(LZ4F_createCompressionContext(&context, UInt32(LZ4F_VERSION)))
         defer { LZ4F_freeCompressionContext(context) }
         var preferences = LZ4F_preferences_t()
         preferences.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled
         preferences.frameInfo.blockSizeID = LZ4F_max4MB
+        preferences.compressionLevel = Int32(level)
         var buffer = [UInt8](repeating: 0, count: LZ4F_compressBound(chunk, &preferences) + 64)
         let capacity = buffer.count
         let header = try lz4Check(buffer.withUnsafeMutableBytes { LZ4F_compressBegin(context, $0.baseAddress, capacity, &preferences) })
@@ -151,10 +153,10 @@ enum StreamCodec {
     // MARK: Avec tar
 
     /// Crée `target` : tar des `names` (relatifs à `directory`) compressé au passage.
-    func createTar(_ names: [String], in directory: URL, to target: URL, job: FileJob) throws {
+    func createTar(_ names: [String], in directory: URL, to target: URL, level: Int, exclude: [String] = [], job: FileJob) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-        process.arguments = ["-c", "--no-mac-metadata", "-f", "-", "-C", directory.path, "--"] + names
+        process.arguments = ["-c", "--no-mac-metadata"] + exclude.flatMap { ["--exclude", $0] } + ["-f", "-", "-C", directory.path, "--"] + names
         let pipe = Pipe(), errors = Pipe()
         process.standardOutput = pipe
         process.standardError = errors
@@ -166,7 +168,7 @@ enum StreamCodec {
         try process.run()
         var failure: Error?
         do {
-            try compress(from: pipe.fileHandleForReading, to: output, progress: { job.waitIfPaused(); job.setDone($0) },
+            try compress(from: pipe.fileHandleForReading, to: output, level: level, progress: { job.waitIfPaused(); job.setDone($0) },
                          isCancelled: { job.isCancelled })
         } catch {
             failure = error

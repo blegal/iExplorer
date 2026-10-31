@@ -175,6 +175,11 @@ extension PanelViewController {
         alert.informativeText = "Le fichier chiffré porte l’extension de l’algorithme (.aes256 ou .chacha20) ; iExplorer propose ensuite « Déchiffrer ». Sans le mot de passe, il est irrécupérable."
         let cipher = NSPopUpButton(frame: NSRect(x: 0, y: 86, width: 300, height: 26))
         cipher.addItems(withTitles: FileCipher.allCases.map { "\($0.title) (.\($0.fileExtension))" })
+        // Algorithme choisi dans le sous-menu Chiffrer.
+        if let raw = (sender as? NSMenuItem)?.representedObject as? UInt8, let chosen = FileCipher(rawValue: raw),
+           let index = FileCipher.allCases.firstIndex(of: chosen) {
+            cipher.selectItem(at: index)
+        }
         let password = NSSecureTextField(frame: NSRect(x: 0, y: 56, width: 300, height: 24))
         password.placeholderString = "Mot de passe"
         let confirm = NSSecureTextField(frame: NSRect(x: 0, y: 26, width: 300, height: 24))

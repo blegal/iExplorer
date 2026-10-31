@@ -153,7 +153,7 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
     private var hashLabels: [URL: [ChecksumAlgorithm: NSTextField]] = [:]
     private var statusIcons: [URL: NSTextField] = [:]
 
-    static func show(files: [URL]) {
+    static func show(files: [URL], focusComparison: Bool = false) {
         let files = files.filter { !$0.hasDirectoryPath && !$0.isExistingDirectory }
         guard !files.isEmpty else { NSSound.beep(); return }
         // Un fichier de sommes seul : on vérifie son contenu.
@@ -162,7 +162,10 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
             let entries = Checksums.parseList(text)
             if !entries.isEmpty { present(ChecksumWindowController(mode: .verify(list: list, entries: entries))); return }
         }
-        present(ChecksumWindowController(mode: .compute(files)))
+        let controller = ChecksumWindowController(mode: .compute(files))
+        present(controller)
+        // « Comparer avec une empreinte… » : le champ de comparaison reçoit le curseur.
+        if focusComparison { controller.window?.makeFirstResponder(controller.verifyField) }
     }
 
     private static func present(_ controller: ChecksumWindowController) {
@@ -427,34 +430,6 @@ private final class FlippedView: NSView {
 extension PanelViewController {
     @objc func showChecksums(_ sender: Any?) {
         ChecksumWindowController.show(files: selectedItems.filter { !$0.isNavigableDirectory }.map(\.url))
-    }
-
-    /// Menu « Créer une somme de contrôle » : un fichier « nom.ext.sha256 » (…) par fichier sélectionné.
-    func checksumMenuItems(for selection: [FileItem]) -> [NSMenuItem] {
-        let files = selection.filter { !$0.isNavigableDirectory && !Checksums.listExtensions.contains($0.url.pathExtension.lowercased()) }
-        guard !files.isEmpty else { return [] }
-        var items: [NSMenuItem] = []
-        let create = NSMenuItem(title: "Créer une somme de contrôle", action: nil, keyEquivalent: "")
-        create.image = NSImage(systemSymbolName: "number.square", accessibilityDescription: nil)
-        create.submenu = NSMenu()
-        for algorithm in ChecksumAlgorithm.allCases {
-            let entry = NSMenuItem(title: "\(algorithm.rawValue) (.\(algorithm.fileExtension))", action: #selector(createChecksumFiles(_:)), keyEquivalent: "")
-            entry.target = self
-            entry.representedObject = algorithm.rawValue
-            create.submenu?.addItem(entry)
-        }
-        items.append(create)
-        // Fichier de somme déjà présent à côté : proposer de valider.
-        if files.count == 1 {
-            for (algorithm, sidecar) in Checksums.existingSidecars(for: files[0].url) {
-                let validate = NSMenuItem(title: "Valider la somme \(algorithm.rawValue)", action: #selector(validateChecksumFile(_:)), keyEquivalent: "")
-                validate.target = self
-                validate.representedObject = sidecar
-                validate.image = NSImage(systemSymbolName: "checkmark.seal", accessibilityDescription: nil)
-                items.append(validate)
-            }
-        }
-        return items
     }
 
     @objc func validateChecksumFile(_ sender: NSMenuItem) {

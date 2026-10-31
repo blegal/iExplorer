@@ -110,7 +110,7 @@ enum MainMenu {
             item("Vérifier les copies", #selector(AppDelegate.toggleVerifyCopies(_:))),
             separator(),
             item("Compresser", #selector(Panel.compressSelection(_:)), "k", [.command, .option]),
-            item("Compresser avec un mot de passe…", #selector(Panel.compressWithPassword(_:)), "k", [.command, .option, .shift]),
+            item("Compresser…", #selector(Panel.compressCustom(_:)), "k", [.command, .option, .shift]),
             item("Chiffrer…", #selector(Panel.encryptFiles(_:)), "e", [.command, .control, .option]),
             item("Déchiffrer…", #selector(Panel.decryptFiles(_:)), "d", [.command, .control, .option]),
             item("Décompresser ici", #selector(Panel.extractHere(_:)), "e", [.command, .option]),
