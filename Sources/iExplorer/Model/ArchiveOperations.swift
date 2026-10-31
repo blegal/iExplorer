@@ -183,7 +183,9 @@ extension FileOperationCenter {
             showError("Le format .\(format.fileExtension) demande \(tool.title) : installez-le dans Réglages › Outils externes.")
             return
         }
-        if let codec = format.externalCodec {
+        // tar.gz : pigz compresse sur tous les cœurs quand il est installé.
+        let codec = format.externalCodec ?? (format == .tarGz && ExternalTool.pigz.isInstalled ? .pigz : nil)
+        if let codec {
             compressExternal(names, in: source, codec: codec, level: level, exclude: request.excludeSystemFiles ? systemFiles : [],
                              target: target, total: request.urls.reduce(Int64(0)) { $0 + Self.allocatedSize(of: $1) },
                              title: title, undoManager: undoManager, completion: completion)
@@ -429,7 +431,7 @@ extension FileOperationCenter {
 
     /// Décompression dans un dossier ; une archive chiffrée fait demander le mot de passe, puis réessayer.
     private func extractFolder(_ archive: URL, base: String, into directory: URL, title: String, password: String?,
-                               undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
+                               useUnar: Bool = false, undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
         let target = uniqueURL(for: directory.appendingPathComponent(base), suffix: "")
         do {
             try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
@@ -439,17 +441,27 @@ extension FileOperationCenter {
         }
         let ext = archive.pathExtension.lowercased()
         let tool: String, arguments: [String]
-        if let password, ["7z", "rar"].contains(ext) || ext == "zip" && Self.sevenZip != nil, let sevenZip = Self.sevenZip {
+        if useUnar, let unar = ExternalTool.unar.path {
+            // The Unarchiver : formats que le tar du système ne sait pas lire. -D : pas de sous-dossier ajouté.
+            tool = unar.path
+            arguments = ["-q", "-f", "-D", "-o", target.path] + (password.map { ["-p", $0] } ?? []) + ["--", archive.path]
+        } else if let password, ["7z", "rar"].contains(ext) || ext == "zip" && Self.sevenZip != nil, let sevenZip = Self.sevenZip {
             tool = sevenZip.path
             arguments = ["x", "-y", "-p" + password, "-o" + target.path, "--", archive.path]
         } else {
             tool = "/usr/bin/tar"
             arguments = (password.map { ["--passphrase", $0] } ?? []) + ["-x", "-f", archive.path, "-C", target.path]
         }
+        // Échec du tar du système : nouvel essai avec The Unarchiver s'il est installé.
+        let fallback: (() -> Void)? = useUnar || tool != "/usr/bin/tar" || !ExternalTool.unar.isInstalled ? nil : { [weak self] in
+            self?.extractFolder(archive, base: base, into: directory, title: title, password: password, useUnar: true,
+                                undoManager: undoManager, completion: completion)
+        }
         runArchiveTool(tool, arguments, title: title, output: target, undoManager: nil, onPasswordNeeded: { [weak self] in
             guard let self, let password = Self.askPassword(for: archive, retry: password != nil) else { completion(nil); return }
-            extractFolder(archive, base: base, into: directory, title: title, password: password, undoManager: undoManager, completion: completion)
-        }) { [weak self] folder in
+            extractFolder(archive, base: base, into: directory, title: title, password: password, useUnar: useUnar,
+                          undoManager: undoManager, completion: completion)
+        }, onFailure: fallback) { [weak self] folder in
             guard let self, let folder else { completion(nil); return }
             let result = flattenSingleItem(folder)
             undoManager?.registerUndo(withTarget: self) { $0.trash([result], undoManager: undoManager, actionName: "Décompression") }
@@ -478,7 +490,7 @@ extension FileOperationCenter {
     /// `onPasswordNeeded` : appelé (sans message d'erreur) quand l'outil réclame un mot de passe.
     private func runArchiveTool(_ tool: String, _ arguments: [String], title: String, output: URL, stdoutTo: URL? = nil,
                                 currentDirectory: URL? = nil, undoManager: UndoManager?, onPasswordNeeded: (() -> Void)? = nil,
-                                completion: @escaping (URL?) -> Void) {
+                                onFailure: (() -> Void)? = nil, completion: @escaping (URL?) -> Void) {
         let job = FileJob(title: title)
         job.setStatus(output.lastPathComponent)
         addJob(job)
@@ -520,6 +532,10 @@ extension FileOperationCenter {
                     try? FileManager.default.removeItem(at: output)
                     if let failure, let onPasswordNeeded, Self.needsPassword(failure) {
                         onPasswordNeeded()
+                        return
+                    }
+                    if failure != nil, !job.isCancelled, let onFailure {
+                        onFailure()
                         return
                     }
                     if let failure { self.showError("\(title) a échoué.\n\(String(failure.suffix(600)))") }

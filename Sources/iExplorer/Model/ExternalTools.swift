@@ -3,7 +3,32 @@ import Foundation
 /// Outils externes facultatifs : détectés dans les dossiers habituels (Homebrew, système) et installables
 /// par Homebrew depuis Réglages › Outils externes. Sans eux, les fonctions concernées sont grisées.
 enum ExternalTool: String, CaseIterable {
-    case sevenZip, rar, unar, bzip3, lzip, brotli, developerTools
+    case sevenZip, rar, unar, bzip3, lzip, brotli, pigz
+    case ffmpeg, exiftool, vips, poppler, pandoc
+    case ripgrep, fd, fclones
+    case age, gnupg
+    case rsync
+    case developerTools
+
+    enum Category: String, CaseIterable {
+        case archives = "Archives et compression"
+        case previews = "Aperçus et métadonnées"
+        case search = "Recherche et doublons"
+        case crypto = "Chiffrement"
+        case sync = "Copie et synchronisation"
+        case development = "Développement"
+    }
+
+    var category: Category {
+        switch self {
+        case .sevenZip, .rar, .unar, .bzip3, .lzip, .brotli, .pigz: .archives
+        case .ffmpeg, .exiftool, .vips, .poppler, .pandoc: .previews
+        case .ripgrep, .fd, .fclones: .search
+        case .age, .gnupg: .crypto
+        case .rsync: .sync
+        case .developerTools: .development
+        }
+    }
 
     var title: String {
         switch self {
@@ -13,6 +38,18 @@ enum ExternalTool: String, CaseIterable {
         case .bzip3: "bzip3"
         case .lzip: "lzip"
         case .brotli: "Brotli"
+        case .pigz: "pigz"
+        case .ffmpeg: "FFmpeg"
+        case .exiftool: "ExifTool"
+        case .vips: "libvips"
+        case .poppler: "Poppler"
+        case .pandoc: "Pandoc"
+        case .ripgrep: "ripgrep"
+        case .fd: "fd"
+        case .fclones: "fclones"
+        case .age: "age"
+        case .gnupg: "GnuPG"
+        case .rsync: "rsync 3"
         case .developerTools: "Outils de développement Apple"
         }
     }
@@ -25,6 +62,18 @@ enum ExternalTool: String, CaseIterable {
         case .bzip3: "Archives .tar.bz3 (meilleur taux que bzip2 sur le texte et le code)"
         case .lzip: "Archives .tar.lz (format d’archivage à long terme)"
         case .brotli: "Archives .tar.br"
+        case .pigz: "gzip sur tous les cœurs du processeur (tar.gz bien plus rapide)"
+        case .ffmpeg: "Vidéos et sons hors QuickLook (mkv, webm, flac…) : miniatures, durée, codecs"
+        case .exiftool: "Métadonnées complètes des photos (RAW, XMP, IPTC, GPS) et des documents"
+        case .vips: "Miniatures rapides des grandes images (RAW, WebP, AVIF, TIFF géants)"
+        case .poppler: "Texte des PDF (pdftotext) pour la recherche dans le contenu"
+        case .pandoc: "Aperçu des documents docx, odt, epub, LaTeX convertis en HTML"
+        case .ripgrep: "Recherche ultra-rapide dans le contenu des fichiers, même hors index Spotlight"
+        case .fd: "Recherche rapide par nom dans les sous-dossiers"
+        case .fclones: "Recherche des fichiers en double"
+        case .age: "Chiffrement moderne de fichiers (.age), lisible sur Linux et Windows"
+        case .gnupg: "Fichiers .gpg et .asc : chiffrement, déchiffrement, signatures"
+        case .rsync: "Synchronisation plus rapide et plus complète que l’rsync de macOS"
         case .developerTools: "git : état Git des fichiers, commit et push depuis l’éditeur"
         }
     }
@@ -38,6 +87,18 @@ enum ExternalTool: String, CaseIterable {
         case .bzip3: ["bzip3"]
         case .lzip: ["lzip"]
         case .brotli: ["brotli"]
+        case .pigz: ["pigz"]
+        case .ffmpeg: ["ffprobe"]
+        case .exiftool: ["exiftool"]
+        case .vips: ["vips"]
+        case .poppler: ["pdftotext"]
+        case .pandoc: ["pandoc"]
+        case .ripgrep: ["rg"]
+        case .fd: ["fd"]
+        case .fclones: ["fclones"]
+        case .age: ["age"]
+        case .gnupg: ["gpg"]
+        case .rsync: ["rsync"]
         case .developerTools: ["git"]
         }
     }
@@ -51,8 +112,25 @@ enum ExternalTool: String, CaseIterable {
         case .bzip3: ("bzip3", false)
         case .lzip: ("lzip", false)
         case .brotli: ("brotli", false)
+        case .pigz: ("pigz", false)
+        case .ffmpeg: ("ffmpeg", false)
+        case .exiftool: ("exiftool", false)
+        case .vips: ("vips", false)
+        case .poppler: ("poppler", false)
+        case .pandoc: ("pandoc", false)
+        case .ripgrep: ("ripgrep", false)
+        case .fd: ("fd", false)
+        case .fclones: ("fclones", false)
+        case .age: ("age", false)
+        case .gnupg: ("gnupg", false)
+        case .rsync: ("rsync", false)
         case .developerTools: nil
         }
+    }
+
+    /// rsync existe déjà dans macOS (ancienne version) : seule celle de Homebrew compte.
+    private var searchPaths: [String] {
+        self == .rsync ? ["/opt/homebrew/bin", "/usr/local/bin"] : Self.searchPaths
     }
 
     private static let searchPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
@@ -63,7 +141,7 @@ enum ExternalTool: String, CaseIterable {
             return GitService.shared.isAvailable ? URL(fileURLWithPath: "/usr/bin/git") : nil
         }
         for binary in binaries {
-            for directory in Self.searchPaths {
+            for directory in searchPaths {
                 let candidate = directory + "/" + binary
                 if FileManager.default.isExecutableFile(atPath: candidate) { return URL(fileURLWithPath: candidate) }
             }
@@ -72,6 +150,14 @@ enum ExternalTool: String, CaseIterable {
     }
 
     var isInstalled: Bool { path != nil }
+
+    /// Outil déjà utilisé par une fonction d'iExplorer (les autres sont signalés « intégration à venir »).
+    var isUsed: Bool {
+        switch self {
+        case .sevenZip, .rar, .unar, .bzip3, .lzip, .brotli, .pigz, .developerTools: true
+        default: false
+        }
+    }
 
     static var homebrew: URL? {
         ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"].first { FileManager.default.isExecutableFile(atPath: $0) }.map { URL(fileURLWithPath: $0) }
@@ -88,7 +174,8 @@ enum ExternalTool: String, CaseIterable {
 
 /// Compression en flux par un outil externe (tar | outil > archive) : bzip3, lzip, Brotli.
 enum ExternalCodec {
-    case bzip3, lzip, brotli
+    /// pigz ne sert qu'à créer les tar.gz (la lecture reste au tar du système).
+    case bzip3, lzip, brotli, pigz
 
     init?(archive: URL) {
         let name = archive.lastPathComponent.lowercased()
@@ -103,6 +190,7 @@ enum ExternalCodec {
         case .bzip3: .bzip3
         case .lzip: .lzip
         case .brotli: .brotli
+        case .pigz: .pigz
         }
     }
 
@@ -112,6 +200,7 @@ enum ExternalCodec {
         case .bzip3: ["-e", "-c", "-b", "\(level)"]
         case .lzip: ["-c", "-\(level)"]
         case .brotli: ["-c", "-q", "\(level)"]
+        case .pigz: ["-c", "-\(level)"]
         }
     }
 

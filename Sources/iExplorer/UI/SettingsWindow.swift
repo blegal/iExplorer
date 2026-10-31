@@ -56,7 +56,24 @@ final class ExternalToolsViewController: NSViewController {
         logScroll.heightAnchor.constraint(equalToConstant: 110).isActive = true
         log.autoresizingMask = [.width]
 
-        let stack = NSStackView(views: [intro, rows, logScroll])
+        // Liste longue : elle défile, le journal reste visible dessous.
+        let rowsScroll = NSScrollView()
+        let flipped = FlippedClipContent()
+        flipped.addSubview(rows)
+        rows.translatesAutoresizingMaskIntoConstraints = false
+        rowsScroll.documentView = flipped
+        flipped.translatesAutoresizingMaskIntoConstraints = false
+        rowsScroll.hasVerticalScroller = true
+        rowsScroll.drawsBackground = false
+        rowsScroll.heightAnchor.constraint(equalToConstant: 470).isActive = true
+        NSLayoutConstraint.activate([
+            rows.topAnchor.constraint(equalTo: flipped.topAnchor),
+            rows.leadingAnchor.constraint(equalTo: flipped.leadingAnchor),
+            rows.trailingAnchor.constraint(equalTo: flipped.trailingAnchor),
+            rows.bottomAnchor.constraint(equalTo: flipped.bottomAnchor),
+            flipped.widthAnchor.constraint(equalTo: rowsScroll.contentView.widthAnchor),
+        ])
+        let stack = NSStackView(views: [intro, rowsScroll, logScroll])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 14
@@ -71,7 +88,7 @@ final class ExternalToolsViewController: NSViewController {
             stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             root.widthAnchor.constraint(equalToConstant: 660),
             intro.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
-            rows.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
+            rowsScroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
             logScroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
         ])
         view = root
@@ -87,8 +104,26 @@ final class ExternalToolsViewController: NSViewController {
             let button = NSButton(title: "Installer Homebrew…", target: self, action: #selector(openHomebrewSite))
             rows.addArrangedSubview(row(installed: false, title: "Homebrew", purpose: "Nécessaire pour installer les outils ci-dessous", detail: "brew.sh", button: button))
         }
+        for category in ExternalTool.Category.allCases {
+            rows.addArrangedSubview(separator())
+            rows.addArrangedSubview(sectionTitle(category.rawValue))
+            for tool in ExternalTool.allCases where tool.category == category { addRow(for: tool) }
+        }
         rows.addArrangedSubview(separator())
-        for tool in ExternalTool.allCases {
+        rows.addArrangedSubview(sectionTitle("Déjà intégrés"))
+        for library in ExternalTool.builtIn {
+            rows.addArrangedSubview(row(installed: true, title: library.title, purpose: library.purpose, detail: nil, button: nil))
+        }
+    }
+
+    private func sectionTitle(_ title: String) -> NSView {
+        let label = NSTextField(labelWithString: title)
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        return label
+    }
+
+    private func addRow(for tool: ExternalTool) {
             let path = tool.path
             var button: NSButton?
             if path == nil {
@@ -99,23 +134,16 @@ final class ExternalToolsViewController: NSViewController {
                 button = install
             }
             let package = tool.brewPackage.map { "brew install \($0.cask ? "--cask " : "")\($0.name)" } ?? "xcode-select --install"
-            rows.addArrangedSubview(row(installed: path != nil, title: tool.title, purpose: tool.purpose,
+            // Outil utile mais pas encore exploité par l'app : on le dit.
+            let purpose = tool.isUsed ? tool.purpose : tool.purpose + " — intégration à venir"
+            rows.addArrangedSubview(row(installed: path != nil, title: tool.title, purpose: purpose,
                                         detail: path?.path ?? package, button: button))
-        }
-        rows.addArrangedSubview(separator())
-        let builtIn = NSTextField(labelWithString: "Déjà intégrés")
-        builtIn.font = .systemFont(ofSize: 11, weight: .semibold)
-        builtIn.textColor = .secondaryLabelColor
-        rows.addArrangedSubview(builtIn)
-        for library in ExternalTool.builtIn {
-            rows.addArrangedSubview(row(installed: true, title: library.title, purpose: library.purpose, detail: nil, button: nil))
-        }
     }
 
     private func separator() -> NSView {
         let box = NSBox()
         box.boxType = .separator
-        box.widthAnchor.constraint(equalToConstant: 620).isActive = true
+        box.widthAnchor.constraint(equalToConstant: 600).isActive = true
         return box
     }
 
@@ -144,7 +172,7 @@ final class ExternalToolsViewController: NSViewController {
         let line = NSStackView(views: [icon, texts] + (button.map { [NSView(), $0] } ?? []))
         line.alignment = .top
         line.spacing = 10
-        line.widthAnchor.constraint(equalToConstant: 620).isActive = true
+        line.widthAnchor.constraint(equalToConstant: 600).isActive = true
         text.preferredMaxLayoutWidth = 480
         return line
     }
@@ -207,6 +235,10 @@ final class ExternalToolsViewController: NSViewController {
         log.textStorage?.append(NSAttributedString(string: text, attributes: [.font: log.font!, .foregroundColor: NSColor.secondaryLabelColor]))
         log.scrollToEndOfDocument(nil)
     }
+}
+
+private final class FlippedClipContent: NSView {
+    override var isFlipped: Bool { true }
 }
 
 extension AppDelegate {
