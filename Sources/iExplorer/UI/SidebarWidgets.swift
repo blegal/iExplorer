@@ -81,8 +81,35 @@ class SidebarWidget: NSView {
     var kind: SidebarWidgetKind { .digitalClock }
     var interval: TimeInterval { 1 }
     private var timer: Timer?
+    /// Petite croix en haut à droite, visible au survol : retire le widget.
+    var onClose: (() -> Void)?
+    private lazy var closeButton: NSButton = {
+        let button = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Retirer le widget")!,
+                              target: self, action: #selector(closeWidget))
+        button.isBordered = false
+        button.symbolConfiguration = .init(pointSize: 11, weight: .regular)
+        button.contentTintColor = .secondaryLabelColor
+        button.toolTip = "Retirer ce widget"
+        button.isHidden = true
+        button.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(button, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([button.topAnchor.constraint(equalTo: topAnchor, constant: 1),
+                                     button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -1)])
+        return button
+    }()
 
     override var isFlipped: Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
+    }
+
+    override func mouseEntered(with event: NSEvent) { closeButton.isHidden = onClose == nil }
+    override func mouseExited(with event: NSEvent) { closeButton.isHidden = true }
+
+    @objc private func closeWidget() { onClose?() }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -474,54 +501,169 @@ final class LoadWidget: SidebarWidget {
 
 // MARK: - Aquarium
 
+/// Styles de l'aquarium, choisis au clic droit.
+enum AquariumStyle: String, CaseIterable {
+    case tropical, abyss, school, koi
+
+    var title: String {
+        switch self {
+        case .tropical: "Lagon tropical"
+        case .abyss: "Abysses (méduses lumineuses)"
+        case .school: "Banc de poissons"
+        case .koi: "Bassin de carpes koï"
+        }
+    }
+
+    static var current: AquariumStyle {
+        get { AquariumStyle(rawValue: UserDefaults.standard.string(forKey: "aquariumStyle") ?? "") ?? .tropical }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "aquariumStyle") }
+    }
+}
+
 final class AquariumWidget: SidebarWidget {
     override var kind: SidebarWidgetKind { .aquarium }
     override var interval: TimeInterval { 1.0 / 30 }
 
-    private struct Fish { var x: CGFloat; var y: CGFloat; var speed: CGFloat; var size: CGFloat; var color: NSColor; var phase: CGFloat }
+    private struct Fish { var x: CGFloat; var y: CGFloat; var speed: CGFloat; var size: CGFloat; var color: NSColor; var phase: CGFloat; var spots: Bool }
     private struct Bubble { var x: CGFloat; var y: CGFloat; var radius: CGFloat }
+    private struct Jelly { var x: CGFloat; var y: CGFloat; var size: CGFloat; var hue: CGFloat; var phase: CGFloat }
     private var fishes: [Fish] = []
     private var bubbles: [Bubble] = []
+    private var jellies: [Jelly] = []
     private var time: CGFloat = 0
+    private var populated: AquariumStyle?
+
+    override func extraMenuItems() -> [NSMenuItem] {
+        let style = NSMenuItem(title: "Style de l’aquarium", action: nil, keyEquivalent: "")
+        style.image = NSImage(systemSymbolName: "fish", accessibilityDescription: nil)
+        let menu = NSMenu()
+        for choice in AquariumStyle.allCases {
+            let item = NSMenuItem(title: choice.title, action: #selector(chooseStyle(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = choice.rawValue
+            item.state = choice == AquariumStyle.current ? .on : .off
+            menu.addItem(item)
+        }
+        style.submenu = menu
+        return [style]
+    }
+
+    @objc private func chooseStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let style = AquariumStyle(rawValue: raw) else { return }
+        AquariumStyle.current = style
+        populated = nil
+    }
+
+    /// Peuple le bocal selon le style (une fois la taille du widget connue).
+    private func populate(_ style: AquariumStyle) {
+        let width = bounds.width, height = bounds.height
+        func fish(_ size: ClosedRange<CGFloat>, _ speed: ClosedRange<CGFloat>, _ color: NSColor, flip: Bool, spots: Bool = false, y: CGFloat? = nil) -> Fish {
+            Fish(x: .random(in: 0...width), y: y ?? .random(in: 14...max(15, height - 24)), speed: .random(in: speed) * (flip ? -1 : 1),
+                 size: .random(in: size), color: color, phase: .random(in: 0...6), spots: spots)
+        }
+        jellies = []
+        switch style {
+        case .tropical:
+            let colors: [NSColor] = [.systemOrange, .systemYellow, .systemPink, .systemTeal, .systemRed]
+            fishes = (0..<5).map { fish(9...15, 0.4...1.2, colors[$0 % colors.count], flip: $0 % 2 == 1) }
+        case .abyss:
+            fishes = (0..<3).map { _ in fish(7...11, 0.2...0.5, NSColor(calibratedRed: 0.3, green: 0.4, blue: 0.6, alpha: 1), flip: Bool.random(), spots: true) }
+            jellies = (0..<3).map { index in
+                Jelly(x: width * (0.2 + 0.3 * CGFloat(index)), y: .random(in: 20...max(21, height - 30)), size: .random(in: 10...16),
+                      hue: [0.55, 0.8, 0.95][index], phase: .random(in: 0...6))
+            }
+        case .school:
+            // Un banc qui nage ensemble, à quelques écarts près.
+            let base = height * 0.45
+            fishes = (0..<16).map { _ in
+                var member = fish(4...6, 0.9...1.0, NSColor(calibratedWhite: 0.85, alpha: 1), flip: false, y: base + .random(in: -18...18))
+                member.x = .random(in: 0...width * 0.5)
+                return member
+            }
+        case .koi:
+            let colors: [NSColor] = [.systemOrange, .white, NSColor(calibratedRed: 0.95, green: 0.35, blue: 0.2, alpha: 1)]
+            fishes = (0..<3).map { fish(16...20, 0.25...0.45, colors[$0 % colors.count], flip: $0 % 2 == 1, spots: true) }
+        }
+        populated = style
+    }
 
     override func tick() {
         // Tant que le widget n'a pas sa taille (premier affichage), rien à animer.
         guard bounds.width > 40, bounds.height > 50 else { return }
-        if fishes.isEmpty {
-            let colors: [NSColor] = [.systemOrange, .systemYellow, .systemPink, .systemTeal, .systemRed]
-            fishes = (0..<5).map { index in
-                Fish(x: .random(in: 0...bounds.width), y: .random(in: 14...(bounds.height - 24)),
-                     speed: .random(in: 0.4...1.2) * (index % 2 == 0 ? 1 : -1), size: .random(in: 9...15),
-                     color: colors[index % colors.count], phase: .random(in: 0...6))
-            }
-        }
+        let style = AquariumStyle.current
+        if populated != style { populate(style) }
         time += 0.05
         for index in fishes.indices {
             fishes[index].x += fishes[index].speed
-            if fishes[index].x > bounds.width + 20 || fishes[index].x < -20 { fishes[index].speed *= -1 }
+            if fishes[index].x > bounds.width + 20 || fishes[index].x < -20 {
+                if style == .school { fishes[index].x = -15 } else { fishes[index].speed *= -1 }
+            }
         }
-        if Int.random(in: 0..<14) == 0 { bubbles.append(Bubble(x: .random(in: 8...(bounds.width - 8)), y: bounds.height - 6, radius: .random(in: 1.5...3.5))) }
+        for index in jellies.indices {
+            // Les méduses montent par pulsations, puis redescendent doucement.
+            jellies[index].y -= max(0, sin(time * 2 + jellies[index].phase)) * 0.6 - 0.15
+            if jellies[index].y < 10 { jellies[index].y = bounds.height - 20 }
+        }
+        if style != .koi, Int.random(in: 0..<14) == 0 {
+            bubbles.append(Bubble(x: .random(in: 8...(bounds.width - 8)), y: bounds.height - 6, radius: .random(in: 1.5...3.5)))
+        }
         for index in bubbles.indices { bubbles[index].y -= 0.8; bubbles[index].x += sin(time + bubbles[index].y / 9) * 0.3 }
         bubbles.removeAll { $0.y < 4 }
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        let style = AquariumStyle.current
         let tank = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
-        NSGradient(starting: NSColor(calibratedRed: 0.1, green: 0.45, blue: 0.75, alpha: 1),
-                   ending: NSColor(calibratedRed: 0.02, green: 0.12, blue: 0.3, alpha: 1))?.draw(in: tank, angle: -90)
+        let colors: (NSColor, NSColor) = switch style {
+        case .tropical: (NSColor(calibratedRed: 0.1, green: 0.45, blue: 0.75, alpha: 1), NSColor(calibratedRed: 0.02, green: 0.12, blue: 0.3, alpha: 1))
+        case .abyss: (NSColor(calibratedRed: 0.02, green: 0.04, blue: 0.12, alpha: 1), NSColor(calibratedRed: 0, green: 0, blue: 0.03, alpha: 1))
+        case .school: (NSColor(calibratedRed: 0.15, green: 0.55, blue: 0.7, alpha: 1), NSColor(calibratedRed: 0.05, green: 0.25, blue: 0.4, alpha: 1))
+        case .koi: (NSColor(calibratedRed: 0.2, green: 0.4, blue: 0.3, alpha: 1), NSColor(calibratedRed: 0.08, green: 0.2, blue: 0.15, alpha: 1))
+        }
+        NSGradient(starting: colors.0, ending: colors.1)?.draw(in: tank, angle: -90)
         // Les poissons qui font demi-tour au bord restent dans le bocal.
         tank.addClip()
-        NSColor(calibratedRed: 0.85, green: 0.75, blue: 0.5, alpha: 1).setFill()
-        NSBezierPath(rect: NSRect(x: 1, y: bounds.height - 9, width: bounds.width - 2, height: 8)).fill()
-        for plant in stride(from: CGFloat(14), to: bounds.width, by: 46) {
-            let path = NSBezierPath()
-            path.move(to: NSPoint(x: plant, y: bounds.height - 8))
-            path.curve(to: NSPoint(x: plant + sin(time) * 4, y: bounds.height - 40),
-                       controlPoint1: NSPoint(x: plant - 8, y: bounds.height - 20), controlPoint2: NSPoint(x: plant + 8, y: bounds.height - 30))
-            path.lineWidth = 3
-            NSColor.systemGreen.withAlphaComponent(0.8).setStroke()
-            path.stroke()
+        if style == .tropical || style == .school {
+            NSColor(calibratedRed: 0.85, green: 0.75, blue: 0.5, alpha: 1).setFill()
+            NSBezierPath(rect: NSRect(x: 1, y: bounds.height - 9, width: bounds.width - 2, height: 8)).fill()
+            for plant in stride(from: CGFloat(14), to: bounds.width, by: 46) {
+                let path = NSBezierPath()
+                path.move(to: NSPoint(x: plant, y: bounds.height - 8))
+                path.curve(to: NSPoint(x: plant + sin(time) * 4, y: bounds.height - 40),
+                           controlPoint1: NSPoint(x: plant - 8, y: bounds.height - 20), controlPoint2: NSPoint(x: plant + 8, y: bounds.height - 30))
+                path.lineWidth = 3
+                NSColor.systemGreen.withAlphaComponent(0.8).setStroke()
+                path.stroke()
+            }
+        }
+        if style == .koi {
+            // Nénuphars à la surface du bassin.
+            for (index, x) in [0.15, 0.62, 0.88].enumerated() {
+                NSColor(calibratedRed: 0.25, green: 0.6, blue: 0.25, alpha: 0.9).setFill()
+                let size: CGFloat = [22, 16, 18][index]
+                NSBezierPath(ovalIn: NSRect(x: bounds.width * CGFloat(x) - size / 2, y: 8 + CGFloat(index * 22), width: size, height: size * 0.7)).fill()
+            }
+        }
+        for jelly in jellies {
+            let color = NSColor(calibratedHue: jelly.hue, saturation: 0.6, brightness: 1, alpha: 0.75)
+            color.withAlphaComponent(0.25).setFill()
+            NSBezierPath(ovalIn: NSRect(x: jelly.x - jelly.size, y: jelly.y - jelly.size, width: jelly.size * 2, height: jelly.size * 2)).fill()
+            color.setFill()
+            let dome = NSBezierPath()
+            dome.appendArc(withCenter: NSPoint(x: jelly.x, y: jelly.y), radius: jelly.size * 0.6, startAngle: 180, endAngle: 360, clockwise: false)
+            dome.close()
+            dome.fill()
+            color.setStroke()
+            for tentacle in 0..<4 {
+                let path = NSBezierPath()
+                let x = jelly.x - jelly.size * 0.45 + CGFloat(tentacle) * jelly.size * 0.3
+                path.move(to: NSPoint(x: x, y: jelly.y))
+                path.curve(to: NSPoint(x: x + sin(time * 3 + CGFloat(tentacle)) * 3, y: jelly.y + jelly.size * 1.3),
+                           controlPoint1: NSPoint(x: x - 3, y: jelly.y + jelly.size * 0.5), controlPoint2: NSPoint(x: x + 3, y: jelly.y + jelly.size * 0.9))
+                path.lineWidth = 1
+                path.stroke()
+            }
         }
         for fish in fishes {
             let direction: CGFloat = fish.speed > 0 ? 1 : -1
@@ -534,6 +676,16 @@ final class AquariumWidget: SidebarWidget {
             tail.line(to: NSPoint(x: fish.x - direction * fish.size * 1.6, y: y + fish.size / 2))
             tail.close()
             tail.fill()
+            if fish.spots {
+                // Koï : taches orangées ; abysses : lanterne lumineuse devant la tête.
+                if style == .abyss {
+                    NSColor(calibratedRed: 1, green: 0.95, blue: 0.5, alpha: 0.9).setFill()
+                    NSBezierPath(ovalIn: NSRect(x: fish.x + direction * fish.size * 1.3 - 2, y: y - fish.size * 0.8, width: 4, height: 4)).fill()
+                } else {
+                    NSColor.systemRed.withAlphaComponent(0.8).setFill()
+                    NSBezierPath(ovalIn: NSRect(x: fish.x - fish.size * 0.3, y: y - fish.size / 4, width: fish.size * 0.6, height: fish.size / 2.5)).fill()
+                }
+            }
             NSColor.black.setFill()
             NSBezierPath(ovalIn: NSRect(x: fish.x + direction * fish.size * 0.5 - 1.5, y: y - 3, width: 3, height: 3)).fill()
         }
@@ -546,13 +698,69 @@ final class AquariumWidget: SidebarWidget {
 
 // MARK: - Pluie Matrix
 
+/// Styles de la pluie de caractères, choisis au clic droit.
+enum MatrixStyle: String, CaseIterable {
+    case green, amber, blue, rainbow, binary, red
+
+    var title: String {
+        switch self {
+        case .green: "Vert classique"
+        case .amber: "Ambre (vieux terminal)"
+        case .blue: "Bleu néon"
+        case .rainbow: "Arc-en-ciel"
+        case .binary: "Binaire (0 et 1)"
+        case .red: "Rouge alerte"
+        }
+    }
+
+    static var current: MatrixStyle {
+        get { MatrixStyle(rawValue: UserDefaults.standard.string(forKey: "matrixStyle") ?? "") ?? .green }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "matrixStyle") }
+    }
+
+    var glyphs: [Character] {
+        self == .binary ? Array("01") : Array("ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ0123456789ABCDEFﾊﾋﾌﾍﾎ")
+    }
+
+    /// Couleur d'une traînée (`column` sert à l'arc-en-ciel).
+    func color(column: Int, fade: CGFloat) -> NSColor {
+        switch self {
+        case .green, .binary: NSColor(calibratedRed: 0, green: 0.9, blue: 0.3, alpha: fade)
+        case .amber: NSColor(calibratedRed: 1, green: 0.7, blue: 0.1, alpha: fade)
+        case .blue: NSColor(calibratedRed: 0.2, green: 0.7, blue: 1, alpha: fade)
+        case .rainbow: NSColor(calibratedHue: CGFloat(column % 12) / 12, saturation: 0.8, brightness: 1, alpha: fade)
+        case .red: NSColor(calibratedRed: 1, green: 0.15, blue: 0.15, alpha: fade)
+        }
+    }
+}
+
 final class MatrixWidget: SidebarWidget {
     override var kind: SidebarWidgetKind { .matrix }
     override var interval: TimeInterval { 1.0 / 14 }
-    private let glyphs = Array("ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ0123456789ABCDEFﾊﾋﾌﾍﾎ")
     private var drops: [CGFloat] = []
     private var speeds: [CGFloat] = []
     private let cell: CGFloat = 11
+
+    override func extraMenuItems() -> [NSMenuItem] {
+        let style = NSMenuItem(title: "Style de la pluie", action: nil, keyEquivalent: "")
+        style.image = NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil)
+        let menu = NSMenu()
+        for choice in MatrixStyle.allCases {
+            let item = NSMenuItem(title: choice.title, action: #selector(chooseStyle(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = choice.rawValue
+            item.state = choice == MatrixStyle.current ? .on : .off
+            menu.addItem(item)
+        }
+        style.submenu = menu
+        return [style]
+    }
+
+    @objc private func chooseStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let style = MatrixStyle(rawValue: raw) else { return }
+        MatrixStyle.current = style
+        needsDisplay = true
+    }
 
     override func tick() {
         let columns = Int(bounds.width / cell)
@@ -568,6 +776,8 @@ final class MatrixWidget: SidebarWidget {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        let style = MatrixStyle.current
+        let glyphs = style.glyphs
         let screen = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
         NSColor.black.setFill()
         screen.fill()
@@ -577,8 +787,8 @@ final class MatrixWidget: SidebarWidget {
             for trail in 0..<9 {
                 let row = Int(head) - trail
                 guard row >= 0, CGFloat(row) * cell < bounds.height else { continue }
-                let color = trail == 0 ? NSColor(calibratedRed: 0.8, green: 1, blue: 0.8, alpha: 1)
-                    : NSColor(calibratedRed: 0, green: 0.9, blue: 0.3, alpha: 1 - CGFloat(trail) / 9)
+                let color = trail == 0 ? NSColor.white.blended(withFraction: 0.3, of: style.color(column: column, fade: 1)) ?? .white
+                    : style.color(column: column, fade: 1 - CGFloat(trail) / 9)
                 let glyph = String(glyphs[(column * 7 + row * 13) % glyphs.count])
                 NSAttributedString(string: glyph, attributes: [.font: font, .foregroundColor: color])
                     .draw(at: NSPoint(x: CGFloat(column) * cell + 1, y: CGFloat(row) * cell))
@@ -670,20 +880,56 @@ final class NetworkWidget: SidebarWidget {
 
 // MARK: - Minuteur, calendrier
 
+/// Bouton rond « flat » : pastille colorée, symbole blanc.
+final class FlatRoundButton: NSButton {
+    var fill: NSColor = .systemRed { didSet { needsDisplay = true } }
+
+    convenience init(symbol: String, fill: NSColor, tip: String, target: AnyObject, action: Selector) {
+        self.init(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+        self.fill = fill
+        image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
+        imagePosition = .imageOnly
+        isBordered = false
+        toolTip = tip
+        self.target = target
+        self.action = action
+        symbolConfiguration = .init(pointSize: 10, weight: .bold)
+        contentTintColor = .white
+        translatesAutoresizingMaskIntoConstraints = false
+        widthAnchor.constraint(equalToConstant: 24).isActive = true
+        heightAnchor.constraint(equalToConstant: 24).isActive = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        (isHighlighted ? fill.shadow(withLevel: 0.2) ?? fill : fill).setFill()
+        NSBezierPath(ovalIn: bounds).fill()
+        super.draw(dirtyRect)
+    }
+}
+
 final class PomodoroWidget: SidebarWidget {
     override var kind: SidebarWidgetKind { .timer }
-    private var duration: TimeInterval = 25 * 60
     private var endDate: Date?
     private var remainingWhenPaused: TimeInterval?
-    private lazy var button: NSButton = {
-        let button = NSButton(title: "Démarrer", target: self, action: #selector(toggle))
-        button.controlSize = .small
-        button.bezelStyle = .accessoryBarAction
-        button.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(button)
-        NSLayoutConstraint.activate([button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-                                     button.centerYAnchor.constraint(equalTo: centerYAnchor)])
-        return button
+    private static let durations = [5, 10, 15, 20, 25, 30, 45, 50, 60, 90]
+
+    private var minutes: Int {
+        get { UserDefaults.standard.object(forKey: "pomodoroMinutes") as? Int ?? 25 }
+        set { UserDefaults.standard.set(newValue, forKey: "pomodoroMinutes") }
+    }
+    private var duration: TimeInterval { TimeInterval(minutes * 60) }
+
+    private lazy var playButton = FlatRoundButton(symbol: "play.fill", fill: .systemGreen, tip: "Démarrer", target: self, action: #selector(toggle))
+    private lazy var stopButton = FlatRoundButton(symbol: "stop.fill", fill: .systemRed, tip: "Arrêter et remettre à zéro", target: self, action: #selector(reset))
+    private lazy var configureButton = FlatRoundButton(symbol: "gearshape.fill", fill: .systemGray, tip: "Durée", target: self, action: #selector(configure(_:)))
+    private lazy var buttons: NSStackView = {
+        let stack = NSStackView(views: [playButton, stopButton, configureButton])
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SidebarWidgetKind.timer.height + 4),
+                                     stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)])
+        return stack
     }()
 
     private var remaining: TimeInterval {
@@ -692,28 +938,59 @@ final class PomodoroWidget: SidebarWidget {
     }
 
     override func tick() {
-        _ = button
+        _ = buttons
         if endDate != nil, remaining <= 0 {
             endDate = nil
             remainingWhenPaused = nil
-            button.title = "Démarrer"
+            updatePlayButton()
             NSSound(named: "Glass")?.play()
             NSApp.requestUserAttention(.informationalRequest)
         }
         needsDisplay = true
     }
 
+    private func updatePlayButton() {
+        let running = endDate != nil
+        playButton.image = NSImage(systemSymbolName: running ? "pause.fill" : "play.fill", accessibilityDescription: running ? "Pause" : "Démarrer")
+        playButton.fill = running ? .systemOrange : .systemGreen
+        playButton.toolTip = running ? "Pause" : (remainingWhenPaused != nil ? "Reprendre" : "Démarrer")
+    }
+
     @objc private func toggle() {
         if endDate != nil {
             remainingWhenPaused = remaining
             endDate = nil
-            button.title = "Reprendre"
         } else {
             endDate = Date().addingTimeInterval(remaining > 0 ? remaining : duration)
             remainingWhenPaused = nil
-            button.title = "Pause"
         }
+        updatePlayButton()
         needsDisplay = true
+    }
+
+    @objc private func reset() {
+        endDate = nil
+        remainingWhenPaused = nil
+        updatePlayButton()
+        needsDisplay = true
+    }
+
+    @objc private func configure(_ sender: NSButton) {
+        let menu = NSMenu()
+        menu.addItem(.sectionHeader(title: "Durée"))
+        for value in Self.durations {
+            let item = NSMenuItem(title: "\(value) minutes", action: #selector(setDuration(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = value
+            item.state = value == minutes ? .on : .off
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    @objc private func setDuration(_ sender: NSMenuItem) {
+        minutes = sender.tag
+        reset()
     }
 
     override func extraMenuItems() -> [NSMenuItem] {
@@ -723,16 +1000,9 @@ final class PomodoroWidget: SidebarWidget {
         return [reset]
     }
 
-    @objc private func reset() {
-        endDate = nil
-        remainingWhenPaused = nil
-        button.title = "Démarrer"
-        needsDisplay = true
-    }
-
     override func draw(_ dirtyRect: NSRect) {
         let side = bounds.height - 12
-        let ring = NSRect(x: 8, y: 6, width: side, height: side)
+        let ring = NSRect(x: 6, y: 6, width: side, height: side)
         let center = NSPoint(x: ring.midX, y: ring.midY)
         let track = NSBezierPath(ovalIn: ring.insetBy(dx: 3, dy: 3))
         track.lineWidth = 5
@@ -748,8 +1018,9 @@ final class PomodoroWidget: SidebarWidget {
         let seconds = Int(remaining.rounded(.up))
         let label = text(String(format: "%02d:%02d", seconds / 60, seconds % 60), size: 15, weight: .medium, monospaced: true)
         label.draw(at: NSPoint(x: center.x - label.size().width / 2, y: center.y - label.size().height / 2))
-        text("Pomodoro", size: 11, weight: .semibold).draw(at: NSPoint(x: ring.maxX + 10, y: 16))
-        text("clic droit : options", size: 9.5, color: faint).draw(at: NSPoint(x: ring.maxX + 10, y: 32))
+        text("Pomodoro", size: 11, weight: .semibold).draw(at: NSPoint(x: ring.maxX + 10, y: 10))
+        let state = endDate != nil ? "en cours" : (remainingWhenPaused != nil ? "en pause" : "\(minutes) min")
+        text(state, size: 10, color: faint).draw(at: NSPoint(x: ring.maxX + 10, y: 26))
     }
 }
 
@@ -843,6 +1114,8 @@ final class SidebarWidgetsView: NSView {
             widget.translatesAutoresizingMaskIntoConstraints = false
             widget.heightAnchor.constraint(equalToConstant: kind.height).isActive = true
             widget.menu = widgetMenu(for: kind, widget: widget)
+            // Retiré après le clic (le bouton ne disparaît pas pendant sa propre action).
+            widget.onClose = { DispatchQueue.main.async { SidebarWidgetKind.enabled = SidebarWidgetKind.enabled.filter { $0 != kind } } }
             stack.addArrangedSubview(widget)
             widget.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -20).isActive = true
         }
