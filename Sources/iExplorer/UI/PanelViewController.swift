@@ -352,6 +352,8 @@ final class PanelViewController: NSViewController {
         tableView.onFocus = { [weak self] in self?.activate(focusTable: false) }
         tableView.keyHandler = { [weak self] event in self?.handleKey(event) ?? false }
         tableView.onZoom = { [weak self] factor in self?.zoom(by: factor) }
+        tableView.onHover = { [weak self] row, previous in self?.hoverEffect(row, previous) }
+        tableView.onRowClick = { [weak self] row, point in self?.clickEffect(row, point) }
         tableView.contextMenuProvider = { [weak self] in self?.contextMenu() }
         tableView.onSlowClick = { [weak self] row in
             guard let self, renamingRow == nil, let index = itemIndex(forRow: row), selectionIndexes == [index] else { return }
@@ -561,6 +563,7 @@ final class PanelViewController: NSViewController {
             accentLine.layer?.backgroundColor = visible ? Theme.accent.cgColor : NSColor.clear.cgColor
         }
         if visible != wasVisible { Effects.accent(accentLine, visible: visible) }
+        Effects.dim(view, active: isActive || !showsActiveIndicator)
         breadcrumb.isActive = isActive || !showsActiveIndicator
         updateTabBar()
     }
@@ -1243,6 +1246,7 @@ final class PanelViewController: NSViewController {
         let urls = selectedURLs
         guard !urls.isEmpty else { return }
         let destination = target.currentURL
+        flyEffect(to: target)
         FileOperationCenter.shared.transfer(kind, sources: urls, to: destination, undoManager: undoManager) { [weak target] created in
             guard let target, destination.isSameLocation(as: target.currentURL) else { return }
             target.reload(selecting: created)
@@ -1336,6 +1340,57 @@ final class PanelViewController: NSViewController {
         }
     }
 
+    // MARK: Effets Whaouh+++
+
+    private func nameCell(_ row: Int) -> NameCellView? {
+        guard row >= 0, row < tableView.numberOfRows else { return nil }
+        return tableView.view(atColumn: max(0, tableView.column(withIdentifier: .name)), row: row, makeIfNecessary: false) as? NameCellView
+    }
+
+    private func hoverEffect(_ row: Int, _ previous: Int) {
+        let rowView = row >= 0 && row < tableView.numberOfRows ? tableView.rowView(atRow: row, makeIfNecessary: false) : nil
+        let oldView = previous >= 0 && previous < tableView.numberOfRows ? tableView.rowView(atRow: previous, makeIfNecessary: false) : nil
+        Effects.hover(rowView, icon: nameCell(row)?.imageView, previous: oldView, previousIcon: nameCell(previous)?.imageView)
+    }
+
+    private func clickEffect(_ row: Int, _ point: NSPoint) {
+        guard let rowView = tableView.rowView(atRow: row, makeIfNecessary: false) else { return }
+        Effects.ripple(in: rowView, at: rowView.convert(point, from: tableView))
+        Effects.pop(nameCell(row)?.imageView)
+    }
+
+    /// Copie ou déplacement vers un autre panneau : les icônes s'envolent vers lui.
+    private func flyEffect(to target: PanelViewController) {
+        guard Effects.isOn(.flyingFiles), let window = view.window else { return }
+        let rows = tableView.selectedRowIndexes.prefix(6)
+        let images = rows.compactMap { nameCell($0)?.imageView?.image }
+        guard let first = rows.first, let rowView = tableView.rowView(atRow: first, makeIfNecessary: false) else { return }
+        let start = rowView.convert(rowView.bounds, to: nil)
+        let end = target.view.convert(NSPoint(x: target.view.bounds.midX, y: target.view.bounds.midY), to: nil)
+        Effects.fly(images, from: start, to: end, in: window)
+    }
+
+    /// Le nom renommé s'écrit lettre par lettre (Whaouh+++).
+    private func typewriterEffect(_ url: URL) {
+        guard let index = items.firstIndex(where: { $0.url == url }) else { return }
+        Effects.typewriter(nameCell(tableRow(forItem: index))?.textField)
+    }
+
+    /// Recharge en sélectionnant les éléments créés, puis les met en valeur (Whaouh+++).
+    func revealCreated(_ urls: [URL], symbol: String? = nil, color: NSColor = .systemPurple, accordion: Bool = false) {
+        reload(selecting: urls) { [weak self] in
+            guard let self else { return }
+            for (offset, url) in urls.enumerated() {
+                guard let index = items.firstIndex(where: { $0.url == url }) else { continue }
+                let row = tableRow(forItem: index)
+                let rowView = row >= 0 && row < tableView.numberOfRows ? tableView.rowView(atRow: row, makeIfNecessary: false) : nil
+                if accordion { Effects.pop(nameCell(row)?.imageView, delay: Double(offset) * 0.05, from: 1.6, axis: "transform.scale.x") }
+                else { Effects.pop(nameCell(row)?.imageView, delay: Double(offset) * 0.05) }
+                if let symbol { Effects.stamp(symbol, color: color, on: rowView) }
+            }
+        }
+    }
+
     /// Glissement ou fondu du contenu, puis cascade des éléments visibles en mode complet.
     private func playNavigationAnimation(_ direction: NavigationDirection) {
         let content: NSView = viewMode == .icons ? gridScrollView : (viewMode == .columns ? browser : scrollView)
@@ -1346,6 +1401,14 @@ final class PanelViewController: NSViewController {
         } else if viewMode != .columns {
             let visible = tableView.rows(in: tableView.visibleRect)
             Effects.cascade((visible.location..<NSMaxRange(visible)).compactMap { tableView.rowView(atRow: $0, makeIfNecessary: false) })
+        }
+        // Whaouh+++ : les icônes du nouveau dossier font « pop » en spirale depuis le centre.
+        if Effects.isOn(.spiral), viewMode != .icons, viewMode != .columns {
+            let visible = tableView.rows(in: tableView.visibleRect)
+            let middle = visible.location + visible.length / 2
+            for row in visible.location..<NSMaxRange(visible) {
+                Effects.pop(nameCell(row)?.imageView, delay: Double(abs(row - middle)) * 0.025, from: 0.4, effect: .spiral)
+            }
         }
     }
 
@@ -1399,7 +1462,7 @@ final class PanelViewController: NSViewController {
         if commit, !newName.isEmpty, newName != item.name {
             do {
                 let renamed = try FileOperationCenter.shared.rename(item.url, to: newName, undoManager: undoManager)
-                reload(selecting: [renamed])
+                reload(selecting: [renamed]) { [weak self] in self?.typewriterEffect(renamed) }
                 return
             } catch {
                 presentErrorSheet(error)
@@ -1435,7 +1498,7 @@ final class PanelViewController: NSViewController {
             }
             do {
                 let renamed = try FileOperationCenter.shared.rename(item.url, to: newName, undoManager: undoManager)
-                reload(selecting: [renamed])
+                reload(selecting: [renamed]) { [weak self] in self?.typewriterEffect(renamed) }
             } catch {
                 presentErrorSheet(error)
             }
@@ -1463,7 +1526,7 @@ final class PanelViewController: NSViewController {
         for archive in archives {
             FileOperationCenter.shared.extract(archive, into: destination, undoManager: undoManager) { [weak panel] folder in
                 guard let folder, let panel, destination.isSameLocation(as: panel.currentURL) else { return }
-                panel.reload(selecting: [folder])
+                panel.revealCreated([folder])
             }
         }
     }
@@ -2016,6 +2079,10 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
         let operation = FileOperationCenter.dropOperation(for: info, sources: sources, destination: destination)
         guard !operation.isEmpty else { return false }
         activate()
+        // Whaouh+++ : gerbe de particules au point de dépôt, couleur selon l'opération.
+        let point = tableView.convert(info.draggingLocation, from: nil)
+        let color: NSColor = operation == .link ? .systemPurple : operation == .copy ? .systemGreen : .systemBlue
+        if Effects.isOn(.dropParticles) { Effects.celebrate(in: tableView, at: point, colors: [color, color.blended(withFraction: 0.5, of: .white) ?? color], amount: 40) }
         if operation == .link { linkItems(sources, in: destination); return true }
         transfer(operation == .copy ? .copy : .move, sources, to: destination)
         return true

@@ -265,7 +265,10 @@ extension PanelViewController {
                 FileOperationCenter.shared.removeJob(job)
                 if trashOriginals, !done.isEmpty { FileOperationCenter.shared.trash(done, undoManager: nil, actionName: title) }
                 if !failures.isEmpty { FileOperationCenter.shared.showError(failures.joined(separator: "\n")) }
-                if let self, folder.isSameLocation(as: self.currentURL), !created.isEmpty { self.reload(selecting: created) }
+                if let self, folder.isSameLocation(as: self.currentURL), !created.isEmpty {
+                    let encrypted = created.contains { FileCipher(encryptedFile: $0) != nil }
+                    self.revealCreated(created, symbol: encrypted ? "lock.fill" : "lock.open.fill", color: encrypted ? .systemPurple : .systemGreen)
+                }
                 if !wrongPassword.isEmpty { onWrongPassword?(wrongPassword) }
             }
         }

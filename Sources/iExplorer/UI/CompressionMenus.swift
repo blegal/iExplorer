@@ -150,7 +150,7 @@ extension PanelViewController {
         guard !urls.isEmpty, !currentURL.isRemote else { return }
         let request = CompressionRequest(urls: urls, format: format, level: level, name: CompressionRequest.defaultName(for: urls), destination: currentURL)
         FileOperationCenter.shared.compress(request, undoManager: undoManager) { [weak self] archive in
-            if let archive { self?.reload(selecting: [archive]) }
+            if let archive { self?.revealCreated([archive], accordion: true) }
         }
     }
 
@@ -223,7 +223,7 @@ extension PanelViewController {
             FileOperationCenter.shared.compress(request, undoManager: undoManager) { [weak self] archive in
                 guard let self, let archive else { return }
                 for panel in [self] + (host?.targetPanels(for: self) ?? []) where panel.currentURL.isSameLocation(as: target) {
-                    panel.reload(selecting: [archive])
+                    panel.revealCreated([archive], accordion: true)
                 }
             }
         }

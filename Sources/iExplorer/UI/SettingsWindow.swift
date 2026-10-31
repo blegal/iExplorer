@@ -14,10 +14,19 @@ final class SettingsWindowController: NSWindowController {
     private init() {
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
-        let tools = NSTabViewItem(viewController: ExternalToolsViewController())
+        // Le titre de chaque onglet devient celui de la fenêtre.
+        let toolsController = ExternalToolsViewController()
+        toolsController.title = "Outils externes"
+        let tools = NSTabViewItem(viewController: toolsController)
         tools.label = "Outils externes"
         tools.image = NSImage(systemSymbolName: "shippingbox", accessibilityDescription: nil)
         tabs.addTabViewItem(tools)
+        let animationsController = AnimationSettingsViewController()
+        animationsController.title = "Animations"
+        let animations = NSTabViewItem(viewController: animationsController)
+        animations.label = "Animations"
+        animations.image = NSImage(systemSymbolName: "wand.and.sparkles", accessibilityDescription: nil)
+        tabs.addTabViewItem(animations)
         let window = NSWindow(contentViewController: tabs)
         window.title = "Réglages"
         window.styleMask = [.titled, .closable]
@@ -234,6 +243,90 @@ final class ExternalToolsViewController: NSViewController {
     private func append(_ text: String) {
         log.textStorage?.append(NSAttributedString(string: text, attributes: [.font: log.font!, .foregroundColor: NSColor.secondaryLabelColor]))
         log.scrollToEndOfDocument(nil)
+    }
+}
+
+/// Onglet Animations : le niveau choisi, puis chaque effet à cocher, rangé par niveau.
+final class AnimationSettingsViewController: NSViewController {
+    private let mode = NSPopUpButton()
+    private var boxes: [AnimationEffect: NSButton] = [:]
+    private var headers: [AnimationMode: NSTextField] = [:]
+
+    override func loadView() {
+        for choice in AnimationMode.allCases { mode.addItem(withTitle: choice.title) }
+        mode.selectItem(at: AnimationMode.chosen.rawValue)
+        mode.target = self
+        mode.action = #selector(changeAnimationLevel)
+        let modeLine = NSStackView(views: [NSTextField(labelWithString: "Niveau :"), mode])
+        let intro = NSTextField(wrappingLabelWithString: "Le niveau active tous les effets jusqu’à lui ; décochez ceux que vous ne voulez pas. "
+            + "Le bouton Animations de la barre d’outils change aussi le niveau.")
+        intro.textColor = .secondaryLabelColor
+        intro.font = .systemFont(ofSize: 12)
+        var views: [NSView] = [modeLine, intro]
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            let warning = NSTextField(wrappingLabelWithString: "« Réduire les animations » est activé dans les réglages d’accessibilité de macOS : aucune animation n’est jouée.")
+            warning.textColor = .systemOrange
+            warning.font = .systemFont(ofSize: 12)
+            views.append(warning)
+        }
+        let disabled = AnimationEffect.disabled
+        for level in [AnimationMode.light, .full, .wow] {
+            let header = NSTextField(labelWithString: level.title)
+            header.font = .systemFont(ofSize: 12, weight: .semibold)
+            headers[level] = header
+            views.append(header)
+            for effect in AnimationEffect.allCases where effect.level == level {
+                let box = NSButton(checkboxWithTitle: effect.title, target: self, action: #selector(toggle(_:)))
+                box.state = disabled.contains(effect) ? .off : .on
+                box.identifier = NSUserInterfaceItemIdentifier(effect.rawValue)
+                boxes[effect] = box
+                views.append(box)
+            }
+        }
+        let stack = NSStackView(views: views)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 22, bottom: 18, right: 22)
+        for header in headers.values { stack.setCustomSpacing(4, after: header) }
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let root = NSView()
+        root.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: root.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            root.widthAnchor.constraint(equalToConstant: 660),
+            intro.widthAnchor.constraint(equalToConstant: 610),
+        ])
+        view = root
+        NotificationCenter.default.addObserver(forName: AnimationMode.changed, object: nil, queue: .main) { [weak self] _ in
+            self?.mode.selectItem(at: AnimationMode.chosen.rawValue)
+            self?.updateAvailability()
+        }
+        updateAvailability()
+    }
+
+    /// Les effets d'un niveau supérieur au niveau choisi restent cochables, mais apparaissent grisés.
+    private func updateAvailability() {
+        let chosen = AnimationMode.chosen
+        for (effect, box) in boxes { box.alphaValue = effect.level.rawValue <= chosen.rawValue ? 1 : 0.45 }
+        for (level, header) in headers {
+            header.stringValue = level.title + (level.rawValue <= chosen.rawValue ? "" : " — actifs à partir de ce niveau")
+            header.textColor = level.rawValue <= chosen.rawValue ? .labelColor : .tertiaryLabelColor
+        }
+    }
+
+    @objc private func changeAnimationLevel() {
+        AnimationMode.current = AnimationMode(rawValue: mode.indexOfSelectedItem) ?? .light
+    }
+
+    @objc private func toggle(_ sender: NSButton) {
+        guard let raw = sender.identifier?.rawValue, let effect = AnimationEffect(rawValue: raw) else { return }
+        var disabled = AnimationEffect.disabled
+        if sender.state == .on { disabled.remove(effect) } else { disabled.insert(effect) }
+        AnimationEffect.disabled = disabled
     }
 }
 

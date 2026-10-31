@@ -113,11 +113,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc func setColorTheme(_ sender: NSMenuItem) {
-        ColorTheme.current = ColorTheme(rawValue: sender.tag) ?? .system
+        withThemeWave { ColorTheme.current = ColorTheme(rawValue: sender.tag) ?? .system }
     }
 
     @objc func chooseAppearance(_ sender: NSMenuItem) {
-        AppAppearance.current = AppAppearance(rawValue: sender.tag) ?? .automatic
+        withThemeWave { AppAppearance.current = AppAppearance(rawValue: sender.tag) ?? .automatic }
+    }
+
+    /// Whaouh+++ : le nouveau thème se propage en vague depuis le haut à droite (bouton Thèmes).
+    private func withThemeWave(_ apply: () -> Void) {
+        let window = NSApp.keyWindow ?? NSApp.mainWindow
+        let origin = window.map { CGPoint(x: $0.frame.width - 150, y: $0.frame.height - 30) } ?? .zero
+        Effects.themeWave(in: window, from: origin, apply: apply)
     }
 
     @objc func setIconTheme(_ sender: NSMenuItem) {

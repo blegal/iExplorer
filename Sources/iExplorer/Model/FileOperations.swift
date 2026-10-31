@@ -22,6 +22,9 @@ final class FileJob {
     /// Progression en nombre d'éléments plutôt qu'en octets (transferts SFTP).
     var countsItems = false
 
+    /// Début de l'opération (le feu d'artifice salue celles qui ont duré).
+    let startDate = Date()
+
     init(title: String) { self.title = title }
 
     var isCancelled: Bool { lock.withLock { cancelled } }

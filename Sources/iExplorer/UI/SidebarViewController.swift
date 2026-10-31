@@ -631,6 +631,15 @@ extension SidebarViewController: NSMenuDelegate {
 }
 
 private final class SidebarCell: NSTableCellView {
+    // Whaouh+++ : l'icône rebondit au survol.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
+    }
+
+    override func mouseEntered(with event: NSEvent) { Effects.bounce(imageView) }
+
     init(item: SidebarItem, target: AnyObject, ejectAction: Selector) {
         super.init(frame: .zero)
         let icon = NSImageView()

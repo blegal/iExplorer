@@ -11,6 +11,33 @@ final class FileTableView: NSTableView {
     var onSlowClick: ((Int) -> Void)?
     private var slowClickTimer: Timer?
     private var didDrag = false
+    /// Ligne survolée (nouvelle, ancienne) et clic sur une ligne (au point cliqué) : effets du mode Whaouh+++.
+    var onHover: ((Int, Int) -> Void)?
+    var onRowClick: ((Int, NSPoint) -> Void)?
+    private var hoveredRow = -1
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.filter { $0.owner === self && $0.userInfo?["hover"] != nil }.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                       owner: self, userInfo: ["hover": true]))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let row = row(at: convert(event.locationInWindow, from: nil))
+        guard row != hoveredRow else { return }
+        let previous = hoveredRow
+        hoveredRow = row
+        onHover?(row, previous)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        guard hoveredRow >= 0 else { return }
+        onHover?(-1, hoveredRow)
+        hoveredRow = -1
+    }
 
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
@@ -34,6 +61,7 @@ final class FileTableView: NSTableView {
             && row >= 0 && selectedRowIndexes == [row]
             && isOnName(point, row: row)
         didDrag = false
+        if row >= 0 { onRowClick?(row, point) }
         super.mouseDown(with: event)
         guard eligible, !didDrag, selectedRowIndexes == [row] else { return }
         // Au-delà de l'intervalle du double-clic, pour qu'un double-clic ouvre sans renommer.

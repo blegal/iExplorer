@@ -408,10 +408,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         NotificationCenter.default.addObserver(forName: GitService.enabledChanged, object: nil, queue: .main) { [weak self] _ in
             self?.gitButton?.state = GitService.isEnabled ? .on : .off
         }
+        NotificationCenter.default.addObserver(forName: AnimationMode.changed, object: nil, queue: .main) { [weak self] _ in
+            self?.animationsItem?.image = AnimationMode.current.icon
+        }
         // Mode d'animation complet : étincelles quand une opération se termine.
-        NotificationCenter.default.addObserver(forName: FileOperationCenter.jobFinished, object: nil, queue: .main) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: FileOperationCenter.jobFinished, object: nil, queue: .main) { [weak self] note in
             guard let content = self?.window?.contentView else { return }
-            Effects.celebrate(in: content, at: CGPoint(x: content.bounds.midX, y: 40))
+            // Plus de 30 s : feu d'artifice (Whaouh+++) ; sinon une gerbe d'étincelles.
+            if let job = note.object as? FileJob, Date().timeIntervalSince(job.startDate) > 30, Effects.isOn(.fireworks) {
+                Effects.fireworks(in: content)
+            } else if Effects.isOn(.sparkles) {
+                Effects.celebrate(in: content, at: CGPoint(x: content.bounds.midX, y: 40))
+            }
         }
         NotificationCenter.default.addObserver(forName: Preferences.showHiddenChanged, object: nil, queue: .main) { [weak self] _ in
             self?.hiddenButton?.state = Preferences.showHiddenFiles ? .on : .off
@@ -509,7 +517,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         AnimationMode.current = mode
         animationsItem?.image = mode.icon
         // Aperçu immédiat du mode complet.
-        if mode == .full, let content = window?.contentView {
+        if mode.isFull, let content = window?.contentView {
             Effects.celebrate(in: content, at: CGPoint(x: content.bounds.maxX - 120, y: content.bounds.maxY - 60))
         }
     }
