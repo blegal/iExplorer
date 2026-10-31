@@ -1,0 +1,214 @@
+import AppKit
+
+/// Fenêtre Réglages (⌘,). Premier onglet : les outils externes, leur état et leur installation par Homebrew.
+final class SettingsWindowController: NSWindowController {
+    private static var shared: SettingsWindowController?
+
+    static func show() {
+        let controller = shared ?? SettingsWindowController()
+        shared = controller
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+    }
+
+    private init() {
+        let tabs = NSTabViewController()
+        tabs.tabStyle = .toolbar
+        let tools = NSTabViewItem(viewController: ExternalToolsViewController())
+        tools.label = "Outils externes"
+        tools.image = NSImage(systemSymbolName: "shippingbox", accessibilityDescription: nil)
+        tabs.addTabViewItem(tools)
+        let window = NSWindow(contentViewController: tabs)
+        window.title = "Réglages"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        super.init(window: window)
+        window.center()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+final class ExternalToolsViewController: NSViewController {
+    static let toolsChanged = Notification.Name("ExternalToolsChanged")
+
+    private let rows = NSStackView()
+    private let log = NSTextView()
+    private var installing: ExternalTool?
+
+    override func loadView() {
+        rows.orientation = .vertical
+        rows.alignment = .leading
+        rows.spacing = 10
+        let intro = NSTextField(wrappingLabelWithString: "Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. "
+            + "« Installer » lance Homebrew en arrière-plan ; le journal s’affiche ci-dessous.")
+        intro.textColor = .secondaryLabelColor
+        intro.font = .systemFont(ofSize: 12)
+
+        log.isEditable = false
+        log.font = .monospacedSystemFont(ofSize: 10.5, weight: .regular)
+        log.textColor = .secondaryLabelColor
+        log.drawsBackground = false
+        let logScroll = NSScrollView()
+        logScroll.documentView = log
+        logScroll.hasVerticalScroller = true
+        logScroll.borderType = .bezelBorder
+        logScroll.heightAnchor.constraint(equalToConstant: 110).isActive = true
+        log.autoresizingMask = [.width]
+
+        let stack = NSStackView(views: [intro, rows, logScroll])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 14
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 18, right: 20)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let root = NSView()
+        root.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: root.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            root.widthAnchor.constraint(equalToConstant: 660),
+            intro.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
+            rows.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
+            logScroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
+        ])
+        view = root
+        rebuild()
+    }
+
+    private func rebuild() {
+        rows.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        // Homebrew d'abord : sans lui, pas d'installation automatique.
+        if let brew = ExternalTool.homebrew {
+            rows.addArrangedSubview(row(installed: true, title: "Homebrew", purpose: "Installe les outils ci-dessous", detail: brew.path, button: nil))
+        } else {
+            let button = NSButton(title: "Installer Homebrew…", target: self, action: #selector(openHomebrewSite))
+            rows.addArrangedSubview(row(installed: false, title: "Homebrew", purpose: "Nécessaire pour installer les outils ci-dessous", detail: "brew.sh", button: button))
+        }
+        rows.addArrangedSubview(separator())
+        for tool in ExternalTool.allCases {
+            let path = tool.path
+            var button: NSButton?
+            if path == nil {
+                let title = installing == tool ? "Installation…" : (tool == .developerTools ? "Installer…" : "Installer")
+                let install = NSButton(title: title, target: self, action: #selector(install(_:)))
+                install.tag = ExternalTool.allCases.firstIndex(of: tool) ?? 0
+                install.isEnabled = installing == nil && (tool == .developerTools || ExternalTool.homebrew != nil)
+                button = install
+            }
+            let package = tool.brewPackage.map { "brew install \($0.cask ? "--cask " : "")\($0.name)" } ?? "xcode-select --install"
+            rows.addArrangedSubview(row(installed: path != nil, title: tool.title, purpose: tool.purpose,
+                                        detail: path?.path ?? package, button: button))
+        }
+        rows.addArrangedSubview(separator())
+        let builtIn = NSTextField(labelWithString: "Déjà intégrés")
+        builtIn.font = .systemFont(ofSize: 11, weight: .semibold)
+        builtIn.textColor = .secondaryLabelColor
+        rows.addArrangedSubview(builtIn)
+        for library in ExternalTool.builtIn {
+            rows.addArrangedSubview(row(installed: true, title: library.title, purpose: library.purpose, detail: nil, button: nil))
+        }
+    }
+
+    private func separator() -> NSView {
+        let box = NSBox()
+        box.boxType = .separator
+        box.widthAnchor.constraint(equalToConstant: 620).isActive = true
+        return box
+    }
+
+    private func row(installed: Bool, title: String, purpose: String, detail: String?, button: NSButton?) -> NSView {
+        let icon = NSImageView(image: NSImage(systemSymbolName: installed ? "checkmark.circle.fill" : "circle.dashed", accessibilityDescription: installed ? "Installé" : "Absent")!)
+        icon.contentTintColor = installed ? .systemGreen : .tertiaryLabelColor
+        icon.symbolConfiguration = .init(pointSize: 15, weight: .regular)
+        let name = NSTextField(labelWithString: title)
+        name.font = .systemFont(ofSize: 13, weight: .semibold)
+        let text = NSTextField(wrappingLabelWithString: purpose)
+        text.font = .systemFont(ofSize: 11.5)
+        text.textColor = .secondaryLabelColor
+        var lines: [NSView] = [name, text]
+        if let detail {
+            let path = NSTextField(labelWithString: detail)
+            path.font = .monospacedSystemFont(ofSize: 10.5, weight: .regular)
+            path.textColor = .tertiaryLabelColor
+            path.isSelectable = true
+            lines.append(path)
+        }
+        let texts = NSStackView(views: lines)
+        texts.orientation = .vertical
+        texts.alignment = .leading
+        texts.spacing = 2
+        texts.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let line = NSStackView(views: [icon, texts] + (button.map { [NSView(), $0] } ?? []))
+        line.alignment = .top
+        line.spacing = 10
+        line.widthAnchor.constraint(equalToConstant: 620).isActive = true
+        text.preferredMaxLayoutWidth = 480
+        return line
+    }
+
+    @objc private func openHomebrewSite() {
+        if let url = URL(string: "https://brew.sh/fr/") { NSWorkspace.shared.open(url) }
+    }
+
+    @objc private func install(_ sender: NSButton) {
+        let tool = ExternalTool.allCases[sender.tag]
+        if tool == .developerTools {
+            // Fenêtre d'installation d'Apple.
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
+            process.arguments = ["--install"]
+            try? process.run()
+            append("xcode-select --install : suivez la fenêtre d’Apple, puis rouvrez ces réglages.\n")
+            return
+        }
+        guard let brew = ExternalTool.homebrew, let package = tool.brewPackage else { return }
+        installing = tool
+        rebuild()
+        let arguments = ["install"] + (package.cask ? ["--cask"] : []) + [package.name]
+        append("$ brew " + arguments.joined(separator: " ") + "\n")
+        let process = Process()
+        process.executableURL = brew
+        process.arguments = arguments
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = brew.deletingLastPathComponent().path + ":/usr/bin:/bin:/usr/sbin:/sbin"
+        environment["NONINTERACTIVE"] = "1"
+        environment["HOMEBREW_NO_ENV_HINTS"] = "1"
+        process.environment = environment
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        process.standardInput = FileHandle.nullDevice
+        output.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let text = String(decoding: handle.availableData, as: UTF8.self)
+            guard !text.isEmpty else { return }
+            DispatchQueue.main.async { self?.append(text) }
+        }
+        process.terminationHandler = { [weak self] process in
+            output.fileHandleForReading.readabilityHandler = nil
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.append(process.terminationStatus == 0 ? "✓ \(tool.title) installé.\n" : "✗ L’installation a échoué (code \(process.terminationStatus)).\n")
+                self.installing = nil
+                self.rebuild()
+                NotificationCenter.default.post(name: Self.toolsChanged, object: nil)
+            }
+        }
+        do { try process.run() } catch {
+            append("✗ \(error.localizedDescription)\n")
+            installing = nil
+            rebuild()
+        }
+    }
+
+    private func append(_ text: String) {
+        log.textStorage?.append(NSAttributedString(string: text, attributes: [.font: log.font!, .foregroundColor: NSColor.secondaryLabelColor]))
+        log.scrollToEndOfDocument(nil)
+    }
+}
+
+extension AppDelegate {
+    @objc func showSettings(_ sender: Any?) { SettingsWindowController.show() }
+}

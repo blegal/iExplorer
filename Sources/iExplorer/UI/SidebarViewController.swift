@@ -1,7 +1,7 @@
 import AppKit
 
 final class SidebarItem {
-    enum Kind { case section, location, volume, connect, server, finderAccess, tag, mountImage }
+    enum Kind { case section, location, volume, connect, server, finderAccess, tag }
 
     let kind: Kind
     let title: String
@@ -199,7 +199,6 @@ final class SidebarViewController: NSViewController {
             item.isEjectable = !isLocal || values?.volumeIsEjectable == true || values?.volumeIsRemovable == true
             (isLocal ? devices : network).children.append(item)
         }
-        devices.children.append(SidebarItem(kind: .mountImage, title: "Monter une image disque…", symbol: "opticaldiscdrive", tint: .secondaryLabelColor))
         // Connexions enregistrées, puis sessions SFTP ouvertes sans favori.
         let sessions = SFTPManager.shared.connectedSessions
         let connections = SavedConnections.all
@@ -277,7 +276,6 @@ final class SidebarViewController: NSViewController {
         case .connect: onConnect?(nil)
         case .finderAccess: FinderFavorites.showDiagnostic()
         case .tag: onShowTag?(item.title)
-        case .mountImage: Volumes.chooseAndMount { [weak self] mountPoint in if let mountPoint { self?.onNavigate?(mountPoint) } }
         case .server: onConnect?(item.connection)
         case .section: break
         }
@@ -317,10 +315,6 @@ final class SidebarViewController: NSViewController {
     @objc private func removeFavorite(_ sender: NSMenuItem) {
         guard let url = sender.representedObject as? URL else { return }
         Preferences.removeFavorite(url)
-    }
-
-    @objc private func mountImage(_ sender: NSMenuItem) {
-        Volumes.chooseAndMount { [weak self] mountPoint in if let mountPoint { self?.onNavigate?(mountPoint) } }
     }
 
     @objc private func resetFavorites(_ sender: NSMenuItem) {
@@ -593,12 +587,6 @@ extension SidebarViewController: NSMenuDelegate {
                 eject.image = NSImage(systemSymbolName: "eject", accessibilityDescription: nil)
                 menu.addItem(eject)
             }
-        }
-        if item.kind == .section, item.title == "Appareils" {
-            let mount = NSMenuItem(title: "Monter une image disque…", action: #selector(mountImage(_:)), keyEquivalent: "")
-            mount.target = self
-            mount.image = NSImage(systemSymbolName: "opticaldiscdrive", accessibilityDescription: nil)
-            menu.addItem(mount)
         }
         if item.isCustomFavorite, let url = item.url {
             let favorites = favoritesSection?.children ?? []

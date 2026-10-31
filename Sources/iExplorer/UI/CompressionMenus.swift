@@ -104,8 +104,17 @@ extension PanelViewController {
     private func compressMenuItem() -> NSMenuItem {
         let item = menuItem("Compresser", nil, icon: "archivebox", tint: MenuTint.compress)
         let formats = NSMenu()
+        formats.autoenablesItems = false
         for format in ArchiveFormat.menuOrder {
+            if format == .tarGz { formats.addItem(.separator()) }
             let entry = NSMenuItem(title: format.fileExtension, action: nil, keyEquivalent: "")
+            // Outil absent : format grisé (installable dans Réglages › Outils externes).
+            if let tool = format.requiredTool, !tool.isInstalled {
+                entry.isEnabled = false
+                entry.toolTip = "Demande \(tool.title) : Réglages › Outils externes"
+                formats.addItem(entry)
+                continue
+            }
             let levels = NSMenu()
             for level in CompressionLevel.allCases {
                 let choice = menuItem(level.title, #selector(compressQuick(_:)), represented: [format.rawValue, level.rawValue])
@@ -228,7 +237,7 @@ final class CompressionPanel: NSObject {
     private let otherPanel: URL?
     private let name = NSTextField()
     private let extensionLabel = NSTextField(labelWithString: "")
-    private let formats = NSSegmentedControl()
+    private let formats = NSPopUpButton()
     private let levels = NSSegmentedControl(labels: CompressionLevel.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     private let levelInfo = NSTextField(labelWithString: "")
     private let usePassword = NSButton(checkboxWithTitle: "Protéger par un mot de passe (AES-256)", target: nil, action: nil)
@@ -246,10 +255,15 @@ final class CompressionPanel: NSObject {
         self.otherPanel = otherPanel
         super.init()
         name.stringValue = CompressionRequest.defaultName(for: urls)
-        formats.segmentCount = order.count
-        for (index, format) in order.enumerated() { formats.setLabel(format.fileExtension, forSegment: index) }
-        formats.trackingMode = .selectOne
-        formats.selectedSegment = order.firstIndex(of: format) ?? 0
+        formats.autoenablesItems = false
+        for format in order {
+            formats.addItem(withTitle: format.fileExtension)
+            if let tool = format.requiredTool, !tool.isInstalled {
+                formats.lastItem?.isEnabled = false
+                formats.lastItem?.toolTip = "Demande \(tool.title) : Réglages › Outils externes"
+            }
+        }
+        formats.selectItem(at: order.firstIndex(of: format.isAvailable ? format : .zip) ?? 0)
         levels.selectedSegment = format.lastLevel.rawValue
         self.usePassword.state = usePassword ? .on : .off
         hideNames.state = .on
@@ -271,13 +285,13 @@ final class CompressionPanel: NSObject {
         update()
     }
 
-    private var format: ArchiveFormat { order[max(0, formats.selectedSegment)] }
+    private var format: ArchiveFormat { order[max(0, formats.indexOfSelectedItem)] }
     private var level: CompressionLevel { CompressionLevel(rawValue: levels.selectedSegment) ?? .normal }
 
     @objc private func update() {
         extensionLabel.stringValue = "." + format.fileExtension
         levelInfo.stringValue = format.levelDescription(level)
-        let canEncrypt = format.supportsPassword && (format != .sevenZ || FileOperationCenter.sevenZip != nil)
+        let canEncrypt = format.supportsPassword && (format != .sevenZ || FileOperationCenter.sevenZip != nil) && format.isAvailable
         usePassword.isEnabled = canEncrypt
         if !canEncrypt { usePassword.state = .off }
         let on = usePassword.state == .on

@@ -19,7 +19,7 @@ enum ArchiveBrowser {
         let name = url.lastPathComponent.lowercased()
         if name.hasSuffix(".iso") { return false }
         let isTar = name.contains(".tar.") || ["tgz", "tbz", "tbz2", "txz"].contains(url.pathExtension.lowercased())
-        return isTar || name.hasSuffix(".tzst") || !["gz", "bz2", "xz", "zst", "lz4"].contains(url.pathExtension.lowercased())
+        return isTar || name.hasSuffix(".tzst") || !["gz", "bz2", "xz", "zst", "lz4", "bz3", "lz", "br"].contains(url.pathExtension.lowercased())
     }
 
     /// Dossier du cache pour cette version de l'archive (chemin, taille et date en font l'empreinte).
@@ -77,6 +77,8 @@ enum ArchiveBrowser {
             do {
                 if let codec = StreamCodec(archive: archive) {
                     // .tar.zst et .tar.lz4 : décompression embarquée, tar lit le flux.
+                    try codec.extractTar(archive, into: staging, extraArguments: ["--exclude", "__MACOSX"], job: job)
+                } else if let codec = ExternalCodec(archive: archive) {
                     try codec.extractTar(archive, into: staging, extraArguments: ["--exclude", "__MACOSX"], job: job)
                 } else {
                     try process.run()

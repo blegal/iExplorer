@@ -1,10 +1,32 @@
 import AppKit
 
 enum ArchiveFormat: Int, CaseIterable {
-    case zip, tarGz, tarBz2, tarXz, tarZst, tarLz4, sevenZ
+    case zip, tarGz, tarBz2, tarXz, tarZst, tarLz4, sevenZ, rar, tarBz3, tarLz, tarBr
 
-    /// Ordre des menus (tar.bz2 reste lisible mais n'est plus proposé à la création).
-    static let menuOrder: [ArchiveFormat] = [.zip, .sevenZ, .tarGz, .tarXz, .tarZst, .tarLz4]
+    /// Ordre des menus : archives courantes, puis la famille tar.
+    static let menuOrder: [ArchiveFormat] = [.zip, .sevenZ, .rar, .tarGz, .tarBz2, .tarXz, .tarZst, .tarLz4, .tarBz3, .tarLz, .tarBr]
+
+    /// Outil externe nécessaire pour créer ce format (`nil` : macOS ou l'app suffisent).
+    var requiredTool: ExternalTool? {
+        switch self {
+        case .rar: .rar
+        case .tarBz3: .bzip3
+        case .tarLz: .lzip
+        case .tarBr: .brotli
+        default: nil
+        }
+    }
+
+    var isAvailable: Bool { requiredTool?.isInstalled ?? true }
+
+    var externalCodec: ExternalCodec? {
+        switch self {
+        case .tarBz3: .bzip3
+        case .tarLz: .lzip
+        case .tarBr: .brotli
+        default: nil
+        }
+    }
 
     var fileExtension: String {
         switch self {
@@ -15,6 +37,10 @@ enum ArchiveFormat: Int, CaseIterable {
         case .tarZst: "tar.zst"
         case .tarLz4: "tar.lz4"
         case .sevenZ: "7z"
+        case .rar: "rar"
+        case .tarBz3: "tar.bz3"
+        case .tarLz: "tar.lz"
+        case .tarBr: "tar.br"
         }
     }
 
@@ -27,8 +53,8 @@ enum ArchiveFormat: Int, CaseIterable {
         }
     }
 
-    /// Seuls zip et 7z savent chiffrer (AES-256).
-    var supportsPassword: Bool { self == .zip || self == .sevenZ }
+    /// zip, 7z et rar savent chiffrer (AES-256).
+    var supportsPassword: Bool { self == .zip || self == .sevenZ || self == .rar }
 
     /// Nom du filtre pour l'option « compression-level » du tar du système.
     fileprivate var libarchiveOption: String? {
@@ -38,7 +64,7 @@ enum ArchiveFormat: Int, CaseIterable {
         case .tarBz2: "bzip2"
         case .tarXz: "xz"
         case .sevenZ: "7zip"
-        case .tarZst, .tarLz4: nil
+        case .tarZst, .tarLz4, .rar, .tarBz3, .tarLz, .tarBr: nil
         }
     }
 
@@ -51,6 +77,15 @@ enum ArchiveFormat: Int, CaseIterable {
         case (.tarLz4, .light): 0
         case (.tarLz4, .normal): 3
         case (.tarLz4, .strong): 12
+        case (.rar, .light): 1
+        case (.rar, .normal): 3
+        case (.rar, .strong): 5
+        case (.tarBz3, .light): 1
+        case (.tarBz3, .normal): 16
+        case (.tarBz3, .strong): 256
+        case (.tarBr, .light): 4
+        case (.tarBr, .normal): 7
+        case (.tarBr, .strong): 11
         case (_, .light): 1
         case (_, .normal): 6
         case (_, .strong): 9
@@ -61,6 +96,9 @@ enum ArchiveFormat: Int, CaseIterable {
         switch self {
         case .tarZst: "zstd niveau \(self.level(level))"
         case .tarLz4: level == .light ? "LZ4 rapide" : "LZ4 HC niveau \(self.level(level))"
+        case .rar: "rar -m\(self.level(level))"
+        case .tarBz3: "blocs de \(self.level(level)) Mo"
+        case .tarBr: "Brotli qualité \(self.level(level))"
         default: "niveau \(self.level(level))"
         }
     }
@@ -114,7 +152,7 @@ struct CompressionRequest {
 /// Compression et décompression avec les outils du système (bsdtar / libarchive, gzip, bzip2).
 extension FileOperationCenter {
     private static let archiveSuffixes = ["zip", "tar", "tgz", "tbz", "tbz2", "txz", "tar.gz", "tar.bz2", "tar.xz", "tar.zst",
-                                          "gz", "bz2", "xz", "tzst", "tar.lz4", "zst", "lz4", "7z", "rar", "cpio", "xar", "iso", "jar", "cab", "lha", "lzh"]
+                                          "gz", "bz2", "xz", "tzst", "tar.lz4", "zst", "lz4", "tar.bz3", "bz3", "tar.lz", "lz", "tar.br", "br", "7z", "rar", "cpio", "xar", "iso", "jar", "cab", "lha", "lzh"]
 
     static func isArchive(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
@@ -139,6 +177,24 @@ extension FileOperationCenter {
             compressStreamed(names, in: source, codec: codec, level: level, exclude: request.excludeSystemFiles ? systemFiles : [],
                              target: target, total: request.urls.reduce(Int64(0)) { $0 + Self.allocatedSize(of: $1) },
                              title: title, undoManager: undoManager, completion: completion)
+            return
+        }
+        if let tool = format.requiredTool, !tool.isInstalled {
+            showError("Le format .\(format.fileExtension) demande \(tool.title) : installez-le dans Réglages › Outils externes.")
+            return
+        }
+        if let codec = format.externalCodec {
+            compressExternal(names, in: source, codec: codec, level: level, exclude: request.excludeSystemFiles ? systemFiles : [],
+                             target: target, total: request.urls.reduce(Int64(0)) { $0 + Self.allocatedSize(of: $1) },
+                             title: title, undoManager: undoManager, completion: completion)
+            return
+        }
+        if format == .rar, let tool = ExternalTool.rar.path {
+            // -ep1 : chemins relatifs aux éléments ; -hp : données et noms chiffrés.
+            var arguments = ["a", "-idq", "-y", "-r", "-ep1", "-m\(level)"] + (request.password.map { ["-hp" + $0] } ?? [])
+            if request.excludeSystemFiles { arguments += ["-x*.DS_Store", "-x*/._*", "-x*/__MACOSX"] }
+            runArchiveTool(tool.path, arguments + ["--", target.path] + names, title: title, output: target, currentDirectory: source,
+                           undoManager: undoManager, completion: completion)
             return
         }
         if format == .sevenZ, let password = request.password {
@@ -241,6 +297,72 @@ extension FileOperationCenter {
         }
     }
 
+    // MARK: bzip3, lzip, Brotli (outils externes)
+
+    private func compressExternal(_ names: [String], in directory: URL, codec: ExternalCodec, level: Int, exclude: [String], target: URL,
+                                  total: Int64, title: String, undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
+        runPipelineJob(title: title, status: target.lastPathComponent, total: total, output: target, undoManager: undoManager,
+                       actionName: "Compression", completion: completion) { job in
+            try codec.createTar(names, in: directory, to: target, level: level, exclude: exclude, job: job)
+            return target
+        }
+    }
+
+    private func extractExternal(_ archive: URL, codec: ExternalCodec, base: String, into directory: URL, title: String,
+                                 undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
+        let name = archive.lastPathComponent.lowercased()
+        let isTar = name.contains(".tar.")
+        let target = uniqueURL(for: directory.appendingPathComponent(base), suffix: "")
+        if isTar {
+            do { try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false) } catch {
+                showError(error.localizedDescription)
+                return
+            }
+        }
+        let total = Int64((try? archive.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        runPipelineJob(title: title, status: archive.lastPathComponent, total: total, output: target, undoManager: undoManager,
+                       actionName: "Décompression", completion: completion) { [weak self] job in
+            if isTar {
+                try codec.extractTar(archive, into: target, job: job)
+                return self?.flattenSingleItem(target) ?? target
+            }
+            try codec.decompressFile(archive, to: target)
+            return target
+        }
+    }
+
+    /// Opération en arrière-plan dans la liste des opérations ; l'élément produit est retiré en cas d'échec.
+    private func runPipelineJob(title: String, status: String, total: Int64, output: URL, undoManager: UndoManager?, actionName: String,
+                                completion: @escaping (URL?) -> Void, work: @escaping (FileJob) throws -> URL) {
+        let job = FileJob(title: title)
+        job.setStatus(status)
+        job.setTotal(total)
+        addJob(job)
+        DispatchQueue.global(qos: .userInitiated).async {
+            var result: URL?
+            var failure: String?
+            do {
+                job.waitIfPaused()
+                result = try work(job)
+            } catch is CancellationError {
+            } catch {
+                if !job.isCancelled { failure = error.localizedDescription }
+            }
+            DispatchQueue.main.async {
+                self.removeJob(job)
+                guard let result, failure == nil, !job.isCancelled else {
+                    try? FileManager.default.removeItem(at: output)
+                    if let failure { self.showError("\(title) a échoué.\n\(failure)") }
+                    completion(nil)
+                    return
+                }
+                undoManager?.registerUndo(withTarget: self) { $0.trash([result], undoManager: undoManager, actionName: actionName) }
+                undoManager?.setActionName(actionName)
+                completion(result)
+            }
+        }
+    }
+
     /// Taille d'un fichier ou d'un dossier (progression approximative de la compression).
     static func allocatedSize(of url: URL) -> Int64 {
         let keys: Set<URLResourceKey> = [.fileSizeKey, .isDirectoryKey]
@@ -256,11 +378,7 @@ extension FileOperationCenter {
     // MARK: Archives chiffrées
 
     /// 7-Zip installé (Homebrew ou autre) : 7z chiffré, noms masqués, rar chiffrés. Sinon zip AES-256 du système seulement.
-    static var sevenZip: URL? {
-        ["/opt/homebrew/bin/7zz", "/opt/homebrew/bin/7z", "/usr/local/bin/7zz", "/usr/local/bin/7z"]
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-            .map { URL(fileURLWithPath: $0) }
-    }
+    static var sevenZip: URL? { ExternalTool.sevenZip.path }
 
     /// Demande le mot de passe d'une archive ; `nil` si l'utilisateur renonce.
     static func askPassword(for archive: URL, retry: Bool) -> String? {
@@ -292,6 +410,10 @@ extension FileOperationCenter {
         let title = "Décompression de « \(archive.lastPathComponent) »"
         if let codec = StreamCodec(archive: archive) {
             extractStreamed(archive, codec: codec, base: base, into: directory, title: title, undoManager: undoManager, completion: completion)
+            return
+        }
+        if let codec = ExternalCodec(archive: archive) {
+            extractExternal(archive, codec: codec, base: base, into: directory, title: title, undoManager: undoManager, completion: completion)
             return
         }
         let isTar = lower.contains(".tar.") || ["tgz", "tbz", "tbz2", "txz"].contains(archive.pathExtension.lowercased())
