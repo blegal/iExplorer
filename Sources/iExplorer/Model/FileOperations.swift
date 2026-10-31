@@ -154,7 +154,11 @@ final class FileOperationCenter {
         if finished.count > 20 { finished.removeLast() }
         startNextQueuedJob()
         NotificationCenter.default.post(name: Self.jobsChanged, object: nil)
+        if !job.isCancelled { NotificationCenter.default.post(name: Self.jobFinished, object: job) }
     }
+
+    /// Opération menée à son terme (pour les effets du mode d'animation complet).
+    static let jobFinished = Notification.Name("FileJobFinished")
 
     func clearFinished() {
         finished = []

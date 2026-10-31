@@ -8,6 +8,7 @@ private extension NSToolbarItem.Identifier {
     static let iconTheme = NSToolbarItem.Identifier("iconTheme")
     static let colorTheme = NSToolbarItem.Identifier("colorTheme")
     static let appearance = NSToolbarItem.Identifier("appearance")
+    static let animations = NSToolbarItem.Identifier("animations")
     static let viewMode = NSToolbarItem.Identifier("viewMode")
     static let diskUsage = NSToolbarItem.Identifier("diskUsage")
     static let syncNavigation = NSToolbarItem.Identifier("syncNavigation")
@@ -308,6 +309,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private lazy var forwardMenu = HistoryMenuProvider(kind: .forward) { [weak self] in self?.activePanel }
     private weak var terminalButton: NSButton?
     private weak var inspectorButton: NSButton?
+    private weak var animationsItem: NSMenuToolbarItem?
     private weak var hiddenButton: NSButton?
     private let workSplit = NSSplitViewController()
     private let terminalController = TerminalPanelController()
@@ -366,7 +368,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             window.center()
         }
 
-        let toolbar = NSToolbar(identifier: "MainToolbar.v11")
+        let toolbar = NSToolbar(identifier: "MainToolbar.v12")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = true
@@ -405,6 +407,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         window.initialFirstResponder = activePanel.tableView
         NotificationCenter.default.addObserver(forName: GitService.enabledChanged, object: nil, queue: .main) { [weak self] _ in
             self?.gitButton?.state = GitService.isEnabled ? .on : .off
+        }
+        // Mode d'animation complet : étincelles quand une opération se termine.
+        NotificationCenter.default.addObserver(forName: FileOperationCenter.jobFinished, object: nil, queue: .main) { [weak self] _ in
+            guard let content = self?.window?.contentView else { return }
+            Effects.celebrate(in: content, at: CGPoint(x: content.bounds.midX, y: 40))
         }
         NotificationCenter.default.addObserver(forName: Preferences.showHiddenChanged, object: nil, queue: .main) { [weak self] _ in
             self?.hiddenButton?.state = Preferences.showHiddenFiles ? .on : .off
@@ -495,6 +502,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private func updateInspector(_ panel: PanelViewController) {
         guard !inspectorItem.isCollapsed, panel === activePanel else { return }
         inspector.show(selection: panel.selectedItems, folder: panel.currentURL)
+    }
+
+    @objc func setAnimationMode(_ sender: NSMenuItem) {
+        guard let mode = AnimationMode(rawValue: sender.tag) else { return }
+        AnimationMode.current = mode
+        animationsItem?.image = mode.icon
+        // Aperçu immédiat du mode complet.
+        if mode == .full, let content = window?.contentView {
+            Effects.celebrate(in: content, at: CGPoint(x: content.bounds.maxX - 120, y: content.bounds.maxY - 60))
+        }
     }
 
     /// Présentation › Éditeur : passe en panneau unique pour lui laisser la place.
@@ -632,6 +649,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         if menuItem.action == #selector(setLayout(_:)) {
             menuItem.state = menuItem.tag == panelsController.layout.rawValue ? .on : .off
         }
+        if menuItem.action == #selector(setAnimationMode(_:)) {
+            menuItem.state = menuItem.tag == AnimationMode.current.rawValue ? .on : .off
+        }
         if menuItem.action == #selector(toggleEditor(_:)) {
             menuItem.state = EditorViewController.isEnabled ? .on : .off
         }
@@ -658,7 +678,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
          .viewMode, .layout, .hidden, .syncNavigation, .space,
          .trash, .git, .terminal, .connect, .space,
-         .inspector, .appearance, .updates]
+         .inspector, .appearance, .animations, .updates]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -785,6 +805,24 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             item.label = "Thème de couleurs"
             item.toolTip = "Thème de couleurs et apparence claire / sombre"
             item.showsIndicator = true
+            return item
+        case .animations:
+            // Sans animation, légères ou complètes : l'icône montre le mode choisi.
+            let item = NSMenuToolbarItem(itemIdentifier: identifier)
+            let menu = NSMenu(title: "Animations")
+            for mode in AnimationMode.allCases {
+                let entry = NSMenuItem(title: mode.title, action: #selector(setAnimationMode(_:)), keyEquivalent: "")
+                entry.target = self
+                entry.tag = mode.rawValue
+                entry.image = NSImage(systemSymbolName: mode.symbol, accessibilityDescription: nil)
+                menu.addItem(entry)
+            }
+            item.menu = menu
+            item.image = AnimationMode.current.icon
+            item.label = "Animations"
+            item.toolTip = "Animations : aucune, légères ou complètes"
+            item.showsIndicator = true
+            animationsItem = item
             return item
         case .appearance:
             // Couleurs et icônes réunies derrière un seul bouton.
@@ -1130,13 +1168,22 @@ private final class SplitLimits: NSObject, NSSplitViewDelegate {
 }
 
 /// Bouton à bascule de la barre d'outils : son symbole prend la couleur d'accent quand il est actif.
+/// L'état « enfoncé » du système n'est pas utilisé : il remplit le bouton de la couleur d'accent et masquerait l'icône.
 final class ToolbarToggle: NSButton {
+    private var isOn = false
+
     override var state: NSControl.StateValue {
-        didSet { updateTint() }
+        get { isOn ? .on : .off }
+        set {
+            isOn = newValue == .on
+            super.state = .off
+            updateTint()
+        }
     }
 
     override func setNextState() {
-        super.setNextState()
+        isOn.toggle()
+        super.state = .off
         updateTint()
     }
 
@@ -1145,10 +1192,8 @@ final class ToolbarToggle: NSButton {
         updateTint()
     }
 
-    /// La barre d'outils ignore `contentTintColor` sur un bouton enfoncé : la couleur est imposée au symbole.
     private func updateTint() {
-        let on = state == .on
-        contentTintColor = on ? .controlAccentColor : nil
-        symbolConfiguration = on ? NSImage.SymbolConfiguration(paletteColors: [.controlAccentColor]) : nil
+        contentTintColor = isOn ? .controlAccentColor : nil
+        symbolConfiguration = isOn ? NSImage.SymbolConfiguration(paletteColors: [.controlAccentColor]) : nil
     }
 }

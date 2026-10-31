@@ -48,7 +48,7 @@ extension PanelViewController {
                                    showHidden: Preferences.showHiddenFiles, by: sortDescriptor, depth: item.depth + 1)
         items.insert(contentsOf: rows, at: index + 1)
         allItems = items
-        tableView.insertRows(at: IndexSet(integersIn: index + 1..<index + 1 + rows.count), withAnimation: .slideDown)
+        tableView.insertRows(at: IndexSet(integersIn: index + 1..<index + 1 + rows.count), withAnimation: AnimationMode.current.rowInsertion)
         outlineDidChange(row: index)
     }
 
@@ -60,7 +60,7 @@ extension PanelViewController {
         let hidesSelection = tableView.selectedRowIndexes.contains { range.contains($0) }
         items.removeSubrange(range)
         allItems = items
-        tableView.removeRows(at: IndexSet(integersIn: range), withAnimation: .slideUp)
+        tableView.removeRows(at: IndexSet(integersIn: range), withAnimation: AnimationMode.current.rowRemoval)
         if hidesSelection { tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: true) }
         outlineDidChange(row: index)
     }

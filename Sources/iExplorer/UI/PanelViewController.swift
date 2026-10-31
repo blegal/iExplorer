@@ -106,6 +106,8 @@ final class PanelViewController: NSViewController {
     private var tabBarHeight: NSLayoutConstraint!
 
     let watcher = DirectoryWatcher()
+    /// Animation à jouer quand le nouveau dossier sera affiché (selon le mode d'animation).
+    var pendingTransition: NavigationDirection?
     private var loadGeneration = 0
     private var loadError: String?
     var freeSpace: String?
@@ -554,9 +556,11 @@ final class PanelViewController: NSViewController {
         guard isViewLoaded else { return }
         let visible = isActive && showsActiveIndicator
         accentLine.layer?.cornerRadius = 1.25
+        let wasVisible = accentLine.layer?.backgroundColor.map { $0.alpha > 0 } ?? false
         view.effectiveAppearance.performAsCurrentDrawingAppearance {
             accentLine.layer?.backgroundColor = visible ? Theme.accent.cgColor : NSColor.clear.cgColor
         }
+        if visible != wasVisible { Effects.accent(accentLine, visible: visible) }
         breadcrumb.isActive = isActive || !showsActiveIndicator
         updateTabBar()
     }
@@ -723,6 +727,10 @@ final class PanelViewController: NSViewController {
         cutPaths = FileClipboard.cutPaths
         reloadViews()
         watchExpandedFolders()
+        if let direction = pendingTransition {
+            pendingTransition = nil
+            playNavigationAnimation(direction)
+        }
 
         let paths = Set(wanted.map(\.normalizedPath))
         var rows = IndexSet(items.indices.filter { paths.contains(items[$0].url.normalizedPath) })
@@ -944,6 +952,7 @@ final class PanelViewController: NSViewController {
         let old = currentURL
         tab.url = url
         tab.selection = select.map { [$0] } ?? []
+        pendingTransition = .between(old, url)
         showCurrentTab()
         host?.panel(self, didMoveFrom: old, to: url)
     }
@@ -954,6 +963,7 @@ final class PanelViewController: NSViewController {
         tab.forward.append(currentURL)
         tab.selection = [currentURL]
         tab.url = previous
+        pendingTransition = .backward
         showCurrentTab()
         host?.panel(self, didMoveFrom: old, to: previous)
     }
@@ -964,6 +974,7 @@ final class PanelViewController: NSViewController {
         tab.back.append(currentURL)
         tab.selection = []
         tab.url = next
+        pendingTransition = .forward
         showCurrentTab()
         host?.panel(self, didMoveFrom: old, to: next)
     }
@@ -1056,6 +1067,7 @@ final class PanelViewController: NSViewController {
         guard index != selectedTabIndex, tabs.indices.contains(index) else { return }
         tab.selection = selectedURLs
         selectedTabIndex = index
+        pendingTransition = .other
         showCurrentTab()
     }
 
@@ -1313,8 +1325,28 @@ final class PanelViewController: NSViewController {
             }
             return
         }
-        FileOperationCenter.shared.trash(urls, undoManager: undoManager)
-        reload(selecting: [], fallbackRow: firstRow)
+        // Mode complet : les lignes s'effacent avant de partir à la corbeille.
+        let rows = viewMode == .icons
+            ? selectionIndexes.compactMap { collectionView.item(at: IndexPath(item: $0, section: 0))?.view }
+            : tableView.selectedRowIndexes.compactMap { tableView.rowView(atRow: $0, makeIfNecessary: false) }
+        Effects.trash(rows) { [weak self] in
+            guard let self else { return }
+            FileOperationCenter.shared.trash(urls, undoManager: undoManager)
+            reload(selecting: [], fallbackRow: firstRow)
+        }
+    }
+
+    /// Glissement ou fondu du contenu, puis cascade des éléments visibles en mode complet.
+    private func playNavigationAnimation(_ direction: NavigationDirection) {
+        let content: NSView = viewMode == .icons ? gridScrollView : (viewMode == .columns ? browser : scrollView)
+        Effects.navigate(content, direction)
+        if viewMode == .icons {
+            Effects.cascade(collectionView.visibleItems().compactMap { $0.view }
+                .sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) })
+        } else if viewMode != .columns {
+            let visible = tableView.rows(in: tableView.visibleRect)
+            Effects.cascade((visible.location..<NSMaxRange(visible)).compactMap { tableView.rowView(atRow: $0, makeIfNecessary: false) })
+        }
     }
 
     @objc func renameSelection(_ sender: Any?) {
