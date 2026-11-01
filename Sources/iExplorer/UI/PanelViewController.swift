@@ -1234,6 +1234,8 @@ final class PanelViewController: NSViewController {
 
     func transfer(_ kind: TransferKind, _ urls: [URL], to destination: URL) {
         FileOperationCenter.shared.transfer(kind, sources: urls, to: destination, undoManager: undoManager) { [weak self] created in
+            // En colonnes, la destination et les dossiers d'origine peuvent être affichés ailleurs que dans la colonne courante.
+            self?.refreshBrowserFolders([destination] + urls.map { $0.deletingLastPathComponent() })
             guard let self, destination.isSameLocation(as: currentURL), !created.isEmpty else { return }
             reload(selecting: created)
         }
@@ -1276,6 +1278,7 @@ final class PanelViewController: NSViewController {
     func linkItems(_ sources: [URL], in destination: URL, hard: Bool = false, reloading panel: PanelViewController? = nil) {
         let created = FileOperationCenter.shared.createLinks(to: sources, in: destination, hard: hard, undoManager: undoManager)
         let panel = panel ?? self
+        if !created.isEmpty { panel.refreshBrowserFolders([destination]) }
         if !created.isEmpty, destination.isSameLocation(as: panel.currentURL) { panel.reload(selecting: created) }
     }
 
@@ -1419,7 +1422,7 @@ final class PanelViewController: NSViewController {
     @objc func renameSelection(_ sender: Any?) {
         if selectionIndexes.count > 1 { batchRename(sender); return }
         guard selectionIndexes.count == 1, let row = selectionIndexes.first else { return }
-        if viewMode == .icons { renameWithSheet(items[row]); return }
+        if viewMode == .icons || viewMode == .columns { renameWithSheet(items[row]); return }
         let column = tableView.column(withIdentifier: .name)
         tableView.scrollRowToVisible(tableRow(forItem: row))
         guard column >= 0,

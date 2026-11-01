@@ -97,7 +97,9 @@ extension PanelViewController: NSBrowserDelegate {
     }
 
     func browser(_ browser: NSBrowser, child index: Int, ofItem item: Any?) -> Any {
-        browserListing(fileItem(item)!.url)[index]
+        let listing = browserListing(fileItem(item)!.url)
+        // Une colonne pas encore rechargée peut demander une ligne qui n'existe plus.
+        return listing.indices.contains(index) ? listing[index] : FileItem(url: fileItem(item)!.url)
     }
 
     func browser(_ browser: NSBrowser, isLeafItem item: Any?) -> Bool {
@@ -155,6 +157,12 @@ extension PanelViewController: NSBrowserDelegate {
 
     func browser(_ browser: NSBrowser, canDragRowsWith rowIndexes: IndexSet, inColumn column: Int, with event: NSEvent) -> Bool { true }
 
+    /// macOS 27 : les colonnes (tables) ne demandent plus que cet écrivain par ligne ; writeRowsWith reste pour macOS 26.
+    @available(macOS 27, *)
+    func browser(_ browser: NSBrowser, pasteboardWriterForRow row: Int, column: Int) -> (any NSPasteboardWriting)? {
+        (browser.item(atRow: row, inColumn: column) as? FileItem)?.url as NSURL?
+    }
+
     func browser(_ browser: NSBrowser, writeRowsWith rowIndexes: IndexSet, inColumn column: Int, to pasteboard: NSPasteboard) -> Bool {
         let urls = rowIndexes.compactMap { (browser.item(atRow: $0, inColumn: column) as? FileItem)?.url as NSURL? }
         guard !urls.isEmpty else { return false }
@@ -173,6 +181,13 @@ extension PanelViewController: NSBrowserDelegate {
     func browser(_ browser: NSBrowser, validateDrop info: NSDraggingInfo, proposedRow row: UnsafeMutablePointer<Int>,
                  column: UnsafeMutablePointer<Int>, dropOperation: UnsafeMutablePointer<NSBrowser.DropOperation>) -> NSDragOperation {
         let sources = FileClipboard.fileURLs(from: info.draggingPasteboard)
+        let rows = (browser.parentForItems(inColumn: column.pointee) as? FileItem).map { browserListing($0.url).count } ?? 0
+        if row.pointee >= rows { row.pointee = -1 }
+        // Un dossier déposé sur lui-même vise la colonne qui le contient.
+        if row.pointee >= 0, let item = browser.item(atRow: row.pointee, inColumn: column.pointee) as? FileItem,
+           sources.contains(where: { $0.isSameLocation(as: item.url) }) {
+            row.pointee = -1
+        }
         guard !sources.isEmpty, let destination = browserDropDestination(row: row.pointee, column: column.pointee, operation: dropOperation.pointee),
               !sources.contains(where: { $0.isSameLocation(as: destination) }) else { return [] }
         let target = row.pointee >= 0 ? browser.item(atRow: row.pointee, inColumn: column.pointee) as? FileItem : nil
@@ -247,15 +262,20 @@ extension PanelViewController: NSBrowserDelegate {
         openSelection(nil)
     }
 
+    /// Colonne qui affiche le contenu de `url` (ce n'est pas toujours la dernière : un dossier sélectionné ouvre la sienne).
+    func browserColumn(showing url: URL) -> Int? {
+        guard browser.lastColumn >= 0 else { return nil }
+        return (0...browser.lastColumn).last { (browser.parentForItems(inColumn: $0) as? FileItem)?.url.isSameLocation(as: url) == true }
+    }
+
+    /// Sélection dans la colonne du dossier courant (vide si rien n'y est sélectionné, même si son dossier l'est à gauche).
     var browserSelection: IndexSet {
-        let column = browser.selectedColumn
-        guard column >= 0 else { return [] }
+        guard let column = browserColumn(showing: currentURL) else { return [] }
         return browser.selectedRowIndexes(inColumn: column) ?? []
     }
 
     func selectInBrowser(_ rows: IndexSet) {
-        guard viewMode == .columns else { return }
-        let column = max(0, browser.lastColumn)
+        guard viewMode == .columns, let column = browserColumn(showing: currentURL) else { return }
         isSyncingBrowser = true
         browser.selectRowIndexes(rows, inColumn: column)
         isSyncingBrowser = false
@@ -264,10 +284,20 @@ extension PanelViewController: NSBrowserDelegate {
     /// Le contenu du dossier courant a changé (surveillance, opération) : rafraîchit sa colonne.
     func reloadBrowserColumn() {
         guard viewMode == .columns else { return }
-        let key = currentURL.standardizedFileURL.path
-        browserCache[key] = items
-        let column = browser.lastColumn
-        guard column >= 0 else { return }
+        browserCache[currentURL.standardizedFileURL.path] = items
+        if let column = browserColumn(showing: currentURL) { reloadBrowser(column: column) }
+    }
+
+    /// Dossiers modifiés par un dépôt, une copie ou un déplacement : leurs colonnes affichées sont relues.
+    func refreshBrowserFolders(_ folders: [URL]) {
+        guard viewMode == .columns else { return }
+        for folder in folders {
+            browserCache[folder.standardizedFileURL.path] = nil
+            if let column = browserColumn(showing: folder) { reloadBrowser(column: column) }
+        }
+    }
+
+    private func reloadBrowser(column: Int) {
         let selection = browser.selectedRowIndexes(inColumn: column)
         isSyncingBrowser = true
         browser.reloadColumn(column)
