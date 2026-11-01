@@ -108,6 +108,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         previewButton.action = #selector(togglePreview(_:))
         previewButton.setButtonType(.pushOnPushOff)
         previewButton.toolTip = "Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON).\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)"
+        wrapButton.image = Self.wrapIcon()
         wrapButton.action = #selector(toggleWrap(_:))
         wrapButton.setButtonType(.pushOnPushOff)
         wrapButton.toolTip = "Retour à la ligne : couper les lignes longues à la largeur de l’éditeur"
@@ -442,6 +443,48 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             button.identifier = NSUserInterfaceItemIdentifier(url.path)
             tabs.addArrangedSubview(button)
         }
+    }
+
+    /// Icône du retour à la ligne : lignes contre une marge, la deuxième revient à gauche (pas de symbole système adapté).
+    private static func wrapIcon() -> NSImage {
+        let image = NSImage(size: NSSize(width: 16, height: 16), flipped: true) { _ in
+            NSColor.black.set()
+            func stroke(_ path: NSBezierPath, width: CGFloat = 1.6) {
+                path.lineWidth = width
+                path.lineCapStyle = .round
+                path.lineJoinStyle = .round
+                path.stroke()
+            }
+            let margin = NSBezierPath()
+            margin.move(to: NSPoint(x: 14.5, y: 1.5))
+            margin.line(to: NSPoint(x: 14.5, y: 14.5))
+            margin.setLineDash([1.5, 1.5], count: 2, phase: 0)
+            margin.lineWidth = 1.2
+            margin.stroke()
+            let first = NSBezierPath()
+            first.move(to: NSPoint(x: 1.5, y: 3))
+            first.line(to: NSPoint(x: 12, y: 3))
+            stroke(first)
+            let hook = NSBezierPath()
+            hook.move(to: NSPoint(x: 1.5, y: 7.5))
+            hook.line(to: NSPoint(x: 10, y: 7.5))
+            hook.appendArc(withCenter: NSPoint(x: 10, y: 9.75), radius: 2.25, startAngle: -90, endAngle: 90, clockwise: false)
+            hook.line(to: NSPoint(x: 6.5, y: 12))
+            stroke(hook)
+            let head = NSBezierPath()
+            head.move(to: NSPoint(x: 8.5, y: 10))
+            head.line(to: NSPoint(x: 6.2, y: 12))
+            head.line(to: NSPoint(x: 8.5, y: 14))
+            stroke(head)
+            let last = NSBezierPath()
+            last.move(to: NSPoint(x: 1.5, y: 12))
+            last.line(to: NSPoint(x: 3.5, y: 12))
+            stroke(last)
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Retour à la ligne"
+        return image
     }
 
     /// Documents et leurs sources : un PDF propose le .tex, le .docx… du même nom, et inversement.
