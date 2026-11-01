@@ -171,9 +171,19 @@ final class SidebarViewController: NSViewController {
             }
             isRebuilding = true
             Preferences.sidebarFavorites = initial
+            Preferences.finderFavoritesMerged = FinderFavorites.lastFailure == nil
             isRebuilding = false
             return initial
         }()
+        // Favoris du Finder illisibles au premier lancement (accès complet au disque accordé depuis) : fusionnés dès qu'ils le deviennent.
+        if !Preferences.finderFavoritesMerged, let finder = FinderFavorites.load(), !finder.isEmpty {
+            isRebuilding = true
+            Preferences.mergeFinderFavorites(finder.map(\.url))
+            Preferences.finderFavoritesMerged = true
+            isRebuilding = false
+            rebuild()
+            return
+        }
         let style = Self.favoriteStyles()
         let names = Preferences.favoriteNames
         favorites.children = urls.filter(\.isExistingDirectory).map { url in
@@ -186,7 +196,7 @@ final class SidebarViewController: NSViewController {
             item.isCustomFavorite = true
             return item
         }
-        if case .accessDenied? = FinderFavorites.lastFailure, Preferences.sidebarFavorites?.isEmpty ?? true {
+        if case .accessDenied? = FinderFavorites.lastFailure, !Preferences.finderFavoritesMerged {
             // Les favoris du Finder sont protégés : on propose d'ouvrir le bon réglage.
             let hint = SidebarItem(kind: .finderAccess, title: L("Afficher les favoris du Finder…"), symbol: "lock.open", tint: .secondaryLabelColor)
             favorites.children.append(hint)
@@ -352,7 +362,8 @@ final class SidebarViewController: NSViewController {
     /// Ajoute les favoris du Finder qui manquent (la lecture demande l'accès complet au disque).
     @objc private func importFinderFavorites(_ sender: NSMenuItem) {
         guard let entries = FinderFavorites.load() else { FinderFavorites.showDiagnostic(); return }
-        Preferences.addFavorites(entries.map(\.url))
+        Preferences.mergeFinderFavorites(entries.map(\.url))
+        Preferences.finderFavoritesMerged = true
     }
 
     @objc private func renameFavorite(_ sender: NSMenuItem) {

@@ -67,6 +67,40 @@ enum Preferences {
         sidebarFavorites = favorites
     }
 
+    /// Vrai une fois les favoris du Finder lus et fusionnés (souvent impossible au premier lancement, faute d'accès complet au disque).
+    static var finderFavoritesMerged: Bool {
+        get {
+            if defaults.object(forKey: "finderFavoritesMerged") == nil, let favorites = sidebarFavorites {
+                // Installations antérieures : la liste par défaut (Images, Musique, Vidéos) trahit un Finder illisible au départ ;
+                // sinon les favoris du Finder ont déjà été repris et l'utilisateur a pu en retirer.
+                let fm = FileManager.default
+                let fallback = [FileManager.SearchPathDirectory.picturesDirectory, .musicDirectory, .moviesDirectory]
+                    .compactMap { fm.urls(for: $0, in: .userDomainMask).first }
+                let usedFallback = fallback.allSatisfy { folder in favorites.contains { $0.isSameLocation(as: folder) } }
+                defaults.set(!usedFallback, forKey: "finderFavoritesMerged")
+            }
+            return defaults.bool(forKey: "finderFavoritesMerged")
+        }
+        set { defaults.set(newValue, forKey: "finderFavoritesMerged") }
+    }
+
+    /// Ajoute les favoris du Finder absents, chacun après celui qui le précède dans le Finder (ordre du Finder conservé).
+    static func mergeFinderFavorites(_ finder: [URL]) {
+        var favorites = sidebarFavorites ?? []
+        var insertion = 0
+        var changed = false
+        for url in finder {
+            if let index = favorites.firstIndex(where: { $0.isSameLocation(as: url) }) {
+                insertion = index + 1
+            } else {
+                favorites.insert(url, at: min(insertion, favorites.count))
+                insertion += 1
+                changed = true
+            }
+        }
+        if changed { sidebarFavorites = favorites }
+    }
+
     static func removeFavorite(_ url: URL) {
         sidebarFavorites = (sidebarFavorites ?? []).filter { !$0.isSameLocation(as: url) }
     }
