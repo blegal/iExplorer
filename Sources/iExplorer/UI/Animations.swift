@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import DiskUsageKit
 
 /// Trois niveaux d'animation, réglés depuis la barre d'outils : aucune, légères (fondus discrets),
 /// complètes (navigation qui glisse, éléments qui apparaissent en cascade, corbeille, étincelles…).
@@ -94,11 +95,13 @@ enum AnimationEffect: String, CaseIterable {
     case pushNavigation, cascade, trashFade, accentSpring, sparkles
     case portal, spiral, hoverGlow, selectionRipple, iconPop, panelDim, flyingFiles, dropParticles
     case crumple, typewriter, stamps, fireworks, themeWave, sidebarBounce
+    // Graphique d'occupation du disque (⌘5), joués par DiskUsageKit : mêmes noms que `DiskEffect`.
+    case growth, zoom, unfold, morph, crumble, liveScan, baobab, leaves
 
     var level: AnimationMode {
         switch self {
-        case .fadeNavigation, .accentFade, .rowAnimation: .light
-        case .pushNavigation, .cascade, .trashFade, .accentSpring, .sparkles: .full
+        case .fadeNavigation, .accentFade, .rowAnimation, .growth, .zoom: .light
+        case .pushNavigation, .cascade, .trashFade, .accentSpring, .sparkles, .unfold, .morph, .crumble, .liveScan: .full
         default: .wow
         }
     }
@@ -127,6 +130,14 @@ enum AnimationEffect: String, CaseIterable {
         case .fireworks: L("Feu d’artifice après une opération de plus de 30 s")
         case .themeWave: L("Nouveau thème en vague circulaire")
         case .sidebarBounce: L("Icônes de la barre latérale qui rebondissent au survol")
+        case .growth: L("Occupation du disque : le graphique se construit à la fin d’une analyse")
+        case .zoom: L("Occupation du disque : zoom en entrant dans un dossier ou en remontant")
+        case .unfold: L("Occupation du disque : les anneaux du soleil se déploient")
+        case .morph: L("Occupation du disque : les blocs glissent d’une représentation à l’autre")
+        case .crumble: L("Occupation du disque : le bloc mis à la corbeille s’effrite")
+        case .liveScan: L("Occupation du disque : les dossiers apparaissent pendant l’analyse")
+        case .baobab: L("Occupation du disque : un baobab pousse à la fin d’une analyse")
+        case .leaves: L("Occupation du disque : pluie de feuilles après avoir libéré plus d’1 Go")
         }
     }
 
@@ -147,6 +158,11 @@ enum Effects {
     /// L'effet est-il actif ? (niveau atteint par le mode choisi, et non décoché)
     static func isOn(_ effect: AnimationEffect) -> Bool {
         mode.rawValue >= effect.level.rawValue && !AnimationEffect.disabled.contains(effect)
+    }
+
+    /// Branche les effets du graphique d'occupation (DiskUsageKit) sur les réglages de l'app.
+    @MainActor static func installDiskEffects() {
+        DiskEffects.isEnabled = { effect in AnimationEffect(rawValue: effect.rawValue).map(isOn) ?? false }
     }
 
     /// Le contenu d'un panneau change de dossier.
