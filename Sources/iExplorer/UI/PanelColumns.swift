@@ -13,10 +13,12 @@ final class FileBrowser: NSBrowser, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         self.menu = menu
-        // ⌘A (et toute sélection au clavier) passe par la table interne de la colonne, qui n'envoie pas l'action du navigateur.
+        // ⌘A (et toute sélection hors clic) passe par la table interne de la colonne, qui n'envoie pas l'action du navigateur.
+        // Les clics, eux, l'envoient déjà ; les sélections faites par le panneau sont ignorées par l'action elle-même.
         NotificationCenter.default.addObserver(forName: NSTableView.selectionDidChangeNotification, object: nil, queue: nil) { [weak self] note in
-            guard let self, let table = note.object as? NSView, table.isDescendant(of: self),
-                  NSApp.currentEvent?.type == .keyDown else { return }
+            guard let self, let table = note.object as? NSView, table.isDescendant(of: self) else { return }
+            let mouse: Set<NSEvent.EventType> = [.leftMouseDown, .leftMouseUp, .leftMouseDragged, .rightMouseDown, .rightMouseUp]
+            if let type = NSApp.currentEvent?.type, mouse.contains(type) { return }
             sendAction()
         }
     }
@@ -77,6 +79,28 @@ final class FileBrowser: NSBrowser, NSMenuDelegate {
             (parentForItems(inColumn: column) as? FileItem).map { panel.browserListing($0.url).count }
         }) else { return (-1, column) }
         return ((0..<count).first { frame(ofRow: $0, inColumn: column).contains(point) } ?? -1, column)
+    }
+
+    /// ⌘A : toute la colonne, dossiers compris (la table interne n'y prend que les fichiers).
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.charactersIgnoringModifiers == "a",
+              let responder = window?.firstResponder as? NSView, responder.isDescendant(of: self) else {
+            return super.performKeyEquivalent(with: event)
+        }
+        selectAllInCurrentColumn()
+        return true
+    }
+
+    @objc override func selectAll(_ sender: Any?) { selectAllInCurrentColumn() }
+
+    func selectAllInCurrentColumn() {
+        // La colonne du dossier courant du panneau (pas celle qu'un dossier sélectionné ouvre à droite).
+        guard let panel = delegate as? PanelViewController, let column = panel.browserColumn(showing: panel.currentURL),
+              let parent = parentForItems(inColumn: column) as? FileItem else { return }
+        let count = panel.browserListing(parent.url).count
+        guard count > 0 else { return }
+        selectRowIndexes(IndexSet(integersIn: 0..<count), inColumn: column)
+        sendAction()
     }
 
     /// Retour, Espace, Tab… non traités par la colonne remontent jusqu'ici.
