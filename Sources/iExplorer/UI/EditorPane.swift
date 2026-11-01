@@ -47,6 +47,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var current: Document?
     /// Dernier document affiché : reste l'onglet d'aperçu réutilisable pendant qu'un PDF ou un Coup d'œil s'affiche.
     private weak var lastShown: Document?
+    /// Fichier à l'écran (texte, PDF ou Coup d'œil), pour proposer ses fichiers liés.
+    private var displayedURL: URL?
 
     private let tabs = NSStackView()
     private let saveButton = NSButton(title: "Enregistrer", target: nil, action: nil)
@@ -304,6 +306,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private func showQuickLook(_ url: URL) {
         storeSelection()
         current = nil
+        displayedURL = url
         func place(_ preview: NSView) {
             preview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(preview)
@@ -356,6 +359,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private func showDocument(_ document: Document?) {
         storeSelection()
         current = document
+        displayedURL = document?.url
         if let document { lastShown = document }
         quickLook?.isHidden = true
         quickLook?.previewItem = nil
@@ -427,6 +431,42 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             button.tag = documents.firstIndex { $0 === document } ?? 0
             tabs.addArrangedSubview(button)
         }
+        for url in Self.relatedFiles(of: displayedURL) {
+            let button = NSButton(title: url.lastPathComponent, target: self, action: #selector(openRelated(_:)))
+            button.bezelStyle = .accessoryBarAction
+            button.controlSize = .small
+            button.image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: nil)
+            button.imagePosition = .imageLeading
+            button.contentTintColor = .secondaryLabelColor
+            button.toolTip = "Ouvrir \(url.lastPathComponent)"
+            button.identifier = NSUserInterfaceItemIdentifier(url.path)
+            tabs.addArrangedSubview(button)
+        }
+    }
+
+    /// Documents et leurs sources : un PDF propose le .tex, le .docx… du même nom, et inversement.
+    private static let documentExtensions: Set<String> = [
+        "pdf", "tex", "typ", "md", "markdown", "rmd", "qmd", "ipynb", "doc", "docx", "odt", "rtf", "pages",
+        "ppt", "pptx", "odp", "key", "xls", "xlsx", "ods", "numbers", "html", "htm", "svg", "dot", "drawio",
+    ]
+
+    /// Fichiers du même dossier et du même nom de base, limités aux documents et à leurs sources (pas de .log, .aux…).
+    private static func relatedFiles(of url: URL?) -> [URL] {
+        guard let url, url.isFileURL, documentExtensions.contains(url.pathExtension.lowercased()) else { return [] }
+        let base = url.deletingPathExtension().lastPathComponent.lowercased()
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)) ?? []
+        return names.sorted().compactMap { name in
+            let candidate = url.deletingLastPathComponent().appendingPathComponent(name)
+            guard candidate.lastPathComponent != url.lastPathComponent,
+                  candidate.deletingPathExtension().lastPathComponent.lowercased() == base,
+                  documentExtensions.contains(candidate.pathExtension.lowercased()) else { return nil }
+            return candidate
+        }
+    }
+
+    @objc private func openRelated(_ sender: NSButton) {
+        guard let path = sender.identifier?.rawValue else { return }
+        open(URL(fileURLWithPath: path))
     }
 
     @objc private func selectTab(_ sender: NSButton) {
