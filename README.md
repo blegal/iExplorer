@@ -87,3 +87,8 @@ aussi le format des actions par type de fichier, la publication des versions et 
 
 L’analyse de l’espace disque et la mise à jour automatique sont partagées avec
 [iBaobab](https://github.com/blegal/iBaobab), l’analyseur d’occupation des disques.
+
+## Développement
+
+iExplorer a été développé avec l’aide de [Claude Code](https://claude.com/claude-code), l’assistant de
+programmation d’Anthropic.
