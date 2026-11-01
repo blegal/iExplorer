@@ -23,6 +23,62 @@ final class FileBrowser: NSBrowser, NSMenuDelegate {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    /// Dépôt géré par le panneau : opération proposée et zone à mettre en évidence, puis exécution.
+    var dropValidator: ((NSDraggingInfo) -> (NSDragOperation, NSRect?))?
+    var dropPerformer: ((NSDraggingInfo) -> Bool)?
+    private let dropHighlight: NSView = {
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.borderWidth = 2
+        view.layer?.cornerRadius = 6
+        view.layer?.borderColor = NSColor.controlAccentColor.cgColor
+        view.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        view.isHidden = true
+        return view
+    }()
+
+    // macOS 27 : les tables internes des colonnes transmettent le dépôt sans colonne ni ligne et ne le mettent plus à jour.
+    // Elles ne sont donc plus cibles de dépôt : le navigateur reçoit le glisser et le panneau décide sous le pointeur.
+    override func tile() {
+        super.tile()
+        var stack = subviews
+        while let view = stack.popLast() {
+            if view !== dropHighlight, !view.registeredDraggedTypes.isEmpty { view.unregisterDraggedTypes() }
+            stack += view.subviews
+        }
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { updateDrop(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { updateDrop(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { dropHighlight.isHidden = true }
+    override func draggingEnded(_ sender: NSDraggingInfo) { dropHighlight.isHidden = true }
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { true }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        dropHighlight.isHidden = true
+        return dropPerformer?(sender) ?? false
+    }
+
+    private func updateDrop(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let (operation, rect) = dropValidator?(sender) ?? ([], nil)
+        if let rect, !operation.isEmpty {
+            if dropHighlight.superview == nil { addSubview(dropHighlight, positioned: .above, relativeTo: nil) }
+            dropHighlight.frame = rect.insetBy(dx: 2, dy: 1)
+            dropHighlight.isHidden = false
+        } else {
+            dropHighlight.isHidden = true
+        }
+        return operation
+    }
+
+    /// Ligne (-1 dans le vide) et colonne sous un point du navigateur.
+    func rowAndColumn(at point: NSPoint) -> (row: Int, column: Int)? {
+        guard lastColumn >= 0, let column = (0...lastColumn).first(where: { frame(ofColumn: $0).contains(point) }) else { return nil }
+        guard let count = (delegate as? PanelViewController).flatMap({ panel in
+            (parentForItems(inColumn: column) as? FileItem).map { panel.browserListing($0.url).count }
+        }) else { return (-1, column) }
+        return ((0..<count).first { frame(ofRow: $0, inColumn: column).contains(point) } ?? -1, column)
+    }
+
     /// Retour, Espace, Tab… non traités par la colonne remontent jusqu'ici.
     override func keyDown(with event: NSEvent) {
         if keyHandler?(event) == true { return }
@@ -32,11 +88,16 @@ final class FileBrowser: NSBrowser, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         // Le clic droit sélectionne d'abord la ligne cliquée, comme dans le Finder.
-        if clickedRow >= 0, clickedColumn >= 0, !(selectedRowIndexes(inColumn: clickedColumn)?.contains(clickedRow) ?? false) {
-            selectRow(clickedRow, inColumn: clickedColumn)
+        // macOS 27 ne renseigne plus clickedRow / clickedColumn : on les retrouve sous le clic.
+        var row = clickedRow, column = clickedColumn
+        if column < 0, let event = NSApp.currentEvent, let target = rowAndColumn(at: convert(event.locationInWindow, from: nil)) {
+            (row, column) = target
+        }
+        if row >= 0, column >= 0, !(selectedRowIndexes(inColumn: column)?.contains(row) ?? false) {
+            selectRow(row, inColumn: column)
             sendAction()
-        } else if clickedRow < 0, clickedColumn >= 0 {
-            backgroundMenuHandler?(clickedColumn)
+        } else if row < 0, column >= 0 {
+            backgroundMenuHandler?(column)
         }
         guard let source = contextMenuProvider?() else { return }
         for item in source.items {
@@ -68,6 +129,8 @@ extension PanelViewController: NSBrowserDelegate {
         browser.keyHandler = { [weak self] event in self?.handleKey(event) ?? false }
         browser.contextMenuProvider = { [weak self] in self?.contextMenu() }
         browser.backgroundMenuHandler = { [weak self] column in self?.browserBackgroundClicked(column: column) }
+        browser.dropValidator = { [weak self] info in self?.validateBrowserDrop(info) ?? ([], nil) }
+        browser.dropPerformer = { [weak self] info in self?.performBrowserDrop(info) ?? false }
         browser.registerForDraggedTypes([.fileURL])
         browser.setDraggingSourceOperationMask([.copy, .move, .generic, .link], forLocal: false)
         browser.setDraggingSourceOperationMask([.copy, .move, .generic, .link], forLocal: true)
@@ -181,38 +244,28 @@ extension PanelViewController: NSBrowserDelegate {
         return pasteboard.writeObjects(urls)
     }
 
-    /// Dossier de dépôt : la ligne survolée si c'est un dossier, sinon le dossier de la colonne.
-    private func browserDropDestination(row: Int, column: Int, operation: NSBrowser.DropOperation) -> URL? {
-        if operation == .on, row >= 0, let item = browser.item(atRow: row, inColumn: column) as? FileItem, item.isNavigableDirectory {
-            return item.url
+    /// Dossier visé sous le pointeur : le dossier survolé, sinon celui de la colonne ; avec la zone à mettre en évidence.
+    private func browserDropDestination(_ info: NSDraggingInfo, sources: [URL]) -> (URL, NSRect)? {
+        guard let (row, column) = browser.rowAndColumn(at: browser.convert(info.draggingLocation, from: nil)),
+              let parent = browser.parentForItems(inColumn: column) as? FileItem else { return nil }
+        if row >= 0, let item = browser.item(atRow: row, inColumn: column) as? FileItem, item.isNavigableDirectory,
+           !sources.contains(where: { $0.isSameLocation(as: item.url) }) {
+            return (item.url, browser.frame(ofRow: row, inColumn: column))
         }
-        return (browser.parentForItems(inColumn: column) as? FileItem)?.url
+        // Sur un fichier, dans le vide ou sur le dossier glissé lui-même : le dossier de la colonne.
+        return (parent.url, browser.frame(ofColumn: column))
     }
 
-    func browser(_ browser: NSBrowser, validateDrop info: NSDraggingInfo, proposedRow row: UnsafeMutablePointer<Int>,
-                 column: UnsafeMutablePointer<Int>, dropOperation: UnsafeMutablePointer<NSBrowser.DropOperation>) -> NSDragOperation {
+    func validateBrowserDrop(_ info: NSDraggingInfo) -> (NSDragOperation, NSRect?) {
         let sources = FileClipboard.fileURLs(from: info.draggingPasteboard)
-        let rows = (browser.parentForItems(inColumn: column.pointee) as? FileItem).map { browserListing($0.url).count } ?? 0
-        if row.pointee >= rows { row.pointee = -1 }
-        // Un dossier déposé sur lui-même vise la colonne qui le contient.
-        if row.pointee >= 0, let item = browser.item(atRow: row.pointee, inColumn: column.pointee) as? FileItem,
-           sources.contains(where: { $0.isSameLocation(as: item.url) }) {
-            row.pointee = -1
-        }
-        guard !sources.isEmpty, let destination = browserDropDestination(row: row.pointee, column: column.pointee, operation: dropOperation.pointee),
-              !sources.contains(where: { $0.isSameLocation(as: destination) }) else { return [] }
-        let target = row.pointee >= 0 ? browser.item(atRow: row.pointee, inColumn: column.pointee) as? FileItem : nil
-        if dropOperation.pointee == .above || target?.isNavigableDirectory != true {
-            // Dépôt dans le dossier de la colonne (toute la colonne est mise en évidence).
-            row.pointee = -1
-            dropOperation.pointee = .on
-        }
-        return validatedOperation(info, sources: sources, destination: destination)
+        guard !sources.isEmpty, let (destination, rect) = browserDropDestination(info, sources: sources),
+              !sources.contains(where: { $0.isSameLocation(as: destination) }) else { return ([], nil) }
+        return (validatedOperation(info, sources: sources, destination: destination), rect)
     }
 
-    func browser(_ browser: NSBrowser, acceptDrop info: NSDraggingInfo, atRow row: Int, column: Int, dropOperation: NSBrowser.DropOperation) -> Bool {
+    func performBrowserDrop(_ info: NSDraggingInfo) -> Bool {
         let sources = FileClipboard.fileURLs(from: info.draggingPasteboard)
-        guard !sources.isEmpty, let destination = browserDropDestination(row: row, column: column, operation: dropOperation) else { return false }
+        guard !sources.isEmpty, let (destination, _) = browserDropDestination(info, sources: sources) else { return false }
         let operation = FileOperationCenter.dropOperation(for: info, sources: sources, destination: destination)
         guard !operation.isEmpty else { return false }
         activate(focusTable: false)
@@ -320,24 +373,40 @@ extension PanelViewController: NSBrowserDelegate {
     /// Le contenu du dossier courant a changé (surveillance, opération) : rafraîchit sa colonne.
     func reloadBrowserColumn() {
         guard viewMode == .columns else { return }
+        let column = browserColumn(showing: currentURL)
+        let selected = column.map(selectedBrowserURLs(inColumn:)) ?? []
         browserCache[currentURL.standardizedFileURL.path] = items
-        if let column = browserColumn(showing: currentURL) { reloadBrowser(column: column) }
+        if let column { reloadBrowser(column: column, selecting: selected) }
     }
 
     /// Dossiers modifiés par un dépôt, une copie ou un déplacement : leurs colonnes affichées sont relues.
     func refreshBrowserFolders(_ folders: [URL]) {
         guard viewMode == .columns else { return }
         for folder in folders {
+            let column = browserColumn(showing: folder)
+            let selected = column.map(selectedBrowserURLs(inColumn:)) ?? []
             browserCache[folder.standardizedFileURL.path] = nil
-            if let column = browserColumn(showing: folder) { reloadBrowser(column: column) }
+            if let column { reloadBrowser(column: column, selecting: selected) }
         }
     }
 
-    private func reloadBrowser(column: Int) {
-        let selection = browser.selectedRowIndexes(inColumn: column)
+    /// Éléments sélectionnés d'une colonne, lus dans son contenu actuel (avant qu'il ne change).
+    private func selectedBrowserURLs(inColumn column: Int) -> [URL] {
+        guard let parent = browser.parentForItems(inColumn: column) as? FileItem,
+              let listing = browserCache[parent.url.standardizedFileURL.path] else { return [] }
+        return (browser.selectedRowIndexes(inColumn: column) ?? []).compactMap { listing.indices.contains($0) ? listing[$0].url : nil }
+    }
+
+    /// Recharge une colonne et y resélectionne les mêmes éléments : leurs lignes ont pu changer, ou disparaître.
+    private func reloadBrowser(column: Int, selecting urls: [URL]) {
         isSyncingBrowser = true
         browser.reloadColumn(column)
-        if let selection { browser.selectRowIndexes(selection, inColumn: column) }
+        if let parent = browser.parentForItems(inColumn: column) as? FileItem {
+            let listing = browserListing(parent.url)
+            let rows = IndexSet(urls.compactMap { url in listing.firstIndex { $0.url.isSameLocation(as: url) } })
+            // Éléments partis (déplacés, supprimés) : plus de sélection, plutôt que la ligne qui a pris leur place.
+            if rows != browser.selectedRowIndexes(inColumn: column) ?? [] { browser.selectRowIndexes(rows, inColumn: column) }
+        }
         isSyncingBrowser = false
     }
 
