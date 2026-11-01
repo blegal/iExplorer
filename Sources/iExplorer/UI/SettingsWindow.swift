@@ -277,6 +277,7 @@ final class ExternalToolsViewController: NSViewController {
 /// Onglet Général : langue de l'interface.
 final class GeneralSettingsViewController: NSViewController {
     private let language = NSPopUpButton()
+    private let icon = NSPopUpButton()
 
     override func loadView() {
         for choice in AppLanguage.allCases { language.addItem(withTitle: choice.title) }
@@ -287,13 +288,31 @@ final class GeneralSettingsViewController: NSViewController {
         let intro = NSTextField(wrappingLabelWithString: L("Par défaut, iExplorer suit la langue de macOS. Le changement s’applique au prochain lancement."))
         intro.textColor = .secondaryLabelColor
         intro.font = .systemFont(ofSize: 12)
-        let stack = NSStackView(views: [line, intro])
+        for choice in AppIconChoice.allCases {
+            icon.addItem(withTitle: choice.title)
+            let image = choice.image?.copy() as? NSImage
+            image?.size = NSSize(width: 18, height: 18)
+            icon.lastItem?.image = image
+        }
+        icon.selectItem(at: AppIconChoice.allCases.firstIndex(of: AppIconChoice.chosen) ?? 0)
+        icon.target = self
+        icon.action = #selector(changeIcon)
+        let iconLine = NSStackView(views: [NSTextField(labelWithString: L("Icône du Dock :")), icon])
+        let iconNote = NSTextField(wrappingLabelWithString: L("L’icône choisie s’affiche dans le Dock quand iExplorer est ouvert ; le Finder garde l’icône d’origine."))
+        iconNote.textColor = .secondaryLabelColor
+        iconNote.font = .systemFont(ofSize: 12)
+        let stack = NSStackView(views: [line, intro, iconLine, iconNote])
+        stack.setCustomSpacing(18, after: intro)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 18, left: 22, bottom: 18, right: 22)
         stack.widthAnchor.constraint(equalToConstant: 520).isActive = true
         view = stack
+    }
+
+    @objc private func changeIcon() {
+        AppIconChoice.chosen = AppIconChoice.allCases[max(0, icon.indexOfSelectedItem)]
     }
 
     @objc private func changeLanguage() {

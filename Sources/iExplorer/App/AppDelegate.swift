@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppAppearance.apply()
+        AppIconChoice.apply()
         // Écrire dans un tube dont le lecteur est parti (tar interrompu) renvoie une erreur au lieu de tuer l'app.
         signal(SIGPIPE, SIG_IGN)
         NSApp.mainMenu = MainMenu.build()

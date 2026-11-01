@@ -187,6 +187,7 @@
 "Arrêter et remettre à zéro" = "Stop and reset";
 "Assembleur" = "Assembly";
 "Atelier" = "Atelier";
+"Aubergine" = "Eggplant";
 "Aucun" = "None";
 "Aucun commit pour cet élément." = "No commits for this item.";
 "Aucun fichier de favoris trouvé. Contenu du dossier : %@." = "No favorites file found. Folder contents: %@.";
@@ -213,6 +214,7 @@
 "Binaire (0 et 1)" = "Binary (0 and 1)";
 "Bleu" = "Blue";
 "Bleu Sur" = "Sur blue";
+"Bleu glacier" = "Glacier blue";
 "Bleu néon" = "Neon blue";
 "Bonbon" = "Candy";
 "Bonbons dégradés" = "Candy gradients";
@@ -258,6 +260,7 @@
 "Cliquez sur une action pour la changer : → copier vers la droite, ← vers la gauche, ✕ ignorer." = "Click an action to change it: → copy to the right, ← to the left, ✕ skip.";
 "Clé" = "Key";
 "Clé privée" = "Private key";
+"Cobalt et corail" = "Cobalt and coral";
 "Coller" = "Paste";
 "Coller une empreinte pour la vérifier (CRC32, MD5, SHA-1, SHA-256 ou SHA-512)" = "Paste a checksum to verify it (CRC32, MD5, SHA-1, SHA-256 or SHA-512)";
 "Colonnes" = "Columns";
@@ -422,6 +425,7 @@
 "En attente · %@e dans la file" = "Waiting · position %@ in queue";
 "En attente · prochaine" = "Waiting · next";
 "En local, ils sont placés dans la corbeille ; sur un serveur SFTP, la suppression est définitive." = "Local items are moved to the Trash; on an SFTP server, deletion is permanent.";
+"Encre et citron" = "Ink and lime";
 "Encre profonde" = "Deep ink";
 "Endormis" = "Sleepy";
 "Enfant" = "Child";
@@ -487,6 +491,7 @@
 "Git : %@ · non enregistré" = "Git: %@ · unsaved";
 "Git n’est pas disponible." = "Git is not available.";
 "Go" = "GB";
+"Graphite et sable" = "Graphite and sand";
 "Graphite neutre" = "Neutral graphite";
 "Gris" = "Gray";
 "Groupe" = "Group";
@@ -501,6 +506,8 @@
 "Horloge analogique" = "Analog clock";
 "Horloge numérique" = "Digital clock";
 "Humain" = "Human";
+"Icône du Dock :" = "Dock icon:";
+"Icône d’origine" = "Original icon";
 "Icônes" = "Icons";
 "Icônes de fichiers" = "File Icons";
 "Icônes de la barre latérale qui rebondissent au survol" = "Sidebar icons bounce on hover";
@@ -602,6 +609,7 @@
 "Liste" = "List";
 "Liste détaillée" = "Detailed List";
 "Légère" = "Light";
+"L’icône choisie s’affiche dans le Dock quand iExplorer est ouvert ; le Finder garde l’icône d’origine." = "The chosen icon appears in the Dock while iExplorer is open; the Finder keeps the original icon.";
 "MAJUSCULES" = "UPPERCASE";
 "Maquillés" = "Made-up";
 "Masquer %@" = "Hide %@";
@@ -835,6 +843,7 @@
 "Saisissez le mot de passe de l’archive." = "Enter the archive’s password.";
 "Saisissez un chemin (« ~ » désigne votre dossier de départ)." = "Enter a path (“~” stands for your home folder).";
 "Sans animation" = "No animation";
+"Sauge" = "Sage";
 "Script Python" = "Python script";
 "Script d’édition de liens" = "Linker script";
 "Script shell" = "Shell script";
