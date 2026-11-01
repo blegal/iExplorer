@@ -5,12 +5,20 @@ import AppKit
 final class FileBrowser: NSBrowser, NSMenuDelegate {
     var keyHandler: ((NSEvent) -> Bool)?
     var contextMenuProvider: (() -> NSMenu?)?
+    /// Clic droit dans le vide d'une colonne : son dossier devient le dossier courant, sans sélection.
+    var backgroundMenuHandler: ((Int) -> Void)?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         let menu = NSMenu()
         menu.delegate = self
         self.menu = menu
+        // ⌘A (et toute sélection au clavier) passe par la table interne de la colonne, qui n'envoie pas l'action du navigateur.
+        NotificationCenter.default.addObserver(forName: NSTableView.selectionDidChangeNotification, object: nil, queue: nil) { [weak self] note in
+            guard let self, let table = note.object as? NSView, table.isDescendant(of: self),
+                  NSApp.currentEvent?.type == .keyDown else { return }
+            sendAction()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -27,6 +35,8 @@ final class FileBrowser: NSBrowser, NSMenuDelegate {
         if clickedRow >= 0, clickedColumn >= 0, !(selectedRowIndexes(inColumn: clickedColumn)?.contains(clickedRow) ?? false) {
             selectRow(clickedRow, inColumn: clickedColumn)
             sendAction()
+        } else if clickedRow < 0, clickedColumn >= 0 {
+            backgroundMenuHandler?(clickedColumn)
         }
         guard let source = contextMenuProvider?() else { return }
         for item in source.items {
@@ -57,6 +67,7 @@ extension PanelViewController: NSBrowserDelegate {
         browser.backgroundColor = .clear
         browser.keyHandler = { [weak self] event in self?.handleKey(event) ?? false }
         browser.contextMenuProvider = { [weak self] in self?.contextMenu() }
+        browser.backgroundMenuHandler = { [weak self] column in self?.browserBackgroundClicked(column: column) }
         browser.registerForDraggedTypes([.fileURL])
         browser.setDraggingSourceOperationMask([.copy, .move, .generic, .link], forLocal: false)
         browser.setDraggingSourceOperationMask([.copy, .move, .generic, .link], forLocal: true)
@@ -241,7 +252,32 @@ extension PanelViewController: NSBrowserDelegate {
         activate(focusTable: false)
         let column = browser.selectedColumn
         guard column >= 0, let parent = browser.parentForItems(inColumn: column) as? FileItem else { return }
-        let parentURL = parent.url.standardizedFileURL
+        adoptBrowserFolder(parent.url.standardizedFileURL)
+    }
+
+    /// Clic droit dans le vide : la colonne perd sa sélection et son dossier devient le dossier courant.
+    func browserBackgroundClicked(column: Int) {
+        guard let parent = browser.parentForItems(inColumn: column) as? FileItem else { return }
+        activate(focusTable: false)
+        isSyncingBrowser = true
+        browser.selectRowIndexes([], inColumn: column)
+        isSyncingBrowser = false
+        adoptBrowserFolder(parent.url.standardizedFileURL)
+    }
+
+    /// Table interne d'une colonne (macOS récents), pour les animations sur ses lignes.
+    func browserTable(column: Int) -> NSTableView? {
+        guard column >= 0, column <= browser.lastColumn else { return nil }
+        let frame = browser.frame(ofColumn: column)
+        var stack: [NSView] = [browser]
+        while let view = stack.popLast() {
+            if let table = view as? NSTableView, frame.contains(NSPoint(x: table.convert(table.bounds, to: browser).midX, y: frame.midY)) { return table }
+            stack += view.subviews
+        }
+        return nil
+    }
+
+    private func adoptBrowserFolder(_ parentURL: URL) {
         if !parentURL.isSameLocation(as: currentURL) {
             // Changement de dossier sans recharger les colonnes (elles sont déjà à jour).
             let old = currentURL

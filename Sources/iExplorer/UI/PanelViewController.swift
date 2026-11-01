@@ -1236,7 +1236,10 @@ final class PanelViewController: NSViewController {
         FileOperationCenter.shared.transfer(kind, sources: urls, to: destination, undoManager: undoManager) { [weak self] created in
             // En colonnes, la destination et les dossiers d'origine peuvent être affichés ailleurs que dans la colonne courante.
             self?.refreshBrowserFolders([destination] + urls.map { $0.deletingLastPathComponent() })
-            guard let self, destination.isSameLocation(as: currentURL), !created.isEmpty else { return }
+            guard let self else { return }
+            // Destination dépliée dans la liste : on recharge pour montrer les éléments arrivés.
+            if !destination.isSameLocation(as: currentURL), expandedPaths.contains(destination.normalizedPath) { reload(); return }
+            guard destination.isSameLocation(as: currentURL), !created.isEmpty else { return }
             reload(selecting: created)
         }
     }
@@ -1337,9 +1340,14 @@ final class PanelViewController: NSViewController {
             return
         }
         // Mode complet : les lignes s'effacent avant de partir à la corbeille.
-        let rows = viewMode == .icons
-            ? selectionIndexes.compactMap { collectionView.item(at: IndexPath(item: $0, section: 0))?.view }
-            : tableView.selectedRowIndexes.compactMap { tableView.rowView(atRow: $0, makeIfNecessary: false) }
+        let rows: [NSView]
+        switch viewMode {
+        case .icons: rows = selectionIndexes.compactMap { collectionView.item(at: IndexPath(item: $0, section: 0))?.view }
+        case .columns:
+            let table = browserColumn(showing: currentURL).flatMap(browserTable(column:))
+            rows = selectionIndexes.compactMap { table?.rowView(atRow: $0, makeIfNecessary: false) }
+        case .list, .details: rows = tableView.selectedRowIndexes.compactMap { tableView.rowView(atRow: $0, makeIfNecessary: false) }
+        }
         Effects.trash(rows) { [weak self] in
             guard let self else { return }
             FileOperationCenter.shared.trash(urls, undoManager: undoManager)
@@ -1369,6 +1377,15 @@ final class PanelViewController: NSViewController {
     /// Copie ou déplacement vers un autre panneau : les icônes s'envolent vers lui.
     private func flyEffect(to target: PanelViewController) {
         guard Effects.isOn(.flyingFiles), let window = view.window else { return }
+        if viewMode == .columns {
+            // Colonnes : les icônes des éléments, depuis la ligne de la colonne courante.
+            guard let table = browserColumn(showing: currentURL).flatMap(browserTable(column:)), let first = selectionIndexes.first,
+                  let rowView = table.rowView(atRow: first, makeIfNecessary: false) else { return }
+            let images = selectionIndexes.prefix(6).map { items[$0].icon }
+            let end = target.view.convert(NSPoint(x: target.view.bounds.midX, y: target.view.bounds.midY), to: nil)
+            Effects.fly(images, from: rowView.convert(rowView.bounds, to: nil), to: end, in: window)
+            return
+        }
         let rows = tableView.selectedRowIndexes.prefix(6)
         let images = rows.compactMap { nameCell($0)?.imageView?.image }
         guard let first = rows.first, let rowView = tableView.rowView(atRow: first, makeIfNecessary: false) else { return }
@@ -2063,11 +2080,13 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     fileprivate func dropDestination(row tableRow: Int, operation: NSTableView.DropOperation, sources: [URL]) -> URL {
-        if operation == .on, let row = itemIndex(forRow: tableRow), items[row].isNavigableDirectory,
-           !sources.contains(where: { $0.isSameLocation(as: items[row].url) }) {
-            return items[row].url
+        guard let row = itemIndex(forRow: tableRow) else { return currentURL }
+        let item = items[row]
+        if operation == .on, item.isNavigableDirectory, !sources.contains(where: { $0.isSameLocation(as: item.url) }) {
+            return item.url
         }
-        return currentURL
+        // Dans un dossier déplié, un dépôt sur un fichier ou entre deux lignes vise le dossier qui les contient.
+        return item.depth > 0 ? item.url.deletingLastPathComponent() : currentURL
     }
 
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
@@ -2075,7 +2094,12 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
         let sources = FileClipboard.fileURLs(from: info.draggingPasteboard)
         guard !sources.isEmpty else { return [] }
         let destination = dropDestination(row: row, operation: dropOperation, sources: sources)
-        if destination.isSameLocation(as: currentURL) { tableView.setDropRow(-1, dropOperation: .on) }
+        if destination.isSameLocation(as: currentURL) {
+            tableView.setDropRow(-1, dropOperation: .on)
+        } else if let folder = items.firstIndex(where: { $0.url.isSameLocation(as: destination) }) {
+            // Le dossier déplié visé est mis en évidence, pas la ligne survolée.
+            tableView.setDropRow(tableRow(forItem: folder), dropOperation: .on)
+        }
         return validatedOperation(info, sources: sources, destination: destination)
     }
 
