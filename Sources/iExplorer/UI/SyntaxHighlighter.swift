@@ -4,7 +4,7 @@ import AppKit
 /// Le langage se déduit du nom du fichier (Makefile, CMakeLists.txt, Dockerfile…) puis de son extension.
 enum SyntaxHighlighter {
     enum Language {
-        case swift, cFamily, python, javascript, java, go, rust, shell, json, tex, markdown, plain
+        case swift, cFamily, python, javascript, java, go, rust, shell, json, tex, bibtex, markdown, plain
         case make, cmake, vhdl, verilog, tcl, yaml, ini, xml, css, sql, lua, ruby, perl, php, r, julia
         case dockerfile, assembly, fortran, haskell, diff
 
@@ -21,6 +21,7 @@ enum SyntaxHighlighter {
             case .shell: "Shell"
             case .json: "JSON"
             case .tex: "LaTeX"
+            case .bibtex: "BibTeX"
             case .markdown: "Markdown"
             case .plain: "Texte"
             case .make: "Makefile"
@@ -72,7 +73,8 @@ enum SyntaxHighlighter {
         case "rs": return .rust
         case "sh", "bash", "zsh", "fish", "ksh", "command": return .shell
         case "json", "geojson", "jsonc": return .json
-        case "tex", "sty", "cls", "bib", "ltx", "dtx": return .tex
+        case "tex", "sty", "cls", "ltx", "dtx": return .tex
+        case "bib": return .bibtex
         case "md", "markdown", "mdown", "mkd": return .markdown
         case "mk", "mak", "make": return .make
         case "cmake": return .cmake
@@ -299,7 +301,7 @@ enum SyntaxHighlighter {
             Grammar(keywords: ["module", "where", "import", "qualified", "as", "hiding", "data", "type", "newtype", "class", "instance", "deriving",
                                "let", "in", "case", "of", "if", "then", "else", "do", "forall", "True", "False", "Nothing", "Just"],
                     lineComments: ["--"], blockComment: ("{-", "-}"), strings: #""(?:\\.|[^"\\\n])*""#)
-        case .json, .tex, .markdown, .diff, .plain:
+        case .json, .tex, .bibtex, .markdown, .diff, .plain:
             nil
         }
     }
@@ -341,6 +343,16 @@ enum SyntaxHighlighter {
             apply(#"\\[A-Za-z@]+"#, colors.command)
             apply(#"\$[^$]*\$"#, colors.number)
             apply(#"(?<!\\)%.*$"#, colors.comment, options: .anchorsMatchLines)
+        case .bibtex:
+            // Champs (author =), valeurs entre accolades ou guillemets, commandes LaTeX, type d'entrée et clé de citation.
+            apply(#"^\s*[A-Za-z][\w-]*(?=\s*=)"#, colors.command, options: .anchorsMatchLines)
+            apply(#"(?<==\s{0,20})(?:\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}|"(?:\\.|[^"\\])*")"#, colors.string)
+            apply(#"(?<==\s{0,20})\d+\b"#, colors.number)
+            apply(#"\\[A-Za-z@]+"#, colors.command)
+            apply(#"@[A-Za-z]+"#, colors.keyword)
+            apply(#"(?<=@[A-Za-z]{1,30}\{)\s*[^,\s{}]+"#, colors.number)
+            // Commentaire en début de ligne seulement : les % des URL restent dans la valeur.
+            apply(#"^\s*%.*$"#, colors.comment, options: .anchorsMatchLines)
         case .markdown:
             apply(#"^#{1,6} .*$"#, colors.keyword, options: .anchorsMatchLines)
             apply(#"`[^`\n]+`|^```.*$"#, colors.string, options: .anchorsMatchLines)
