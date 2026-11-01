@@ -1672,11 +1672,7 @@ final class PanelViewController: NSViewController {
         if shown(.tagDots), !selection.isEmpty, !currentURL.isRemote { palette.append(tagsPalette(for: selection)) }
         group(nil, palette)
 
-        // Actions définies par les règles de type de fichier (Makefile, Typst, Markdown…).
-        if shown(.fileTypeActions) { group(nil, fileActionMenuItems()) }
-
-        // Groupes titrés, icônes colorées par famille : Ouvrir, Transformer, Organiser
-        // (ordre inspiré du Finder, de l'Explorateur Windows et de Dolphin).
+        // Ordre du Finder : Ouvrir, Organiser, actions, Transformer, Partager et tags, puis Créer et la corbeille.
         let files = selection.filter { !$0.isNavigableDirectory }
         if !selection.isEmpty {
             var open: [NSMenuItem] = []
@@ -1694,11 +1690,8 @@ final class PanelViewController: NSViewController {
                 open.append(tinted(L("Afficher le contenu du paquet"), #selector(showPackageContents(_:)), "shippingbox", MenuTint.open))
             }
             group(L("Ouvrir"), open)
-            if !currentURL.isRemote { group(L("Transformer"), transformMenuItems(for: selection)) }
-        }
 
-        var organize: [NSMenuItem] = []
-        if !selection.isEmpty {
+            var organize: [NSMenuItem] = []
             if shown(.newFolderWithSelection), selection.count > 1, !currentURL.isRemote {
                 organize.append(item(L("Nouveau dossier avec la sélection (\(selection.count) éléments)"), #selector(newFolderWithSelection(_:)), "folder.badge.plus"))
             }
@@ -1718,13 +1711,21 @@ final class PanelViewController: NSViewController {
                 organize.append(links)
             }
             if shown(.copyPath) { organize.append(item(L("Copier le chemin"), #selector(copyPath(_:)), "link")) }
-            if !currentURL.isRemote {
-                if shown(.tags) { organize.append(tagsMenuItem()) }
-                if shown(.customActions), let actions = customActionsMenuItem() { organize.append(actions) }
-                if shown(.share) { organize.append(shareMenuItem(for: selection.map(\.url))) }
-            }
+            group(L("Organiser"), organize)
         }
-        group(L("Organiser"), organize)
+
+        // Actions des règles de type de fichier (Makefile, Typst, Markdown…), puis actions personnalisées.
+        var actions: [NSMenuItem] = shown(.fileTypeActions) ? fileActionMenuItems() : []
+        if shown(.customActions), !selection.isEmpty, !currentURL.isRemote, let custom = customActionsMenuItem() { actions.append(custom) }
+        group(nil, actions)
+
+        if !selection.isEmpty, !currentURL.isRemote {
+            group(L("Transformer"), transformMenuItems(for: selection))
+            var share: [NSMenuItem] = []
+            if shown(.tags) { share.append(tagsMenuItem()) }
+            if shown(.share) { share.append(shareMenuItem(for: selection.map(\.url))) }
+            group(nil, share)
+        }
 
         var create: [NSMenuItem] = []
         if shown(.newFolder) { create.append(item(L("Nouveau dossier"), #selector(newFolder(_:)), "folder.badge.plus")) }

@@ -1,17 +1,19 @@
 import AppKit
 
-/// Groupes du menu contextuel, masquables en entier ; un groupe affiché laisse choisir ses éléments un à un.
+/// Groupes du menu contextuel, dans l'ordre du menu (celui du Finder), masquables en entier ;
+/// un groupe affiché laisse choisir ses éléments un à un.
 /// Masquer une entrée ne retire que le menu contextuel : la barre de menus et les raccourcis restent.
 enum ContextMenuGroup: String, CaseIterable {
-    case palette, fileActions, open, transform, organize, create, trash, view
+    case palette, open, organize, fileActions, transform, share, create, trash, view
 
     var title: String {
         switch self {
         case .palette: L("Barre d’actions rapides")
-        case .fileActions: L("Actions par type de fichier")
+        case .fileActions: L("Actions")
         case .open: L("Ouvrir")
         case .transform: L("Transformer")
         case .organize: L("Organiser")
+        case .share: L("Partager et tags")
         case .create: L("Créer")
         case .trash: L("Corbeille")
         case .view: L("Présentation")
@@ -30,10 +32,11 @@ enum ContextMenuGroup: String, CaseIterable {
 
 enum ContextMenuEntry: String, CaseIterable {
     case quickActions, tagDots
-    case fileTypeActions
     case open, openWith, openInNewTab, packageContents
+    case newFolderWithSelection, copyMoveTo, links, copyPath
+    case fileTypeActions, customActions
     case compress, checksum, encrypt, split
-    case newFolderWithSelection, copyMoveTo, links, copyPath, tags, customActions, share
+    case tags, share
     case newFolder, newDocument, terminal, diskUsage
     case trash
     case flatView, grouping
@@ -41,10 +44,11 @@ enum ContextMenuEntry: String, CaseIterable {
     var group: ContextMenuGroup {
         switch self {
         case .quickActions, .tagDots: .palette
-        case .fileTypeActions: .fileActions
+        case .fileTypeActions, .customActions: .fileActions
         case .open, .openWith, .openInNewTab, .packageContents: .open
         case .compress, .checksum, .encrypt, .split: .transform
-        case .newFolderWithSelection, .copyMoveTo, .links, .copyPath, .tags, .customActions, .share: .organize
+        case .newFolderWithSelection, .copyMoveTo, .links, .copyPath: .organize
+        case .tags, .share: .share
         case .newFolder, .newDocument, .terminal, .diskUsage: .create
         case .trash: .trash
         case .flatView, .grouping: .view
@@ -55,7 +59,7 @@ enum ContextMenuEntry: String, CaseIterable {
         switch self {
         case .quickActions: L("Icônes d’actions courantes")
         case .tagDots: L("Pastilles de tags")
-        case .fileTypeActions: L("Actions des règles (make, latexmk, typst…)")
+        case .fileTypeActions: L("Actions par type de fichier (make, latexmk, typst…)")
         case .open: L("Ouvrir")
         case .openWith: L("Ouvrir avec")
         case .openInNewTab: L("Ouvrir dans un nouvel onglet")
