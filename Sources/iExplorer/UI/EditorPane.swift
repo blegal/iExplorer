@@ -45,6 +45,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     private var documents: [Document] = []
     private var current: Document?
+    /// Dernier document affiché : reste l'onglet d'aperçu réutilisable pendant qu'un PDF ou un Coup d'œil s'affiche.
+    private weak var lastShown: Document?
 
     private let tabs = NSStackView()
     private let saveButton = NSButton(title: "Enregistrer", target: nil, action: nil)
@@ -277,7 +279,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             return
         }
         let document = Document(url: url, text: loaded.text, encoding: loaded.encoding)
-        if let reusable = current, !reusable.isModified, let index = documents.firstIndex(where: { $0 === reusable }) {
+        if let reusable = current ?? lastShown, !reusable.isModified, let index = documents.firstIndex(where: { $0 === reusable }) {
             documents[index] = document
         } else {
             documents.append(document)
@@ -354,6 +356,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private func showDocument(_ document: Document?) {
         storeSelection()
         current = document
+        if let document { lastShown = document }
         quickLook?.isHidden = true
         quickLook?.previewItem = nil
         pdfViewer?.isHidden = true
