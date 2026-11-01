@@ -105,8 +105,10 @@
 "Acier doux" = "Soft steel";
 "Action" = "Action";
 "Actions" = "Actions";
+"Actions des règles (make, latexmk, typst…)" = "Rule actions (make, latexmk, typst…)";
 "Actions du projet « %@ » à approuver…" = "Project actions “%@” to approve…";
 "Actions par type" = "File Type Actions";
+"Actions par type de fichier" = "Actions by File Type";
 "Actions par type de fichier…" = "Actions by File Type…";
 "Actions personnalisées" = "Custom Actions";
 "Actualiser" = "Refresh";
@@ -209,6 +211,7 @@
 "Autres" = "Others";
 "Badges d’extension" = "Extension badges";
 "Banc de poissons" = "School of fish";
+"Barre d’actions rapides" = "Quick actions bar";
 "Bassin de carpes koï" = "Koi pond";
 "Batch Windows" = "Windows Batch";
 "Binaire (0 et 1)" = "Binary (0 and 1)";
@@ -249,6 +252,7 @@
 "Chiffrement moderne de fichiers (.age), lisible sur Linux et Windows" = "Modern file encryption (.age), readable on Linux and Windows";
 "Chiffrer" = "Encrypt";
 "Chiffrer %@ fichiers" = "Encrypt %@ files";
+"Chiffrer / Déchiffrer" = "Encrypt / Decrypt";
 "Chiffrer « %@ »" = "Encrypt “%@”";
 "Chiffrer…" = "Encrypt…";
 "Chiffres" = "Digits";
@@ -289,6 +293,7 @@
 "Compresser" = "Compress";
 "Compresser %@ éléments" = "Compress %@ items";
 "Compresser (qualité écran)" = "Compress (screen quality)";
+"Compresser / Décompresser" = "Compress / Expand";
 "Compresser en HEVC 1080p" = "Compress to HEVC 1080p";
 "Compresser « %@ »" = "Compress “%@”";
 "Compresser…" = "Compress…";
@@ -324,6 +329,7 @@
 "Copier le chemin" = "Copy Path";
 "Copier les SHA-256" = "Copy SHA-256";
 "Copier vers" = "Copy To";
+"Copier vers / Déplacer vers" = "Copy To / Move To";
 "Copier vers l’autre panneau" = "Copy to Other Panel";
 "Corbeille" = "Trash";
 "Couleur" = "Color";
@@ -387,6 +393,7 @@
 "Déchiffrer %@ fichiers" = "Decrypt %@ files";
 "Déchiffrer « %@ »" = "Decrypt “%@”";
 "Déchiffrer…" = "Decrypt…";
+"Décochez un groupe pour le retirer du clic droit, ou seulement certains de ses éléments. Ils restent dans la barre de menus et gardent leurs raccourcis." = "Uncheck a group to remove it from the right-click menu, or only some of its items. They stay in the menu bar and keep their shortcuts.";
 "Décompresser" = "Extract";
 "Décompresser ici" = "Extract Here";
 "Décompresser vers l’autre panneau" = "Extract to Other Panel";
@@ -394,6 +401,7 @@
 "Décompression de « %@ »" = "Extraction of “%@”";
 "Découpage de « %@ »" = "Splitting “%@”";
 "Découper" = "Split";
+"Découper / Réassembler" = "Split / Join";
 "Découper le fichier…" = "Split File…";
 "Découper « %@ »" = "Split “%@”";
 "Déjà intégrés" = "Built in";
@@ -511,6 +519,7 @@
 "Icônes" = "Icons";
 "Icônes de fichiers" = "File Icons";
 "Icônes de la barre latérale qui rebondissent au survol" = "Sidebar icons bounce on hover";
+"Icônes d’actions courantes" = "Common action icons";
 "Identifiant numérique — Retour pour appliquer" = "Numeric ID — Return to apply";
 "Identique" = "Identical";
 "Ignorer" = "Skip";
@@ -621,6 +630,7 @@
 "Masquer l’inspecteur" = "Hide Inspector";
 "Masqué" = "Hidden";
 "Matériau coloré" = "Colorful Material";
+"Menu contextuel" = "Context Menu";
 "Mes règles" = "My Rules";
 "Message du commit :" = "Commit message:";
 "Mettre en forme" = "Format";
@@ -681,6 +691,7 @@
 "Nouveau document" = "New Document";
 "Nouveau dossier" = "New Folder";
 "Nouveau dossier (⇧⌘N)" = "New folder (⇧⌘N)";
+"Nouveau dossier avec la sélection" = "New Folder with Selection";
 "Nouveau dossier avec la sélection (%@ éléments)" = "New Folder with Selection (%@ items)";
 "Nouveau nom" = "New name";
 "Nouveau nom écrit lettre par lettre" = "New name typed letter by letter";
@@ -724,10 +735,12 @@
 "Papier grainé" = "Grained paper";
 "Papirus plat" = "Flat Papirus";
 "Par défaut, iExplorer suit la langue de macOS. Le changement s’applique au prochain lancement." = "By default, iExplorer follows the macOS language. The change applies the next time you launch it.";
+"Partager" = "Share";
 "Partager…" = "Share…";
 "Particules au dépôt d’un glisser-déposer" = "Particles on drop";
 "Pas" = "Step";
 "Pas de données SyncTeX : enregistrez (⌘S) pour recompiler" = "No SyncTeX data: save (⌘S) to recompile";
+"Pastilles de tags" = "Tag dots";
 "Pause" = "Pause";
 "Personnaliser les actions « %@ »…" = "Customize “%@” Actions…";
 "Personnaliser les actions…" = "Customize Actions…";
@@ -781,6 +794,7 @@
 "Rechercher une commande ou un raccourci" = "Search for a command or shortcut";
 "Rechercher…" = "Find…";
 "Redémarrer le shell" = "Restart the shell";
+"Regroupement" = "Grouping";
 "Regrouper par" = "Group By";
 "Relancer" = "Relaunch";
 "Relancer iExplorer maintenant ?" = "Relaunch iExplorer now?";
@@ -864,6 +878,7 @@
 "Solarisé" = "Solarized";
 "Sombre" = "Dark";
 "Somme de contrôle" = "Checksum";
+"Somme de contrôle / Vérifier" = "Checksum / Verify";
 "Sommes %@ de %@ fichiers" = "%@ checksums of %@ files";
 "Sommes %@ de « %@ »" = "%@ checksums of “%@”";
 "Sommes de contrôle — %@" = "Checksums — %@";
@@ -936,6 +951,7 @@
 "Tout mettre en pause" = "Pause All";
 "Tout ramener au premier plan" = "Bring All to Front";
 "Tout reprendre" = "Resume All";
+"Tout réafficher" = "Show All";
 "Tout rétablir…" = "Restore All…";
 "Tout sélectionner" = "Select All";
 "Trait fin" = "Thin line";

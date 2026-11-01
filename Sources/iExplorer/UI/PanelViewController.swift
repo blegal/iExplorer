@@ -1642,112 +1642,107 @@ final class PanelViewController: NSViewController {
     func contextMenu() -> NSMenu {
         let menu = NSMenu()
         let selection = selectedItems
-        func add(_ title: String, _ action: Selector, _ symbol: String? = nil) {
+        let shown = { (entry: ContextMenuEntry) in entry.isShown }
+        func item(_ title: String, _ action: Selector, _ symbol: String? = nil) -> NSMenuItem {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
             if let symbol { item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) }
-            menu.addItem(item)
+            return item
+        }
+        func tinted(_ title: String, _ action: Selector, _ symbol: String, _ tint: NSColor) -> NSMenuItem {
+            let entry = item(title, action)
+            entry.image = MenuTint.icon(symbol, tint)
+            MenuTint.style(entry, tint)
+            return entry
+        }
+        func separator() {
+            if let last = menu.items.last, !last.isSeparatorItem { menu.addItem(.separator()) }
+        }
+        // Un groupe n'apparaît (avec son titre éventuel) que s'il lui reste des entrées : réglages, sélection, serveur.
+        func group(_ title: String?, _ entries: [NSMenuItem]) {
+            guard !entries.isEmpty else { return }
+            separator()
+            if let title { menu.addItem(.sectionHeader(title: title)) }
+            entries.forEach(menu.addItem)
         }
 
         // Actions courantes en icônes, en tête du menu.
-        menu.addItem(quickActionsPalette(for: selection))
-        if !selection.isEmpty, !currentURL.isRemote { menu.addItem(tagsPalette(for: selection)) }
-        menu.addItem(.separator())
+        var palette: [NSMenuItem] = []
+        if shown(.quickActions) { palette.append(quickActionsPalette(for: selection)) }
+        if shown(.tagDots), !selection.isEmpty, !currentURL.isRemote { palette.append(tagsPalette(for: selection)) }
+        group(nil, palette)
 
         // Actions définies par les règles de type de fichier (Makefile, Typst, Markdown…).
-        let fileActions = fileActionMenuItems()
-        if !fileActions.isEmpty {
-            fileActions.forEach(menu.addItem)
-            menu.addItem(.separator())
-        }
+        if shown(.fileTypeActions) { group(nil, fileActionMenuItems()) }
 
         // Groupes titrés, icônes colorées par famille : Ouvrir, Transformer, Organiser
         // (ordre inspiré du Finder, de l'Explorateur Windows et de Dolphin).
-        func header(_ title: String) {
-            if menu.items.last?.isSeparatorItem == false { menu.addItem(.separator()) }
-            menu.addItem(.sectionHeader(title: title))
-        }
-        func separator() {
-            if menu.items.last?.isSeparatorItem == false { menu.addItem(.separator()) }
-        }
-        func tinted(_ title: String, _ action: Selector, _ symbol: String, _ tint: NSColor) {
-            add(title, action)
-            menu.items.last?.image = MenuTint.icon(symbol, tint)
-            if let item = menu.items.last { MenuTint.style(item, tint) }
-        }
         let files = selection.filter { !$0.isNavigableDirectory }
         if !selection.isEmpty {
-            header(L("Ouvrir"))
-            if !files.isEmpty { tinted(L("Ouvrir"), #selector(openSelection(_:)), "arrow.up.forward.app", MenuTint.open) }
-            if let first = files.first, files.count == selection.count, !first.url.isRemote {
+            var open: [NSMenuItem] = []
+            if shown(.open), !files.isEmpty { open.append(tinted(L("Ouvrir"), #selector(openSelection(_:)), "arrow.up.forward.app", MenuTint.open)) }
+            if shown(.openWith), let first = files.first, files.count == selection.count, !first.url.isRemote {
                 let openWith = openWithMenu(for: first.url)
                 openWith.image = MenuTint.icon("square.grid.2x2", MenuTint.open)
                 MenuTint.style(openWith, MenuTint.open)
-                menu.addItem(openWith)
+                open.append(openWith)
             }
-            if selection.contains(where: \.isNavigableDirectory) {
-                tinted(L("Ouvrir dans un nouvel onglet"), #selector(openInNewTab(_:)), "plus.square.on.square", MenuTint.open)
+            if shown(.openInNewTab), selection.contains(where: \.isNavigableDirectory) {
+                open.append(tinted(L("Ouvrir dans un nouvel onglet"), #selector(openInNewTab(_:)), "plus.square.on.square", MenuTint.open))
             }
-            if selection.count == 1, selection[0].isPackage {
-                tinted(L("Afficher le contenu du paquet"), #selector(showPackageContents(_:)), "shippingbox", MenuTint.open)
+            if shown(.packageContents), selection.count == 1, selection[0].isPackage {
+                open.append(tinted(L("Afficher le contenu du paquet"), #selector(showPackageContents(_:)), "shippingbox", MenuTint.open))
             }
-            if !currentURL.isRemote {
-                let transform = transformMenuItems(for: selection)
-                if !transform.isEmpty {
-                    header(L("Transformer"))
-                    transform.forEach(menu.addItem)
-                }
-            }
+            group(L("Ouvrir"), open)
+            if !currentURL.isRemote { group(L("Transformer"), transformMenuItems(for: selection)) }
         }
 
-        header(L("Organiser"))
+        var organize: [NSMenuItem] = []
         if !selection.isEmpty {
-            if selection.count > 1, !currentURL.isRemote {
-                add(L("Nouveau dossier avec la sélection (\(selection.count) éléments)"), #selector(newFolderWithSelection(_:)), "folder.badge.plus")
+            if shown(.newFolderWithSelection), selection.count > 1, !currentURL.isRemote {
+                organize.append(item(L("Nouveau dossier avec la sélection (\(selection.count) éléments)"), #selector(newFolderWithSelection(_:)), "folder.badge.plus"))
             }
             let targets = host?.targetPanels(for: self) ?? []
-            if !targets.isEmpty {
-                menu.addItem(panelSubmenu(L("Copier vers"), #selector(copyToOtherPanel(_:)), targets, "arrow.right.doc.on.clipboard"))
-                menu.addItem(panelSubmenu(L("Déplacer vers"), #selector(moveToOtherPanel(_:)), targets, "arrow.right.square"))
+            if shown(.copyMoveTo), !targets.isEmpty {
+                organize.append(panelSubmenu(L("Copier vers"), #selector(copyToOtherPanel(_:)), targets, "arrow.right.doc.on.clipboard"))
+                organize.append(panelSubmenu(L("Déplacer vers"), #selector(moveToOtherPanel(_:)), targets, "arrow.right.square"))
             }
-            if !currentURL.isRemote {
+            if shown(.links), !currentURL.isRemote {
                 let links = NSMenuItem(title: L("Créer un lien"), action: nil, keyEquivalent: "")
                 links.image = NSImage(systemSymbolName: "link.badge.plus", accessibilityDescription: nil)
                 links.submenu = NSMenu()
                 for (title, action) in [(L("Lien symbolique ici"), #selector(symlinkHere(_:))), (L("Lien symbolique dans l’autre panneau"), #selector(symlinkInOtherPanel(_:))),
                                         (L("Lien physique ici"), #selector(hardLinkHere(_:))), (L("Lien physique dans l’autre panneau"), #selector(hardLinkInOtherPanel(_:)))] {
-                    let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
-                    entry.target = self
-                    links.submenu?.addItem(entry)
+                    links.submenu?.addItem(item(title, action))
                 }
-                menu.addItem(links)
+                organize.append(links)
             }
-            add(L("Copier le chemin"), #selector(copyPath(_:)), "link")
+            if shown(.copyPath) { organize.append(item(L("Copier le chemin"), #selector(copyPath(_:)), "link")) }
             if !currentURL.isRemote {
-                menu.addItem(tagsMenuItem())
-                if let actions = customActionsMenuItem() { menu.addItem(actions) }
-                menu.addItem(shareMenuItem(for: selection.map(\.url)))
+                if shown(.tags) { organize.append(tagsMenuItem()) }
+                if shown(.customActions), let actions = customActionsMenuItem() { organize.append(actions) }
+                if shown(.share) { organize.append(shareMenuItem(for: selection.map(\.url))) }
             }
-            separator()
         }
-        add(L("Nouveau dossier"), #selector(newFolder(_:)), "folder.badge.plus")
+        group(L("Organiser"), organize)
+
+        var create: [NSMenuItem] = []
+        if shown(.newFolder) { create.append(item(L("Nouveau dossier"), #selector(newFolder(_:)), "folder.badge.plus")) }
         if !currentURL.isRemote {
-            menu.addItem(newDocumentMenuItem())
-            add(L("Ouvrir dans le Terminal"), #selector(openInTerminal(_:)), "terminal")
-            if selection.isEmpty { add(L("Occupation du disque"), #selector(toggleDiskUsage(_:)), "chart.pie") }
+            if shown(.newDocument) { create.append(newDocumentMenuItem()) }
+            if shown(.terminal) { create.append(item(L("Ouvrir dans le Terminal"), #selector(openInTerminal(_:)), "terminal")) }
+            if shown(.diskUsage), selection.isEmpty { create.append(item(L("Occupation du disque"), #selector(toggleDiskUsage(_:)), "chart.pie")) }
         }
-        if !selection.isEmpty {
-            separator()
-            tinted(L("Placer dans la corbeille"), #selector(moveToTrash(_:)), "trash", MenuTint.danger)
+        group(nil, create)
+
+        if shown(.trash), !selection.isEmpty {
+            group(nil, [tinted(L("Placer dans la corbeille"), #selector(moveToTrash(_:)), "trash", MenuTint.danger)])
         }
-        if selection.isEmpty, isFlatView || canShowFlatView {
-            menu.addItem(.separator())
-            menu.addItem(flatViewMenuItem())
-        }
-        if selection.isEmpty, viewMode == .list || viewMode == .details {
-            if !(isFlatView || canShowFlatView) { menu.addItem(.separator()) }
-            menu.addItem(groupingMenuItem())
-        }
+
+        var view: [NSMenuItem] = []
+        if shown(.flatView), selection.isEmpty, isFlatView || canShowFlatView { view.append(flatViewMenuItem()) }
+        if shown(.grouping), selection.isEmpty, viewMode == .list || viewMode == .details { view.append(groupingMenuItem()) }
+        group(nil, view)
         return menu
     }
 

@@ -54,7 +54,8 @@ extension PanelViewController {
         var items: [NSMenuItem] = []
         let files = selection.filter { !$0.isNavigableDirectory }
 
-        if !selection.isEmpty, selection.allSatisfy({ FileOperationCenter.isArchive($0.url) }) {
+        if !ContextMenuEntry.compress.isShown {
+        } else if !selection.isEmpty, selection.allSatisfy({ FileOperationCenter.isArchive($0.url) }) {
             items.append(menuItem(L("Décompresser ici"), #selector(extractHere(_:)), icon: "archivebox.circle", tint: MenuTint.compress))
             if !(host?.targetPanels(for: self).isEmpty ?? true) {
                 items.append(menuItem(L("Décompresser vers l’autre panneau"), #selector(extractToOtherPanel(_:)), icon: "arrow.right.circle", tint: MenuTint.compress))
@@ -65,21 +66,24 @@ extension PanelViewController {
 
         // Somme de contrôle, chiffrement et découpage ne portent que sur des fichiers.
         let onlyFiles = !files.isEmpty && files.count == selection.count
-        if let verify = verificationTarget(for: files), onlyFiles {
+        if !ContextMenuEntry.checksum.isShown {
+        } else if let verify = verificationTarget(for: files), onlyFiles {
             items.append(menuItem(L("Vérifier la somme de contrôle"), #selector(validateChecksumFile(_:)), icon: "checkmark.seal",
                                   tint: MenuTint.checksum, hint: verify.algorithm, represented: verify.list))
         } else if onlyFiles {
             items.append(checksumMenuItem())
         }
 
-        if onlyFiles, encryptedFiles.count == files.count {
+        if !ContextMenuEntry.encrypt.isShown {
+        } else if onlyFiles, encryptedFiles.count == files.count {
             let cipher = FileCipher(encryptedFile: files[0].url)
             items.append(menuItem(L("Déchiffrer…"), #selector(decryptFiles(_:)), icon: "lock.open", tint: MenuTint.encrypt, hint: cipher?.title))
         } else if onlyFiles {
             items.append(encryptMenuItem(hasFiles: !encryptableFiles.isEmpty))
         }
 
-        if joinCandidate != nil {
+        if !ContextMenuEntry.split.isShown {
+        } else if joinCandidate != nil {
             items.append(menuItem(L("Réassembler les morceaux…"), #selector(joinFiles(_:)), icon: "square.stack.3d.up", tint: MenuTint.compress))
         } else if let candidate = splitCandidate, (candidate.size ?? 0) > 50_000_000 {
             // Découper ne sert que pour les gros fichiers : le menu reste court pour les autres (toujours dans Fichier).

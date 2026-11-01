@@ -4,7 +4,7 @@ import AppKit
 final class SettingsWindowController: NSWindowController {
     private static var shared: SettingsWindowController?
 
-    enum Tab: Int { case general, fileActions, customActions, tools, animations }
+    enum Tab: Int { case general, contextMenu, fileActions, customActions, tools, animations }
 
     /// Ouvre la fenêtre, sur un onglet donné si besoin ; renvoie le contrôleur de l'onglet affiché.
     @discardableResult
@@ -31,6 +31,7 @@ final class SettingsWindowController: NSWindowController {
             tabs.addTabViewItem(item)
         }
         add(GeneralSettingsViewController(), L("Général"), "gearshape")
+        add(ContextMenuSettingsViewController(), L("Menu contextuel"), "contextualmenu.and.cursorarrow")
         let fileActions = FileActionsEditorController()
         fileActions.preferredContentSize = NSSize(width: 980, height: 640)
         add(fileActions, L("Actions par type"), "doc.badge.gearshape")
@@ -416,7 +417,7 @@ final class AnimationSettingsViewController: NSViewController {
     }
 }
 
-private final class FlippedClipContent: NSView {
+final class FlippedClipContent: NSView {
     override var isFlipped: Bool { true }
 }
 
