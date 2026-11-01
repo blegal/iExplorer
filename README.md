@@ -1,62 +1,107 @@
 # iExplorer
 
-**Gestionnaire de fichiers natif pour macOS** : jusqu’à quatre panneaux avec onglets, état Git, terminal intégré,
-serveurs distants, analyse de l’espace disque et thèmes. Écrit en Swift / AppKit, sans Electron.
+**English** · [Français](README.fr.md)
 
-![iExplorer : deux panneaux, dossiers dépliés en liste, colonnes, état Git](docs/images/hero.png)
+**A native file manager for macOS**: up to four panels with tabs, Git status, an editor with live preview, a built-in
+terminal, remote servers, disk usage analysis and themes. Written in Swift / AppKit, no Electron.
 
-## Fonctionnalités
+![iExplorer: two panels, folders expanded in a list with Git status, column view](docs/images/en/hero.png)
 
-**Navigation**
-- Interface en français ou en anglais : la langue du système par défaut, réglable dans Réglages › Général.
-- 1, 2, 3 ou 4 panneaux (8 dispositions), chacun avec ses onglets colorés et sa barre d’état (sélection, zoom).
-- Vues icônes, liste, détails et colonnes ; dossiers dépliables sur place dans les listes ; regroupement par type, date ou taille ; vue à plat de toute une arborescence.
-- Navigation synchronisée entre panneaux, comparaison et synchronisation de dossiers, recherche (nom, contenu, tags).
-- Archives (zip, tar.gz, 7z, rar…) parcourues comme des dossiers.
+## Why iExplorer?
 
-**Fichiers**
-- Copies et déplacements en arrière-plan, avec débit, pause et vérification facultative des copies.
-- Renommage par lot, tags du Finder, nouveaux documents à partir de modèles, partage, annulation (⌘Z).
-- Inspecteur : aperçu du code avec coloration, PDF, images, vidéo et son, permissions (R/W/X, octal, propriétaire).
+- **Several folders in sight.** 1 to 4 side-by-side panels, each with its own tabs; F5 / F6 copy or move to the other
+  panel, as in classic dual-pane file managers.
+- **Made for projects.** Git status shows up in the lists, an editor with preview opens next to your files, and the
+  built-in terminal follows the current folder.
+- **Where did the disk space go?** ⌘5 turns any folder into a disk usage chart.
+- **Make it yours.** 20 color themes in light and dark, 13 icon themes, a configurable context menu, a choice of Dock
+  icons, animations from subtle to spectacular, and an English or French interface.
 
-**Pour les développeurs**
-- État Git dans les listes, comme dans VS Code ; indexer, valider, tirer et pousser depuis l’inspecteur.
-- Terminal intégré qui suit le dossier du panneau actif.
-- Éditeur à côté du panneau en disposition simple : aperçu Markdown, CSV et JSON en direct, compilation LaTeX ou Typst avec le PDF à côté, synchronisation texte ↔ PDF (SyncTeX) et texte ↔ aperçu Markdown par ⌘-clic, lignes modifiées depuis le dernier commit marquées dans la marge, coloration syntaxique de plus de soixante-dix langages (Makefile, CMake, VHDL, Verilog, Tcl et contraintes FPGA, SPICE, Typst, BibTeX, Matlab, Chisel, YAML, Terraform…).
-- Actions personnalisées et actions par type de fichier (cibles d’un Makefile, compiler un .typ, convertir un .md…).
-- Serveurs SFTP, SMB, AFP, NFS et WebDAV.
+## Screenshots
 
-**Apparence**
-- 20 thèmes de couleurs, chacun en clair et en sombre ; apparence automatique, claire ou sombre.
-- 13 thèmes d’icônes de fichiers.
+### Four panels, light theme
 
-**Espace disque**
-- Occupation du dossier courant (⌘5) en 7 graphiques : cartes, soleil, histogramme, liste façon Baobab.
+Icons, details, list and columns in one window, with Finder tags and Git status.
+
+![Four panels: photos as icons, documents in details, a Git project as a list, videos](docs/images/en/four-panels.png)
+
+### Editor with live preview
+
+In the single-panel layout, the editor opens next to the panel: live Markdown, CSV and JSON preview, LaTeX or Typst
+builds with the PDF alongside, and syntax highlighting for more than seventy languages.
+
+![Markdown editor with its live preview, next to the file panel](docs/images/en/editor.png)
+
+### Disk usage (⌘5)
+
+The current folder in seven charts (treemap, sunburst, histogram, Baobab-style list), animated at the level you choose.
+
+![Disk usage: sunburst chart and list of the largest folders](docs/images/en/disk-usage.png)
+
+### Settings that fit your way of working
 
 | | |
 |---|---|
-| ![Vue en icônes, thème clair](docs/images/icones-clair.png) | ![Aperçu du code dans l’inspecteur](docs/images/apercu-code.png) |
-| ![Occupation du disque](docs/images/occupation.png) | ![Quatre panneaux, thème Atelier](docs/images/quatre-panneaux.png) |
+| ![Settings › Context Menu: groups and items to show or hide](docs/images/en/settings-menu.png) | ![Settings › General: language, Dock icon, updates](docs/images/en/settings-general.png) |
+| **Context Menu**: hide a whole group, or items one by one. | **General**: interface language, Dock icon, updates. |
+
+![Settings › Animations: level and one switch per effect](docs/images/en/settings-animations.png)
+
+**Animations**: one level (none, light, full, Whaouh+++) and one switch per effect. The macOS “Reduce motion” setting
+is always honored.
+
+## Features
+
+**Navigation**
+- English or French interface: follows the system language by default, configurable in Settings › General.
+- 1, 2, 3 or 4 panels (8 layouts), each with colored tabs and its own status bar (selection, zoom).
+- Icon, list, details and column views; folders expand in place in lists; grouping by kind, date or size; flat view of a whole tree.
+- Synchronized navigation across panels, folder comparison and synchronization, search (name, content, tags).
+- Archives (zip, tar.gz, 7z, rar…) browsed like folders.
+
+**Files**
+- Background copies and moves, with throughput, pause and optional verification.
+- Drag and drop between panels, with the Finder and other apps, in every view.
+- Batch rename, Finder tags, new documents from templates, sharing, undo (⌘Z).
+- Compression, checksums, encryption, splitting large files.
+- Inspector: highlighted code preview, PDF, images, video and audio, permissions (R/W/X, octal, owner).
+
+**For developers**
+- Git status in the lists, as in VS Code; stage, commit, pull and push from the inspector.
+- Built-in terminal that follows the active panel’s folder.
+- Editor next to the panel in the single layout: live Markdown, CSV and JSON preview, LaTeX or Typst builds with the PDF alongside, text ↔ PDF (SyncTeX) and text ↔ Markdown preview sync with ⌘-click, lines changed since the last commit marked in the gutter, syntax highlighting for more than seventy languages (Makefile, CMake, VHDL, Verilog, Tcl and FPGA constraints, SPICE, Typst, BibTeX, Matlab, Chisel, YAML, Terraform…).
+- Custom actions and per-file-type actions (Makefile targets, build a .typ, convert a .md…).
+- Optional external tools (7-Zip, unar, pigz, LaTeX, Typst…) installed in one click through Homebrew.
+- SFTP, SMB, AFP, NFS and WebDAV servers.
+
+**Appearance**
+- 20 color themes, each in light and dark; automatic, light or dark appearance.
+- 13 file icon themes, 7 Dock icons.
+- Four animation levels, adjustable effect by effect.
+
+**Disk space**
+- Disk usage of the current folder (⌘5) in 7 charts: treemap, sunburst, histogram, Baobab-style list.
+- Move to Trash straight from the chart, rescan in one click.
 
 ## Installation
 
-Nécessite **macOS 26** ou plus récent.
+Requires **macOS 26** or later.
 
-1. Téléchargez `iExplorer-x.y.z.dmg` depuis la page [Releases](https://github.com/blegal/iExplorer/releases/latest).
-2. Ouvrez l’image disque et glissez **iExplorer** dans **Applications**.
-3. L’app n’est pas notarisée par Apple : au premier lancement, faites **clic droit › Ouvrir**, puis confirmez.
-   Vous pouvez aussi retirer l’attribut de quarantaine :
+1. Download `iExplorer-x.y.z.dmg` from the [Releases](https://github.com/blegal/iExplorer/releases/latest) page.
+2. Open the disk image and drag **iExplorer** to **Applications**.
+3. The app is not notarized by Apple: on first launch, **right-click › Open**, then confirm.
+   You can also remove the quarantine attribute:
 
    ```bash
    xattr -dr com.apple.quarantine /Applications/iExplorer.app
    ```
 
-Les mises à jour sont ensuite automatiques. L’app vérifie les nouvelles versions au lancement, ou à la demande avec
-**iExplorer › Rechercher les mises à jour…**. Chaque image disque est signée (Ed25519) et vérifiée avant d’être installée.
+Updates are then automatic. The app checks for new versions at launch, or on demand with
+**iExplorer › Check for Updates…**. Every disk image is signed (Ed25519) and verified before it is installed.
 
-### Compiler depuis les sources
+### Build from source
 
-Il faut Xcode avec Swift 6.
+You need Xcode with Swift 6.
 
 ```bash
 git clone https://github.com/blegal/iExplorer.git
@@ -65,30 +110,29 @@ cd iExplorer
 open build/iExplorer.app
 ```
 
-## Raccourcis essentiels
+## Essential shortcuts
 
-| Action | Raccourci |
+| Action | Shortcut |
 |---|---|
-| Panneau suivant | ⇥ |
-| Copier / déplacer vers l’autre panneau | F5 / F6 |
-| Renommer | F2 |
-| Coup d’œil | Espace |
-| Icônes, liste, détails, colonnes | ⌘1 … ⌘4 |
-| Occupation du disque | ⌘5 |
-| 1 à 4 panneaux | ⌥⌘1 … ⌥⌘4 |
-| Rechercher | ⌘F |
-| Se connecter à un serveur | ⌘K |
-| Terminal intégré | ⌃\` |
+| Next panel | ⇥ |
+| Copy / move to the other panel | F5 / F6 |
+| Rename | F2 |
+| Quick Look | Space |
+| Icons, list, details, columns | ⌘1 … ⌘4 |
+| Disk usage | ⌘5 |
+| 1 to 4 panels | ⌥⌘1 … ⌥⌘4 |
+| Search | ⌘F |
+| Connect to server | ⌘K |
+| Built-in terminal | ⌃\` |
 
-## En savoir plus
+## Learn more
 
-Le [guide détaillé](docs/GUIDE.md) décrit toutes les fonctionnalités et la liste complète des raccourcis. Il explique
-aussi le format des actions par type de fichier, la publication des versions et la signature des mises à jour.
+The [detailed guide](docs/GUIDE.md) (in French) covers every feature and the full list of shortcuts. It also explains
+the format of per-file-type actions, how releases are published and how updates are signed.
 
-L’analyse de l’espace disque et la mise à jour automatique sont partagées avec
-[iBaobab](https://github.com/blegal/iBaobab), l’analyseur d’occupation des disques.
+Disk usage analysis and automatic updates are shared with [iBaobab](https://github.com/blegal/iBaobab), the disk
+usage analyzer.
 
-## Développement
+## Development
 
-iExplorer a été développé avec l’aide de [Claude Code](https://claude.com/claude-code), l’assistant de
-programmation d’Anthropic.
+iExplorer was developed with the help of [Claude Code](https://claude.com/claude-code), Anthropic’s coding assistant.
