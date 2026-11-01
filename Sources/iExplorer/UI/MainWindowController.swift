@@ -926,7 +926,7 @@ final class JobsView: NSView {
         }
         var parts = [jobs.count > 1 ? L("\(jobs.count) opérations") : L("\(jobs.count) opération")]
         if waiting > 0 { parts.append(L("\(waiting) en attente")) }
-        if remaining > 0 { parts.append(L("\(Format.size(remaining)) restants")) }
+        if remaining > 0 { parts.append(L("\(Format.fileSize(remaining)) restants")) }
         summary.stringValue = parts.joined(separator: " · ")
         sequential.state = FileOperationCenter.sequential ? .on : .off
         let allPaused = !jobs.isEmpty && jobs.allSatisfy(\.isPaused)
@@ -1079,7 +1079,7 @@ private final class JobRowView: NSView {
             progress.doubleValue = min(1, Double(snapshot.done) / Double(snapshot.total))
             let amount = job.countsItems
                 ? L("\(snapshot.done) sur \(Format.itemCount(Int(snapshot.total)))")
-                : L("\(Format.size(snapshot.done)) sur \(Format.size(snapshot.total))")
+                : L("\(Format.fileSize(snapshot.done)) sur \(Format.fileSize(snapshot.total))")
             detail.stringValue = [amount, timing(done: snapshot.done, total: snapshot.total), snapshot.status]
                 .compactMap { $0 }.joined(separator: " — ")
         } else {
@@ -1100,7 +1100,7 @@ private final class JobRowView: NSView {
         lastSample = (now, done)
         guard rate > 0, total > done else { return nil }
         let itemRate = String(format: "%.1f", rate)
-        let speed = job.countsItems ? L("\(itemRate) éléments/s") : "\(Format.size(Int64(rate)))/s"
+        let speed = job.countsItems ? L("\(itemRate) éléments/s") : "\(Format.fileSize(Int64(rate)))/s"
         return L("\(speed), \(Self.duration(Double(total - done) / rate)) restantes")
     }
 

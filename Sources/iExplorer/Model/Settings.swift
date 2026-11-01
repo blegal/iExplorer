@@ -101,6 +101,12 @@ enum Preferences {
         if changed { sidebarFavorites = favorites }
     }
 
+    /// Recherche automatique des mises à jour au lancement (le menu « Rechercher les mises à jour… » reste disponible).
+    static var checksUpdatesAtLaunch: Bool {
+        get { defaults.object(forKey: "checksUpdatesAtLaunch") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "checksUpdatesAtLaunch") }
+    }
+
     static func removeFavorite(_ url: URL) {
         sidebarFavorites = (sidebarFavorites ?? []).filter { !$0.isSameLocation(as: url) }
     }

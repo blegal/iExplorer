@@ -20,12 +20,20 @@ struct FinderTag: Equatable {
 enum FinderTags {
     private static let attribute = "com.apple.metadata:_kMDItemUserTags"
 
-    /// Tags de couleur standard (numéros 1 à 7), avec leur nom dans la langue de l'utilisateur.
+    /// Tags de couleur standard (numéros 1 à 7), avec leur nom dans la langue du système : c'est ce nom qui est écrit
+    /// dans les fichiers et que le Finder reconnaît, même si l'interface d'iExplorer est réglée sur une autre langue.
     static let standard: [(name: String, index: Int, color: NSColor)] = {
         let colors = NSWorkspace.shared.fileLabelColors
-        let french = ["Gris", "Vert", "Violet", "Bleu", "Jaune", "Rouge", "Orange"]
-        let isFrench = Locale.preferredLanguages.first?.hasPrefix("fr") ?? false
-        let names = isFrench ? [""] + french : NSWorkspace.shared.fileLabels
+        let system = (CFPreferencesCopyValue("AppleLanguages" as CFString, kCFPreferencesAnyApplication,
+                                             kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? [String])?.first ?? "en"
+        let names: [String]
+        if system.hasPrefix("fr") {
+            names = ["", "Gris", "Vert", "Violet", "Bleu", "Jaune", "Rouge", "Orange"]
+        } else if system.hasPrefix("en") {
+            names = ["", "Gray", "Green", "Purple", "Blue", "Yellow", "Red", "Orange"]
+        } else {
+            names = NSWorkspace.shared.fileLabels
+        }
         return (1..<min(8, colors.count, names.count)).map { (names[$0], $0, colors[$0]) }
     }()
 

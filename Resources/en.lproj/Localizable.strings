@@ -262,7 +262,7 @@
 "Cliquez sur une action pour la changer : → copier vers la droite, ← vers la gauche, ✕ ignorer." = "Click an action to change it: → copy to the right, ← to the left, ✕ skip.";
 "Clé" = "Key";
 "Clé privée" = "Private key";
-"Cobalt et corail" = "Cobalt and coral";
+"Cobalt et corail" = "Cobalt & coral";
 "Coller" = "Paste";
 "Coller une empreinte pour la vérifier (CRC32, MD5, SHA-1, SHA-256 ou SHA-512)" = "Paste a checksum to verify it (CRC32, MD5, SHA-1, SHA-256 or SHA-512)";
 "Colonnes" = "Columns";
@@ -430,7 +430,7 @@
 "En attente · %@e dans la file" = "Waiting · position %@ in queue";
 "En attente · prochaine" = "Waiting · next";
 "En local, ils sont placés dans la corbeille ; sur un serveur SFTP, la suppression est définitive." = "Local items are moved to the Trash; on an SFTP server, deletion is permanent.";
-"Encre et citron" = "Ink and lime";
+"Encre et citron" = "Ink & lime";
 "Encre profonde" = "Deep ink";
 "Endormis" = "Sleepy";
 "Enfant" = "Child";
@@ -496,7 +496,7 @@
 "Git : %@ · non enregistré" = "Git: %@ · unsaved";
 "Git n’est pas disponible." = "Git is not available.";
 "Go" = "GB";
-"Graphite et sable" = "Graphite and sand";
+"Graphite et sable" = "Graphite & sand";
 "Graphite neutre" = "Neutral graphite";
 "Gris" = "Gray";
 "Groupe" = "Group";
@@ -790,7 +790,9 @@
 "Rechercher (ex. rapport, *.pdf)" = "Search (e.g. report, *.pdf)";
 "Rechercher de nouveau les outils installés" = "Rescan Installed Tools";
 "Rechercher et remplacer dans le fichier (⌘F)" = "Find and replace in the file (⌘F)";
+"Rechercher les mises à jour au lancement" = "Check for updates at launch";
 "Rechercher les mises à jour…" = "Check for Updates…";
+"Rechercher maintenant" = "Check Now";
 "Rechercher une commande ou un raccourci" = "Search for a command or shortcut";
 "Rechercher…" = "Find…";
 "Redémarrer le shell" = "Restart the shell";
@@ -974,6 +976,7 @@
 "Variante sombre du thème, même si macOS est en mode clair" = "Dark variant of the theme, even if macOS is in Light Mode";
 "Verre liquide" = "Liquid glass";
 "Verrouillé" = "Locked";
+"Version %@" = "Version %@";
 "Version du dernier commit" = "Version from the last commit";
 "Vert" = "Green";
 "Vert classique" = "Classic green";

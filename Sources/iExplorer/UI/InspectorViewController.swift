@@ -122,7 +122,7 @@ final class InspectorViewController: NSViewController {
         }
 
         if url.isRemote {
-            subtitleLabel.stringValue = item.isNavigableDirectory ? L("Dossier") : [item.kind, item.size.map(Format.size)].compactMap { $0 }.joined(separator: " — ")
+            subtitleLabel.stringValue = item.isNavigableDirectory ? L("Dossier") : [item.kind, item.size.map(Format.fileSize)].compactMap { $0 }.joined(separator: " — ")
             fillGeneral([(L("Chemin"), url.path), (L("Serveur"), url.host ?? ""),
                          (L("Modifié"), item.modificationDate.map { Format.dateFormatter.string(from: $0) } ?? "—")])
             showRemotePermissions(for: url)
@@ -130,9 +130,9 @@ final class InspectorViewController: NSViewController {
         }
         let values = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey, .addedToDirectoryDateKey,
                                                          .fileSizeKey, .localizedTypeDescriptionKey, .isHiddenKey])
-        let sizeText = item.size.map { L("\(Format.size($0)) (\($0.formatted()) octets)") }
+        let sizeText = item.size.map { L("\(Format.fileSize($0)) (\($0.formatted()) octets)") }
         subtitleLabel.stringValue = [item.isNavigableDirectory ? L("Dossier") : values?.localizedTypeDescription,
-                                     item.size.map(Format.size)].compactMap { $0 }.joined(separator: " — ")
+                                     item.size.map(Format.fileSize)].compactMap { $0 }.joined(separator: " — ")
         let ext = url.pathExtension
         var rows: [(String, String)] = [
             (L("Chemin"), url.deletingLastPathComponent().path),
@@ -159,8 +159,8 @@ final class InspectorViewController: NSViewController {
         titleLabel.stringValue = L("\(items.count) éléments")
         let bytes = items.compactMap(\.size).reduce(0, +)
         let folders = items.filter(\.isNavigableDirectory).count
-        subtitleLabel.stringValue = folders > 0 ? L("\(folders) dossier(s), \(items.count - folders) fichier(s)") : Format.size(bytes)
-        fillGeneral([(L("Taille des fichiers"), Format.size(bytes))])
+        subtitleLabel.stringValue = folders > 0 ? L("\(folders) dossier(s), \(items.count - folders) fichier(s)") : Format.fileSize(bytes)
+        fillGeneral([(L("Taille des fichiers"), Format.fileSize(bytes))])
         setPermissionsVisible(false)
     }
 
@@ -198,7 +198,7 @@ final class InspectorViewController: NSViewController {
             }
             DispatchQueue.main.async {
                 guard let self, current == self.generation else { return }
-                self.updateGeneral(L("Taille"), "\(Format.size(total)) (\(Format.itemCount(count)))")
+                self.updateGeneral(L("Taille"), "\(Format.fileSize(total)) (\(Format.itemCount(count)))")
             }
         }
     }

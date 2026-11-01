@@ -96,7 +96,7 @@ extension PanelViewController {
 
     /// Texte de la colonne Taille pour un dossier.
     func folderSizeText(for item: FileItem) -> String {
-        if let size = item.folderSize { return Format.size(size) }
+        if let size = item.folderSize { return Format.fileSize(size) }
         return computingFolders.contains(item.url.normalizedPath) ? L("calcul…") : "—"
     }
 }

@@ -809,7 +809,7 @@ final class DiskWidget: SidebarWidget {
         let free = Double(values?.volumeAvailableCapacityForImportantUsage ?? 0)
         let used = total > 0 ? 1 - free / total : 0
         text(values?.volumeLocalizedName ?? L("Disque"), size: 11, weight: .semibold).draw(at: NSPoint(x: 2, y: 2))
-        let free​Text = text(L("\(Format.size(Int64(free))) libres"), size: 10.5, color: faint, monospaced: true)
+        let free​Text = text(L("\(Format.fileSize(Int64(free))) libres"), size: 10.5, color: faint, monospaced: true)
         free​Text.draw(at: NSPoint(x: bounds.width - free​Text.size().width - 2, y: 3))
         let bar = NSRect(x: 2, y: 24, width: bounds.width - 4, height: 10)
         faint.withAlphaComponent(0.2).setFill()
@@ -856,8 +856,8 @@ final class NetworkWidget: SidebarWidget {
             path.lineWidth = 1.5
             path.stroke()
         }
-        text("↓ \(Format.size(Int64(downHistory.last ?? 0)))/s", size: 10.5, color: .systemBlue, monospaced: true).draw(at: NSPoint(x: 2, y: 1))
-        let up = text("↑ \(Format.size(Int64(upHistory.last ?? 0)))/s", size: 10.5, color: .systemPink, monospaced: true)
+        text("↓ \(Format.fileSize(Int64(downHistory.last ?? 0)))/s", size: 10.5, color: .systemBlue, monospaced: true).draw(at: NSPoint(x: 2, y: 1))
+        let up = text("↑ \(Format.fileSize(Int64(upHistory.last ?? 0)))/s", size: 10.5, color: .systemPink, monospaced: true)
         up.draw(at: NSPoint(x: bounds.width - up.size().width - 2, y: 1))
     }
 

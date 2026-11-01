@@ -307,7 +307,7 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         func describe(_ side: TreeEntry?) -> String {
             guard let side else { return "—" }
             if side.isDirectory { return L("dossier") }
-            return "\(Format.size(side.size)) · \(side.date.map { Format.dateFormatter.string(from: $0) } ?? "")"
+            return "\(Format.fileSize(side.size)) · \(side.date.map { Format.dateFormatter.string(from: $0) } ?? "")"
         }
         let newer: NSColor = .systemGreen
         switch tableColumn?.identifier.rawValue {

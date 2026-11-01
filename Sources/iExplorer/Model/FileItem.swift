@@ -139,8 +139,13 @@ extension Format {
     /// Nombre d'éléments dans la langue de l'interface (Format.items de DiskUsageKit reste en français).
     static func itemCount(_ count: Int) -> String { count <= 1 ? L("\(count) élément") : L("\(count) éléments") }
 
+    /// Taille dans la langue de l'interface (unités et séparateur décimal), pas dans la région du système.
+    static func fileSize(_ bytes: Int64) -> String {
+        bytes.formatted(.byteCount(style: .file).locale(AppLanguage.locale))
+    }
+
     static func freeSpace(at url: URL) -> String? {
-        availableCapacity(at: url).map { L("\(size($0)) disponibles") }
+        availableCapacity(at: url).map { L("\(fileSize($0)) disponibles") }
     }
 }
 

@@ -166,7 +166,7 @@ extension PanelViewController {
         let size = item.size ?? 0
         let alert = NSAlert()
         alert.messageText = L("Découper « \(item.name) »")
-        alert.informativeText = L("\(Format.size(size)). Les morceaux s’appellent « \(item.name).001 », « .002 »… et se recollent avec iExplorer, 7-Zip ou « cat ».")
+        alert.informativeText = L("\(Format.fileSize(size)). Les morceaux s’appellent « \(item.name).001 », « .002 »… et se recollent avec iExplorer, 7-Zip ou « cat ».")
         let presets = NSPopUpButton(frame: NSRect(x: 0, y: 84, width: 300, height: 26))
         presets.addItems(withTitles: Self.splitPresets.map(\.0))
         presets.selectItem(at: 2)
@@ -190,7 +190,7 @@ extension PanelViewController {
             if partSize == 0 { partSize = Int64((Double(custom.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0) * 1_000_000) }
             guard partSize > 0 else { NSSound.beep(); return }
             guard partSize < size else {
-                FileOperationCenter.shared.showError(L("Le fichier fait moins de \(Format.size(partSize)) : rien à découper."))
+                FileOperationCenter.shared.showError(L("Le fichier fait moins de \(Format.fileSize(partSize)) : rien à découper."))
                 return
             }
             let target = destination.indexOfSelectedItem == 1 ? host?.targetPanels(for: self).first ?? self : self

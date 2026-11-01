@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         NSApp.activate()
         Updater.shared.beforeRelaunch = { [weak self] in self?.saveSession() }
-        Updater.shared.checkAtLaunch()
+        if Preferences.checksUpdatesAtLaunch { Updater.shared.checkAtLaunch() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

@@ -1,4 +1,5 @@
 import AppKit
+import UpdateKit
 
 /// Fenêtre Réglages (⌘,), façon Réglages d'iPadOS : barre latérale à pastilles colorées, pages en cartes.
 final class SettingsWindowController: NSWindowController {
@@ -374,7 +375,23 @@ final class GeneralSettingsViewController: NSViewController {
             SettingsUI.footnote(L("Par défaut, iExplorer suit la langue de macOS. Le changement s’applique au prochain lancement.")),
             SettingsUI.caption(L("Icône du Dock")), iconCard,
             SettingsUI.footnote(L("L’icône choisie s’affiche dans le Dock quand iExplorer est ouvert ; le Finder garde l’icône d’origine.")),
+            SettingsUI.caption(L("Mises à jour")), updatesCard(),
         ])
+    }
+
+    private func updatesCard() -> NSView {
+        let toggle = SettingsUI.toggle(Preferences.checksUpdatesAtLaunch, target: self, action: #selector(toggleUpdates(_:)),
+                                       identifier: "checksUpdatesAtLaunch", label: L("Rechercher les mises à jour au lancement"))
+        let check = NSButton(title: L("Rechercher maintenant"), target: Updater.shared, action: #selector(Updater.checkForUpdates(_:)))
+        return SettingsCard(rows: [
+            SettingsUI.row(L("Rechercher les mises à jour au lancement"), tile: SettingsUI.tile("arrow.triangle.2.circlepath", .systemGreen), accessory: toggle),
+            SettingsUI.row(L("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")"),
+                           tile: SettingsUI.tile("info", .systemGray), accessory: check),
+        ])
+    }
+
+    @objc private func toggleUpdates(_ sender: NSSwitch) {
+        Preferences.checksUpdatesAtLaunch = sender.state == .on
     }
 
     private func updateIconSelection() {

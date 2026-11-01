@@ -211,7 +211,7 @@ final class SidebarViewController: NSViewController {
             let symbol = !isLocal ? "server.rack" : (values?.volumeIsInternal == true ? "internaldrive" : "externaldrive")
             let item = SidebarItem(kind: .volume, title: values?.volumeLocalizedName ?? url.lastPathComponent,
                                    symbol: symbol, tint: isLocal ? .systemGray : .systemTeal, url: url)
-            item.detail = Format.availableCapacity(at: url).map(Format.size)
+            item.detail = Format.availableCapacity(at: url).map(Format.fileSize)
             if isLocal { item.capacity = Volumes.capacity(of: url) }
             item.isEjectable = !isLocal || values?.volumeIsEjectable == true || values?.volumeIsRemovable == true
             (isLocal ? devices : network).children.append(item)
@@ -716,7 +716,7 @@ private final class SidebarCell: NSTableCellView {
                 gauge.heightAnchor.constraint(equalToConstant: 4),
             ])
             let used = Double(capacity.total - capacity.available) / Double(capacity.total)
-            toolTip = (toolTip.map { $0 + "\n" } ?? "") + L("\(Format.size(capacity.available)) disponibles sur \(Format.size(capacity.total)) (\(Int((used * 100).rounded())) % utilisés)")
+            toolTip = (toolTip.map { $0 + "\n" } ?? "") + L("\(Format.fileSize(capacity.available)) disponibles sur \(Format.fileSize(capacity.total)) (\(Int((used * 100).rounded())) % utilisés)")
         }
     }
 

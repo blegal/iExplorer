@@ -145,7 +145,7 @@ extension PanelViewController {
         guard selection.count == 1, !infoText.hasPrefix("⚠︎") else { return infoText }
         let item = selection[0]
         var parts = [item.name, item.kind]
-        if let size = item.effectiveSize { parts.append(Format.size(size)) }
+        if let size = item.effectiveSize { parts.append(Format.fileSize(size)) }
         if let date = item.modificationDate { parts.append(L("modifié le \(Format.dateFormatter.string(from: date))")) }
         if item.isSymlink { parts.append(L("alias")) }
         return parts.joined(separator: " — ")

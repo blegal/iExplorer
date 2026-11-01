@@ -783,7 +783,7 @@ final class PanelViewController: NSViewController {
             if items.count >= FileItem.flatLimit { text += " " + L("(limité à 10 000)") }
             if !selection.isEmpty {
                 let bytes = selection.compactMap(\.effectiveSize).reduce(0, +)
-                let size = Format.size(bytes)
+                let size = Format.fileSize(bytes)
                 text += " — " + (selection.count > 1 ? L("\(selection.count) sélectionnés (\(size))") : L("\(selection.count) sélectionné (\(size))"))
             }
             infoText = text
@@ -800,7 +800,7 @@ final class PanelViewController: NSViewController {
             text = Format.itemCount(items.count)
         } else {
             let bytes = selection.compactMap(\.effectiveSize).reduce(0, +)
-            let size = Format.size(bytes)
+            let size = Format.fileSize(bytes)
             text = selection.count > 1 ? L("\(selection.count) sur \(items.count) sélectionnés (\(size))") : L("\(selection.count) sur \(items.count) sélectionné (\(size))")
             if selection.count > 1 { text += " — " + Self.describeKinds(selection) }
         }
@@ -1953,7 +1953,7 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
         switch identifier {
         case .size:
             let bytes = item.isNavigableDirectory ? item.folderSize : item.size
-            let full = item.isNavigableDirectory ? folderSizeText(for: item) : (item.size.map(Format.size) ?? "—")
+            let full = item.isNavigableDirectory ? folderSizeText(for: item) : (item.size.map(Format.fileSize) ?? "—")
             field.stringValue = bytes.map { Format.fitting([full, Format.compactSize($0)], width: available, font: field.font!) } ?? full
             field.alignment = .right
         case .date:

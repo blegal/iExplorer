@@ -522,7 +522,7 @@ final class FileOperationCenter {
             let from = try? source.resourceValues(forKeys: keys), to = try? target.resourceValues(forKeys: keys)
             let fromDate = from?.contentModificationDate, toDate = to?.contentModificationDate
             func describe(_ title: String, _ values: URLResourceValues?, newer: Bool?) -> NSView {
-                let size = (values?.totalFileSize ?? values?.fileSize).map { Format.size(Int64($0)) } ?? "—"
+                let size = (values?.totalFileSize ?? values?.fileSize).map { Format.fileSize(Int64($0)) } ?? "—"
                 let date = (values?.contentModificationDate).map { Format.dateFormatter.string(from: $0) } ?? "—"
                 let header = NSTextField(labelWithString: title)
                 header.font = .systemFont(ofSize: 10, weight: .semibold)

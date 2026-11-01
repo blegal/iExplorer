@@ -43,8 +43,29 @@ enum AppLanguage: String, CaseIterable {
         return inverse
     }()
 
+    /// Traductions à une valeur (« Masquer %@ » → « Hide %@ »), sous forme de motif pour retrouver le texte d'origine.
+    private static let sourceTemplates: [(pattern: NSRegularExpression, french: String)] = {
+        guard current != "fr", let url = Bundle.main.url(forResource: "Localizable", withExtension: "strings"),
+              let table = NSDictionary(contentsOf: url) as? [String: String] else { return [] }
+        return table.compactMap { french, translated in
+            guard french.components(separatedBy: "%@").count == 2, translated.components(separatedBy: "%@").count == 2,
+                  !translated.contains("$"), translated.count < 80 else { return nil }
+            let parts = translated.components(separatedBy: "%@").map(NSRegularExpression.escapedPattern(for:))
+            return (try? NSRegularExpression(pattern: "^" + parts[0] + "(.+)" + parts[1] + "$")).map { ($0, french) }
+        }
+    }()
+
     /// Texte français d'un libellé affiché : les réglages enregistrés par libellé restent valables d'une langue à l'autre.
-    static func sourceText(_ displayed: String) -> String { sourceTexts[displayed] ?? displayed }
+    static func sourceText(_ displayed: String) -> String {
+        if let french = sourceTexts[displayed] { return french }
+        let range = NSRange(displayed.startIndex..., in: displayed)
+        for template in sourceTemplates {
+            if let match = template.pattern.firstMatch(in: displayed, range: range), let value = Range(match.range(at: 1), in: displayed) {
+                return template.french.replacingOccurrences(of: "%%", with: "%").replacingOccurrences(of: "%@", with: displayed[value])
+            }
+        }
+        return displayed
+    }
 }
 
 /// Texte d'interface écrit en français dans le code, traduit d'après `<langue>.lproj/Localizable.strings`.
