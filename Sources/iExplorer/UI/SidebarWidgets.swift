@@ -16,7 +16,7 @@ enum SidebarWidgetKind: String, CaseIterable {
         case .matrix: "Pluie Matrix (cmatrix)"
         case .disk: "Espace disque"
         case .network: "Débit réseau"
-        case .timer: "Minuteur Pomodoro"
+        case .timer: "Minuteur"
         case .calendar: "Calendrier du mois"
         }
     }
@@ -60,7 +60,7 @@ enum SidebarWidgetKind: String, CaseIterable {
         case .matrix: MatrixWidget()
         case .disk: DiskWidget()
         case .network: NetworkWidget()
-        case .timer: PomodoroWidget()
+        case .timer: TimerWidget()
         case .calendar: CalendarWidget()
         }
     }
@@ -907,7 +907,7 @@ final class FlatRoundButton: NSButton {
     }
 }
 
-final class PomodoroWidget: SidebarWidget {
+final class TimerWidget: SidebarWidget {
     override var kind: SidebarWidgetKind { .timer }
     private var endDate: Date?
     private var remainingWhenPaused: TimeInterval?
@@ -922,14 +922,17 @@ final class PomodoroWidget: SidebarWidget {
     private lazy var playButton = FlatRoundButton(symbol: "play.fill", fill: .systemGreen, tip: "Démarrer", target: self, action: #selector(toggle))
     private lazy var stopButton = FlatRoundButton(symbol: "stop.fill", fill: .systemRed, tip: "Arrêter et remettre à zéro", target: self, action: #selector(reset))
     private lazy var configureButton = FlatRoundButton(symbol: "gearshape.fill", fill: .systemGray, tip: "Durée", target: self, action: #selector(configure(_:)))
-    private lazy var buttons: NSStackView = {
-        let stack = NSStackView(views: [playButton, stopButton, configureButton])
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SidebarWidgetKind.timer.height + 4),
-                                     stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)])
-        return stack
+    private lazy var extendButton = FlatRoundButton(symbol: "plus", fill: .systemBlue, tip: "Ajouter 5 minutes", target: self, action: #selector(extend))
+    /// Les quatre boutons en matrice 2 × 2, à droite de l'anneau.
+    private lazy var buttons: NSGridView = {
+        let grid = NSGridView(views: [[playButton, stopButton], [extendButton, configureButton]])
+        grid.rowSpacing = 8
+        grid.columnSpacing = 8
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(grid)
+        NSLayoutConstraint.activate([grid.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SidebarWidgetKind.timer.height + 6),
+                                     grid.centerYAnchor.constraint(equalTo: centerYAnchor)])
+        return grid
     }()
 
     private var remaining: TimeInterval {
@@ -975,6 +978,16 @@ final class PomodoroWidget: SidebarWidget {
         needsDisplay = true
     }
 
+    @objc private func extend() {
+        if let endDate {
+            self.endDate = endDate.addingTimeInterval(300)
+        } else {
+            remainingWhenPaused = remaining + 300
+        }
+        updatePlayButton()
+        needsDisplay = true
+    }
+
     @objc private func configure(_ sender: NSButton) {
         let menu = NSMenu()
         menu.addItem(.sectionHeader(title: "Durée"))
@@ -1008,7 +1021,7 @@ final class PomodoroWidget: SidebarWidget {
         track.lineWidth = 5
         faint.withAlphaComponent(0.2).setStroke()
         track.stroke()
-        let progress = 1 - remaining / duration
+        let progress = max(0, 1 - remaining / duration)
         let arc = NSBezierPath()
         arc.appendArc(withCenter: center, radius: side / 2 - 3, startAngle: -90, endAngle: -90 + 360 * progress, clockwise: false)
         arc.lineWidth = 5
@@ -1018,9 +1031,6 @@ final class PomodoroWidget: SidebarWidget {
         let seconds = Int(remaining.rounded(.up))
         let label = text(String(format: "%02d:%02d", seconds / 60, seconds % 60), size: 15, weight: .medium, monospaced: true)
         label.draw(at: NSPoint(x: center.x - label.size().width / 2, y: center.y - label.size().height / 2))
-        text("Pomodoro", size: 11, weight: .semibold).draw(at: NSPoint(x: ring.maxX + 10, y: 10))
-        let state = endDate != nil ? "en cours" : (remainingWhenPaused != nil ? "en pause" : "\(minutes) min")
-        text(state, size: 10, color: faint).draw(at: NSPoint(x: ring.maxX + 10, y: 26))
     }
 }
 
