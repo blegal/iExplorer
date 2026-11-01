@@ -62,8 +62,8 @@ enum ArchiveBrowser {
             completion(nil)
             return
         }
-        let job = FileJob(title: "Ouverture de « \(archive.lastPathComponent) »")
-        job.setStatus("Lecture de l’archive")
+        let job = FileJob(title: L("Ouverture de « \(archive.lastPathComponent) »"))
+        job.setStatus(L("Lecture de l’archive"))
         FileOperationCenter.shared.addJob(job)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
@@ -98,7 +98,7 @@ enum ArchiveBrowser {
                 guard failure == nil, !job.isCancelled else {
                     try? fm.removeItem(at: entry)
                     if let failure, !job.isCancelled {
-                        FileOperationCenter.shared.showError("« \(archive.lastPathComponent) » n’a pas pu être ouverte.\n\(failure)")
+                        FileOperationCenter.shared.showError(L("« \(archive.lastPathComponent) » n’a pas pu être ouverte.\n\(failure)"))
                     }
                     completion(nil)
                     return

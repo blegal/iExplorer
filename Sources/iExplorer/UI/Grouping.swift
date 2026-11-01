@@ -6,10 +6,10 @@ enum PanelGrouping: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .none: "Aucun"
-        case .kind: "Type"
-        case .date: "Date de modification"
-        case .size: "Taille"
+        case .none: L("Aucun")
+        case .kind: L("Type")
+        case .date: L("Date de modification")
+        case .size: L("Taille")
         }
     }
 }
@@ -98,7 +98,7 @@ extension PanelViewController {
     }
 
     func groupingMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "Regrouper par", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L("Regrouper par"), action: nil, keyEquivalent: "")
         item.image = NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: nil)
         item.submenu = NSMenu()
         for value in PanelGrouping.allCases {
@@ -144,19 +144,19 @@ extension PanelViewController {
         case .none:
             return (0, "")
         case .kind:
-            return item.isNavigableDirectory ? (0, "Dossiers") : (1, item.kind)
+            return item.isNavigableDirectory ? (0, L("Dossiers")) : (1, item.kind)
         case .size:
-            guard let size = item.effectiveSize else { return (6, "Dossiers") }
+            guard let size = item.effectiveSize else { return (6, L("Dossiers")) }
             switch size {
-            case 1_000_000_000...: return (0, "Plus de 1 Go")
-            case 100_000_000...: return (1, "100 Mo à 1 Go")
-            case 1_000_000...: return (2, "1 à 100 Mo")
-            case 100_000...: return (3, "100 Ko à 1 Mo")
-            case 1...: return (4, "Moins de 100 Ko")
-            default: return (5, "Vides")
+            case 1_000_000_000...: return (0, L("Plus de 1 Go"))
+            case 100_000_000...: return (1, L("100 Mo à 1 Go"))
+            case 1_000_000...: return (2, L("1 à 100 Mo"))
+            case 100_000...: return (3, L("100 Ko à 1 Mo"))
+            case 1...: return (4, L("Moins de 100 Ko"))
+            default: return (5, L("Vides"))
             }
         case .date:
-            guard let date = item.modificationDate else { return (.infinity, "Date inconnue") }
+            guard let date = item.modificationDate else { return (.infinity, L("Date inconnue")) }
             let (start, title) = dateBucket(for: date)
             return (-start.timeIntervalSinceReferenceDate, title)
         }
@@ -167,13 +167,13 @@ extension PanelViewController {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         func daysAgo(_ n: Int) -> Date { calendar.date(byAdding: .day, value: -n, to: today)! }
-        if date >= today { return (today, "Aujourd’hui") }
-        if date >= daysAgo(1) { return (daysAgo(1), "Hier") }
-        if date >= daysAgo(6) { return (daysAgo(6), "7 derniers jours") }
-        if date >= daysAgo(29) { return (daysAgo(29), "30 derniers jours") }
+        if date >= today { return (today, L("Aujourd’hui")) }
+        if date >= daysAgo(1) { return (daysAgo(1), L("Hier")) }
+        if date >= daysAgo(6) { return (daysAgo(6), L("7 derniers jours")) }
+        if date >= daysAgo(29) { return (daysAgo(29), L("30 derniers jours")) }
         if calendar.isDate(date, equalTo: today, toGranularity: .year) {
             let month = calendar.dateInterval(of: .month, for: date)!.start
-            return (month, monthFormatter.string(from: date).capitalized(with: Locale(identifier: "fr_FR")))
+            return (month, monthFormatter.string(from: date).capitalized(with: AppLanguage.locale))
         }
         let year = calendar.dateInterval(of: .year, for: date)!.start
         return (year, String(calendar.component(.year, from: date)))
@@ -181,7 +181,7 @@ extension PanelViewController {
 
     private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = AppLanguage.locale
         formatter.dateFormat = "LLLL"
         return formatter
     }()

@@ -7,18 +7,18 @@ extension PanelViewController {
     func quickActionsPalette(for selection: [FileItem]) -> NSMenuItem {
         var entries: [(String, String, Selector)] = []
         if !selection.isEmpty {
-            entries += [("Couper", "scissors", #selector(cut(_:))), ("Copier", "doc.on.doc", #selector(copy(_:)))]
+            entries += [(L("Couper"), "scissors", #selector(cut(_:))), (L("Copier"), "doc.on.doc", #selector(copy(_:)))]
         }
-        if FileClipboard.hasFiles { entries.append(("Coller", "doc.on.clipboard", #selector(paste(_:)))) }
+        if FileClipboard.hasFiles { entries.append((L("Coller"), "doc.on.clipboard", #selector(paste(_:)))) }
         if !selection.isEmpty {
-            entries.append(("Dupliquer", "plus.rectangle.on.rectangle", #selector(duplicate(_:))))
-            entries.append(selection.count == 1 ? ("Renommer", "pencil", #selector(renameSelection(_:)))
-                                                : ("Renommer par lot…", "pencil.and.list.clipboard", #selector(batchRename(_:))))
-            if !currentURL.isRemote { entries.append(("Coup d’œil", "eye", #selector(quickLook(_:)))) }
-            entries.append((currentURL.isRemote ? "Supprimer du serveur…" : "Placer dans la corbeille", "trash", #selector(moveToTrash(_:))))
+            entries.append((L("Dupliquer"), "plus.rectangle.on.rectangle", #selector(duplicate(_:))))
+            entries.append(selection.count == 1 ? (L("Renommer"), "pencil", #selector(renameSelection(_:)))
+                                                : (L("Renommer par lot…"), "pencil.and.list.clipboard", #selector(batchRename(_:))))
+            if !currentURL.isRemote { entries.append((L("Coup d’œil"), "eye", #selector(quickLook(_:)))) }
+            entries.append((currentURL.isRemote ? L("Supprimer du serveur…") : L("Placer dans la corbeille"), "trash", #selector(moveToTrash(_:))))
         } else {
-            entries.append(("Nouveau dossier", "folder.badge.plus", #selector(newFolder(_:))))
-            entries.append(("Copier le chemin", "link", #selector(copyPath(_:))))
+            entries.append((L("Nouveau dossier"), "folder.badge.plus", #selector(newFolder(_:))))
+            entries.append((L("Copier le chemin"), "link", #selector(copyPath(_:))))
         }
         let palette = NSMenu(title: "Actions")
         palette.presentationStyle = .palette

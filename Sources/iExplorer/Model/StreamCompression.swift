@@ -40,7 +40,7 @@ enum StreamCodec {
     }
 
     private static func zstdCompress(_ input: FileHandle, _ output: FileHandle, _ level: Int, _ progress: (Int64) -> Void, _ isCancelled: () -> Bool) throws {
-        guard let context = ZSTD_createCCtx() else { throw Failure(message: "zstd : mémoire insuffisante") }
+        guard let context = ZSTD_createCCtx() else { throw Failure(message: L("zstd : mémoire insuffisante")) }
         defer { ZSTD_freeCCtx(context) }
         ZSTD_CCtx_setParameter(context, ZSTD_c_compressionLevel, Int32(level))
         ZSTD_CCtx_setParameter(context, ZSTD_c_checksumFlag, 1)
@@ -59,7 +59,7 @@ enum StreamCodec {
                         let result = ZSTD_compressStream2(context, &outBuffer, &inBuffer, mode)
                         return (result, outBuffer.pos)
                     }
-                    if ZSTD_isError(remaining) != 0 { throw Failure(message: "zstd : " + String(cString: ZSTD_getErrorName(remaining))) }
+                    if ZSTD_isError(remaining) != 0 { throw Failure(message: L("zstd : \(String(cString: ZSTD_getErrorName(remaining)))")) }
                     if produced > 0 { try output.write(contentsOf: buffer[0..<produced]) }
                     if mode == ZSTD_e_end { finished = remaining == 0 } else if inBuffer.pos == inBuffer.size { break }
                 } while !finished
@@ -70,7 +70,7 @@ enum StreamCodec {
     }
 
     private static func zstdDecompress(_ input: FileHandle, _ output: FileHandle, _ progress: (Int64) -> Void, _ isCancelled: () -> Bool) throws {
-        guard let context = ZSTD_createDCtx() else { throw Failure(message: "zstd : mémoire insuffisante") }
+        guard let context = ZSTD_createDCtx() else { throw Failure(message: L("zstd : mémoire insuffisante")) }
         defer { ZSTD_freeDCtx(context) }
         var buffer = [UInt8](repeating: 0, count: ZSTD_DStreamOutSize())
         var done: Int64 = 0
@@ -84,7 +84,7 @@ enum StreamCodec {
                         let result = ZSTD_decompressStream(context, &outBuffer, &inBuffer)
                         return (result, outBuffer.pos)
                     }
-                    if ZSTD_isError(result) != 0 { throw Failure(message: "zstd : " + String(cString: ZSTD_getErrorName(result))) }
+                    if ZSTD_isError(result) != 0 { throw Failure(message: L("zstd : \(String(cString: ZSTD_getErrorName(result)))")) }
                     if produced > 0 { try output.write(contentsOf: buffer[0..<produced]) }
                 }
             }
@@ -94,7 +94,7 @@ enum StreamCodec {
     }
 
     private static func lz4Check(_ code: Int) throws -> Int {
-        if LZ4F_isError(code) != 0 { throw Failure(message: "LZ4 : " + String(cString: LZ4F_getErrorName(code))) }
+        if LZ4F_isError(code) != 0 { throw Failure(message: L("LZ4 : \(String(cString: LZ4F_getErrorName(code)))")) }
         return code
     }
 

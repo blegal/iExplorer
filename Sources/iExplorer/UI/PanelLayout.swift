@@ -20,14 +20,14 @@ enum PanelLayout: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .single: "1 panneau"
-        case .twoColumns: "2 panneaux côte à côte"
-        case .twoRows: "2 panneaux superposés"
-        case .threeColumns: "3 colonnes"
-        case .mainAndStacked: "1 à gauche, 2 empilés à droite"
-        case .stackedAndMain: "2 empilés à gauche, 1 à droite"
-        case .pairAndBottom: "2 en haut, 1 en bas"
-        case .grid: "4 panneaux (grille)"
+        case .single: L("1 panneau")
+        case .twoColumns: L("2 panneaux côte à côte")
+        case .twoRows: L("2 panneaux superposés")
+        case .threeColumns: L("3 colonnes")
+        case .mainAndStacked: L("1 à gauche, 2 empilés à droite")
+        case .stackedAndMain: L("2 empilés à gauche, 1 à droite")
+        case .pairAndBottom: L("2 en haut, 1 en bas")
+        case .grid: L("4 panneaux (grille)")
         }
     }
 

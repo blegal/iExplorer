@@ -55,9 +55,9 @@ extension PanelViewController {
         let files = selection.filter { !$0.isNavigableDirectory }
 
         if !selection.isEmpty, selection.allSatisfy({ FileOperationCenter.isArchive($0.url) }) {
-            items.append(menuItem("Décompresser ici", #selector(extractHere(_:)), icon: "archivebox.circle", tint: MenuTint.compress))
+            items.append(menuItem(L("Décompresser ici"), #selector(extractHere(_:)), icon: "archivebox.circle", tint: MenuTint.compress))
             if !(host?.targetPanels(for: self).isEmpty ?? true) {
-                items.append(menuItem("Décompresser vers l’autre panneau", #selector(extractToOtherPanel(_:)), icon: "arrow.right.circle", tint: MenuTint.compress))
+                items.append(menuItem(L("Décompresser vers l’autre panneau"), #selector(extractToOtherPanel(_:)), icon: "arrow.right.circle", tint: MenuTint.compress))
             }
         } else if !selection.isEmpty {
             items.append(compressMenuItem())
@@ -66,7 +66,7 @@ extension PanelViewController {
         // Somme de contrôle, chiffrement et découpage ne portent que sur des fichiers.
         let onlyFiles = !files.isEmpty && files.count == selection.count
         if let verify = verificationTarget(for: files), onlyFiles {
-            items.append(menuItem("Vérifier la somme de contrôle", #selector(validateChecksumFile(_:)), icon: "checkmark.seal",
+            items.append(menuItem(L("Vérifier la somme de contrôle"), #selector(validateChecksumFile(_:)), icon: "checkmark.seal",
                                   tint: MenuTint.checksum, hint: verify.algorithm, represented: verify.list))
         } else if onlyFiles {
             items.append(checksumMenuItem())
@@ -74,16 +74,16 @@ extension PanelViewController {
 
         if onlyFiles, encryptedFiles.count == files.count {
             let cipher = FileCipher(encryptedFile: files[0].url)
-            items.append(menuItem("Déchiffrer…", #selector(decryptFiles(_:)), icon: "lock.open", tint: MenuTint.encrypt, hint: cipher?.title))
+            items.append(menuItem(L("Déchiffrer…"), #selector(decryptFiles(_:)), icon: "lock.open", tint: MenuTint.encrypt, hint: cipher?.title))
         } else if onlyFiles {
             items.append(encryptMenuItem(hasFiles: !encryptableFiles.isEmpty))
         }
 
         if joinCandidate != nil {
-            items.append(menuItem("Réassembler les morceaux…", #selector(joinFiles(_:)), icon: "square.stack.3d.up", tint: MenuTint.compress))
+            items.append(menuItem(L("Réassembler les morceaux…"), #selector(joinFiles(_:)), icon: "square.stack.3d.up", tint: MenuTint.compress))
         } else if let candidate = splitCandidate, (candidate.size ?? 0) > 50_000_000 {
             // Découper ne sert que pour les gros fichiers : le menu reste court pour les autres (toujours dans Fichier).
-            items.append(menuItem("Découper le fichier…", #selector(splitFile(_:)), icon: "scissors", tint: MenuTint.compress))
+            items.append(menuItem(L("Découper le fichier…"), #selector(splitFile(_:)), icon: "scissors", tint: MenuTint.compress))
         }
         return items
     }
@@ -102,7 +102,7 @@ extension PanelViewController {
     // MARK: Compresser › format › niveau
 
     private func compressMenuItem() -> NSMenuItem {
-        let item = menuItem("Compresser", nil, icon: "archivebox", tint: MenuTint.compress)
+        let item = menuItem(L("Compresser"), nil, icon: "archivebox", tint: MenuTint.compress)
         let formats = NSMenu()
         formats.autoenablesItems = false
         for format in ArchiveFormat.menuOrder {
@@ -111,7 +111,7 @@ extension PanelViewController {
             // Outil absent : format grisé (installable dans Réglages › Outils externes).
             if let tool = format.requiredTool, !tool.isInstalled {
                 entry.isEnabled = false
-                entry.toolTip = "Demande \(tool.title) : Réglages › Outils externes"
+                entry.toolTip = L("Demande \(tool.title) : Réglages › Outils externes")
                 formats.addItem(entry)
                 continue
             }
@@ -123,12 +123,12 @@ extension PanelViewController {
                 levels.addItem(choice)
             }
             levels.addItem(.separator())
-            levels.addItem(menuItem("Personnalisé…", #selector(compressCustom(_:)), represented: format.rawValue))
+            levels.addItem(menuItem(L("Personnalisé…"), #selector(compressCustom(_:)), represented: format.rawValue))
             entry.submenu = levels
             formats.addItem(entry)
         }
         formats.addItem(.separator())
-        formats.addItem(menuItem("Personnalisé…", #selector(compressCustom(_:))))
+        formats.addItem(menuItem(L("Personnalisé…"), #selector(compressCustom(_:))))
         item.submenu = formats
         return item
     }
@@ -163,16 +163,16 @@ extension PanelViewController {
     // MARK: Somme de contrôle
 
     private func checksumMenuItem() -> NSMenuItem {
-        let item = menuItem("Somme de contrôle", nil, icon: "number.square", tint: MenuTint.checksum)
+        let item = menuItem(L("Somme de contrôle"), nil, icon: "number.square", tint: MenuTint.checksum)
         let menu = NSMenu()
-        menu.addItem(.sectionHeader(title: "Écrire un fichier à côté"))
+        menu.addItem(.sectionHeader(title: L("Écrire un fichier à côté")))
         for algorithm in ChecksumAlgorithm.allCases {
             menu.addItem(menuItem(algorithm.rawValue, #selector(createChecksumFiles(_:)), hint: "." + algorithm.fileExtension,
                                   represented: algorithm.rawValue))
         }
         menu.addItem(.separator())
-        menu.addItem(menuItem("Afficher toutes les sommes…", #selector(showChecksums(_:))))
-        menu.addItem(menuItem("Comparer avec une empreinte…", #selector(compareChecksum(_:))))
+        menu.addItem(menuItem(L("Afficher toutes les sommes…"), #selector(showChecksums(_:))))
+        menu.addItem(menuItem(L("Comparer avec une empreinte…"), #selector(compareChecksum(_:))))
         item.submenu = menu
         return item
     }
@@ -184,22 +184,22 @@ extension PanelViewController {
     // MARK: Chiffrer
 
     private func encryptMenuItem(hasFiles: Bool) -> NSMenuItem {
-        let item = menuItem("Chiffrer", nil, icon: "lock.shield", tint: MenuTint.encrypt)
+        let item = menuItem(L("Chiffrer"), nil, icon: "lock.shield", tint: MenuTint.encrypt)
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(.sectionHeader(title: "Fichier chiffré"))
+        menu.addItem(.sectionHeader(title: L("Fichier chiffré")))
         for cipher in FileCipher.allCases {
             let entry = menuItem(cipher.title + "…", #selector(encryptFiles(_:)), hint: "." + cipher.fileExtension, represented: cipher.rawValue)
             entry.isEnabled = hasFiles
-            if !hasFiles { entry.toolTip = "Les dossiers se chiffrent dans une archive avec mot de passe." }
+            if !hasFiles { entry.toolTip = L("Les dossiers se chiffrent dans une archive avec mot de passe.") }
             menu.addItem(entry)
         }
         menu.addItem(.separator())
-        menu.addItem(.sectionHeader(title: "Archive avec mot de passe"))
-        menu.addItem(menuItem("zip AES-256…", #selector(compressWithPassword(_:)), hint: "7-Zip, WinRAR, Keka", represented: ArchiveFormat.zip.rawValue))
-        let sevenZ = menuItem("7z AES-256, noms masqués…", #selector(compressWithPassword(_:)), hint: "7-Zip", represented: ArchiveFormat.sevenZ.rawValue)
+        menu.addItem(.sectionHeader(title: L("Archive avec mot de passe")))
+        menu.addItem(menuItem(L("zip AES-256…"), #selector(compressWithPassword(_:)), hint: "7-Zip, WinRAR, Keka", represented: ArchiveFormat.zip.rawValue))
+        let sevenZ = menuItem(L("7z AES-256, noms masqués…"), #selector(compressWithPassword(_:)), hint: "7-Zip", represented: ArchiveFormat.sevenZ.rawValue)
         sevenZ.isEnabled = FileOperationCenter.sevenZip != nil
-        if !sevenZ.isEnabled { sevenZ.toolTip = "Installez 7-Zip : brew install sevenzip" }
+        if !sevenZ.isEnabled { sevenZ.toolTip = L("Installez 7-Zip : brew install sevenzip") }
         menu.addItem(sevenZ)
         item.submenu = menu
         return item
@@ -240,13 +240,13 @@ final class CompressionPanel: NSObject {
     private let formats = NSPopUpButton()
     private let levels = NSSegmentedControl(labels: CompressionLevel.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     private let levelInfo = NSTextField(labelWithString: "")
-    private let usePassword = NSButton(checkboxWithTitle: "Protéger par un mot de passe (AES-256)", target: nil, action: nil)
+    private let usePassword = NSButton(checkboxWithTitle: L("Protéger par un mot de passe (AES-256)"), target: nil, action: nil)
     private let password = NSSecureTextField()
     private let confirm = NSSecureTextField()
-    private let hideNames = NSButton(checkboxWithTitle: "Masquer les noms des fichiers (7z)", target: nil, action: nil)
-    private let destination = NSSegmentedControl(labels: ["Ce dossier", "Autre panneau"], trackingMode: .selectOne, target: nil, action: nil)
-    private let excludeSystem = NSButton(checkboxWithTitle: "Exclure .DS_Store et fichiers système macOS", target: nil, action: nil)
-    private let remember = NSButton(checkboxWithTitle: "Retenir ce format et ce niveau par défaut", target: nil, action: nil)
+    private let hideNames = NSButton(checkboxWithTitle: L("Masquer les noms des fichiers (7z)"), target: nil, action: nil)
+    private let destination = NSSegmentedControl(labels: [L("Ce dossier"), L("Autre panneau")], trackingMode: .selectOne, target: nil, action: nil)
+    private let excludeSystem = NSButton(checkboxWithTitle: L("Exclure .DS_Store et fichiers système macOS"), target: nil, action: nil)
+    private let remember = NSButton(checkboxWithTitle: L("Retenir ce format et ce niveau par défaut"), target: nil, action: nil)
     private let order = ArchiveFormat.menuOrder
 
     init(urls: [URL], format: ArchiveFormat, password usePassword: Bool, otherPanel: URL?, here: URL) {
@@ -260,7 +260,7 @@ final class CompressionPanel: NSObject {
             formats.addItem(withTitle: format.fileExtension)
             if let tool = format.requiredTool, !tool.isInstalled {
                 formats.lastItem?.isEnabled = false
-                formats.lastItem?.toolTip = "Demande \(tool.title) : Réglages › Outils externes"
+                formats.lastItem?.toolTip = L("Demande \(tool.title) : Réglages › Outils externes")
             }
         }
         formats.selectItem(at: order.firstIndex(of: format.isAvailable ? format : .zip) ?? 0)
@@ -275,8 +275,8 @@ final class CompressionPanel: NSObject {
             control.target = self
             control.action = #selector(update)
         }
-        password.placeholderString = "Mot de passe"
-        confirm.placeholderString = "Confirmer"
+        password.placeholderString = L("Mot de passe")
+        confirm.placeholderString = L("Confirmer")
         for label in [levelInfo] {
             label.font = .systemFont(ofSize: 11)
             label.textColor = .secondaryLabelColor
@@ -321,11 +321,11 @@ final class CompressionPanel: NSObject {
         password.widthAnchor.constraint(equalToConstant: 160).isActive = true
         confirm.widthAnchor.constraint(equalToConstant: 160).isActive = true
         let grid = NSGridView(views: [
-            row("Nom de l’archive", [nameLine]),
-            row("Format", [formats]),
-            row("Niveau", [levels, levelInfo]),
-            row("Mot de passe", [usePassword, passwords, hideNames]),
-            row("Destination", [destination]),
+            row(L("Nom de l’archive"), [nameLine]),
+            row(L("Format"), [formats]),
+            row(L("Niveau"), [levels, levelInfo]),
+            row(L("Mot de passe"), [usePassword, passwords, hideNames]),
+            row(L("Destination"), [destination]),
             row("", [excludeSystem, remember]),
         ])
         grid.rowSpacing = 12
@@ -335,10 +335,10 @@ final class CompressionPanel: NSObject {
         grid.frame = NSRect(origin: .zero, size: grid.fittingSize)
 
         let alert = NSAlert()
-        alert.messageText = urls.count == 1 ? "Compresser « \(urls[0].lastPathComponent) »" : "Compresser \(urls.count) éléments"
+        alert.messageText = urls.count == 1 ? L("Compresser « \(urls[0].lastPathComponent) »") : L("Compresser \(urls.count) éléments")
         alert.accessoryView = grid
-        alert.addButton(withTitle: "Compresser")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Compresser"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = usePassword.state == .on ? password : name
         alert.beginSheetModal(for: window) { [self] response in
             guard response == .alertFirstButtonReturn else { completion(nil); return }
@@ -350,7 +350,7 @@ final class CompressionPanel: NSObject {
             request.hideNames = hideNames.state == .on
             if usePassword.state == .on {
                 guard !password.stringValue.isEmpty, password.stringValue == confirm.stringValue else {
-                    FileOperationCenter.shared.showError(password.stringValue.isEmpty ? "Le mot de passe est vide." : "Les deux mots de passe ne correspondent pas.")
+                    FileOperationCenter.shared.showError(password.stringValue.isEmpty ? L("Le mot de passe est vide.") : L("Les deux mots de passe ne correspondent pas."))
                     completion(nil)
                     return
                 }

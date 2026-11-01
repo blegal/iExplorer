@@ -34,18 +34,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if EditorViewController.hasUnsavedChanges {
             let alert = NSAlert()
-            alert.messageText = "Des fichiers modifiés dans l’éditeur ne sont pas enregistrés."
-            alert.informativeText = "Si vous quittez maintenant, ces modifications seront perdues."
-            alert.addButton(withTitle: "Annuler")
-            alert.addButton(withTitle: "Quitter sans enregistrer")
+            alert.messageText = L("Des fichiers modifiés dans l’éditeur ne sont pas enregistrés.")
+            alert.informativeText = L("Si vous quittez maintenant, ces modifications seront perdues.")
+            alert.addButton(withTitle: L("Annuler"))
+            alert.addButton(withTitle: L("Quitter sans enregistrer"))
             guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
         }
         guard FileOperationCenter.shared.hasActiveJobs else { return .terminateNow }
         let alert = NSAlert()
-        alert.messageText = "Des opérations sur les fichiers sont en cours."
-        alert.informativeText = "Si vous quittez maintenant, elles seront interrompues."
-        alert.addButton(withTitle: "Continuer")
-        alert.addButton(withTitle: "Quitter")
+        alert.messageText = L("Des opérations sur les fichiers sont en cours.")
+        alert.informativeText = L("Si vous quittez maintenant, elles seront interrompues.")
+        alert.addButton(withTitle: L("Continuer"))
+        alert.addButton(withTitle: L("Quitter"))
         return alert.runModal() == .alertSecondButtonReturn ? .terminateNow : .terminateCancel
     }
 
@@ -77,8 +77,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleGit(_ sender: Any?) {
         if !GitService.isEnabled, !GitService.shared.isAvailable {
             let alert = NSAlert()
-            alert.messageText = "Git n’est pas disponible."
-            alert.informativeText = "Installez les outils de ligne de commande (xcode-select --install) pour afficher l’état Git."
+            alert.messageText = L("Git n’est pas disponible.")
+            alert.informativeText = L("Installez les outils de ligne de commande (xcode-select --install) pour afficher l’état Git.")
             alert.runModal()
             (sender as? NSButton)?.state = .off
             return

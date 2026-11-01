@@ -198,8 +198,8 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
     private func build() {
         guard let window, let content = window.contentView else { return }
         switch mode {
-        case .compute(let files): window.title = files.count == 1 ? "Sommes de contrôle — \(files[0].lastPathComponent)" : "Sommes de contrôle — \(files.count) fichiers"
-        case .verify(let list, _): window.title = "Vérification — \(list.lastPathComponent)"
+        case .compute(let files): window.title = files.count == 1 ? L("Sommes de contrôle — \(files[0].lastPathComponent)") : L("Sommes de contrôle — \(files.count) fichiers")
+        case .verify(let list, _): window.title = L("Vérification — \(list.lastPathComponent)")
         }
         rows.orientation = .vertical
         rows.alignment = .leading
@@ -231,7 +231,7 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
 
         var bottom: [NSView] = []
         if case .compute = mode {
-            verifyField.placeholderString = "Coller une empreinte pour la vérifier (CRC32, MD5, SHA-1, SHA-256 ou SHA-512)"
+            verifyField.placeholderString = L("Coller une empreinte pour la vérifier (CRC32, MD5, SHA-1, SHA-256 ou SHA-512)")
             verifyField.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
             verifyField.target = self
             verifyField.action = #selector(verifyPasted)
@@ -242,9 +242,9 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
             verifyField.setContentHuggingPriority(.defaultLow, for: .horizontal)
             bottom.append(line)
         }
-        let copy = NSButton(title: "Copier les SHA-256", target: self, action: #selector(copySHA256))
-        let save = NSButton(title: "Enregistrer un fichier .sha256…", target: self, action: #selector(saveList))
-        let close = NSButton(title: "Fermer", target: self, action: #selector(closeWindow))
+        let copy = NSButton(title: L("Copier les SHA-256"), target: self, action: #selector(copySHA256))
+        let save = NSButton(title: L("Enregistrer un fichier .sha256…"), target: self, action: #selector(saveList))
+        let close = NSButton(title: L("Fermer"), target: self, action: #selector(closeWindow))
         close.keyEquivalent = "\u{1b}"
         let buttons: NSStackView
         if case .compute = mode {
@@ -302,7 +302,7 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
             tag.font = .systemFont(ofSize: 11)
             tag.textColor = .secondaryLabelColor
             tag.widthAnchor.constraint(equalToConstant: 60).isActive = true
-            let value = NSTextField(labelWithString: "calcul…")
+            let value = NSTextField(labelWithString: L("calcul…"))
             value.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
             value.isSelectable = true
             value.lineBreakMode = .byCharWrapping
@@ -323,7 +323,7 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
     private func start() {
         let files = files
         let total = Double(files.count)
-        statusLabel.stringValue = "Calcul en cours…"
+        statusLabel.stringValue = L("Calcul en cours…")
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             for (index, url) in files.enumerated() {
                 guard let self, !cancelled else { return }
@@ -347,8 +347,8 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
         guard let result else {
             statusIcons[url]?.stringValue = "✗"
             statusIcons[url]?.textColor = .systemRed
-            hashLabels[url]?.values.forEach { $0.stringValue = "fichier illisible ou absent" }
-            if hashLabels[url]?.isEmpty ?? true { statusIcons[url]?.toolTip = "Fichier illisible ou absent" }
+            hashLabels[url]?.values.forEach { $0.stringValue = L("fichier illisible ou absent") }
+            if hashLabels[url]?.isEmpty ?? true { statusIcons[url]?.toolTip = L("Fichier illisible ou absent") }
             return
         }
         results[url] = result
@@ -370,12 +370,12 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
         progress.isHidden = true
         switch mode {
         case .compute:
-            statusLabel.stringValue = "\(results.count) fichier\(results.count > 1 ? "s" : "") calculé\(results.count > 1 ? "s" : "")"
+            statusLabel.stringValue = (results.count > 1 ? L("\(results.count) fichiers calculés") : L("\(results.count) fichier calculé"))
         case .verify(_, let entries):
             let good = entries.filter { entry in
                 files.first { $0.lastPathComponent == entry.name }.flatMap { results[$0] }?.values.contains(entry.hash) == true
             }.count
-            statusLabel.stringValue = good == entries.count ? "Tout est conforme (\(good) fichiers)" : "\(entries.count - good) fichier(s) non conforme(s) sur \(entries.count)"
+            statusLabel.stringValue = good == entries.count ? L("Tout est conforme (\(good) fichiers)") : entries.count - good > 1 ? L("\(entries.count - good) fichiers non conformes sur \(entries.count)") : L("\(entries.count - good) fichier non conforme sur \(entries.count)")
             statusLabel.textColor = good == entries.count ? .systemGreen : .systemRed
         }
     }
@@ -386,10 +386,10 @@ final class ChecksumWindowController: NSWindowController, NSWindowDelegate {
         let match = results.first { $0.value.values.contains(pasted) }
         if let match {
             let algorithm = match.value.first { $0.value == pasted }?.key.rawValue ?? ""
-            verifyResult.stringValue = "✓ \(algorithm) de \(match.key.lastPathComponent)"
+            verifyResult.stringValue = L("✓ \(algorithm) de \(match.key.lastPathComponent)")
             verifyResult.textColor = .systemGreen
         } else {
-            verifyResult.stringValue = Checksums.algorithm(forHexLength: pasted.count) == nil ? "Empreinte non reconnue" : "✗ Aucune correspondance"
+            verifyResult.stringValue = Checksums.algorithm(forHexLength: pasted.count) == nil ? L("Empreinte non reconnue") : L("✗ Aucune correspondance")
             verifyResult.textColor = .systemRed
         }
     }
@@ -440,7 +440,7 @@ extension PanelViewController {
     @objc func createChecksumFiles(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let algorithm = ChecksumAlgorithm(rawValue: raw) else { return }
         let files = selectedItems.filter { !$0.isNavigableDirectory }.map(\.url)
-        let job = FileJob(title: "Sommes \(algorithm.rawValue) de \(files.count == 1 ? "« \(files[0].lastPathComponent) »" : "\(files.count) fichiers")")
+        let job = FileJob(title: files.count == 1 ? L("Sommes \(algorithm.rawValue) de « \(files[0].lastPathComponent) »") : L("Sommes \(algorithm.rawValue) de \(files.count) fichiers"))
         job.setTotal(files.reduce(Int64(0)) { $0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) })
         FileOperationCenter.shared.addJob(job)
         let folder = currentURL
@@ -458,7 +458,7 @@ extension PanelViewController {
                     if let hash = hashes[algorithm] { created.append(try Checksums.writeSidecar(for: url, algorithm, hash: hash)) }
                 } catch is Checksums.Cancelled {
                 } catch {
-                    failures.append("\(url.lastPathComponent) : \(error.localizedDescription)")
+                    failures.append(L("\(url.lastPathComponent) : \(error.localizedDescription)"))
                 }
                 base += size
             }

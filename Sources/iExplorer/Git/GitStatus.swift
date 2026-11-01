@@ -91,7 +91,7 @@ struct GitRepositoryStatus {
             index += 1
             if line.hasPrefix("# branch.head ") {
                 let head = String(line.dropFirst("# branch.head ".count))
-                status.summary.branch = head == "(detached)" ? "détachée" : head
+                status.summary.branch = head == "(detached)" ? L("détachée") : head
             } else if line.hasPrefix("# branch.upstream ") {
                 status.summary.hasUpstream = true
             } else if line.hasPrefix("# branch.ab ") {

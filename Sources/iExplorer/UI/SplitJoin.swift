@@ -25,10 +25,10 @@ extension FileOperationCenter {
     /// Découpe `file` en morceaux de `partSize` octets dans `folder` ; écrit au besoin « nom.sha256 ».
     func split(_ file: URL, partSize: Int64, into folder: URL, writeChecksum: Bool, completion: @escaping ([URL]) -> Void) {
         let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
-        guard size > 0, partSize > 0 else { showError("Ce fichier est vide."); return }
+        guard size > 0, partSize > 0 else { showError(L("Ce fichier est vide.")); return }
         let count = Int((size + partSize - 1) / partSize)
         let digits = max(3, String(count).count)
-        let job = FileJob(title: "Découpage de « \(file.lastPathComponent) »")
+        let job = FileJob(title: L("Découpage de « \(file.lastPathComponent) »"))
         job.setTotal(size)
         addJob(job)
         DispatchQueue.global(qos: .userInitiated).async {
@@ -41,7 +41,7 @@ extension FileOperationCenter {
                 var done: Int64 = 0
                 for index in 1...count {
                     let part = folder.appendingPathComponent(file.lastPathComponent + "." + String(format: "%0\(digits)d", index))
-                    guard !FileManager.default.fileExists(atPath: part.path) else { throw self.splitError("« \(part.lastPathComponent) » existe déjà.") }
+                    guard !FileManager.default.fileExists(atPath: part.path) else { throw self.splitError(L("« \(part.lastPathComponent) » existe déjà.")) }
                     FileManager.default.createFile(atPath: part.path, contents: nil)
                     created.append(part)
                     let output = try FileHandle(forWritingTo: part)
@@ -75,7 +75,7 @@ extension FileOperationCenter {
                 self.removeJob(job)
                 if let failure {
                     for url in created { try? FileManager.default.removeItem(at: url) }
-                    if !failure.isEmpty { self.showError("Le découpage a échoué.\n\(failure)") }
+                    if !failure.isEmpty { self.showError(L("Le découpage a échoué.\n\(failure)")) }
                     completion([])
                 } else {
                     completion(created)
@@ -89,11 +89,11 @@ extension FileOperationCenter {
         guard let first = parts.first else { return }
         let name = first.deletingPathExtension().lastPathComponent
         let output = folder.appendingPathComponent(name)
-        guard !FileManager.default.fileExists(atPath: output.path) else { showError("« \(name) » existe déjà dans ce dossier."); return }
+        guard !FileManager.default.fileExists(atPath: output.path) else { showError(L("« \(name) » existe déjà dans ce dossier.")); return }
         let expected = (try? String(contentsOf: first.deletingPathExtension().appendingPathExtension("sha256"), encoding: .utf8))
             .flatMap { Checksums.parseList($0).first { $0.name == name }?.hash }
         let total = parts.reduce(Int64(0)) { $0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
-        let job = FileJob(title: "Réassemblage de « \(name) »")
+        let job = FileJob(title: L("Réassemblage de « \(name) »"))
         job.setTotal(total)
         addJob(job)
         DispatchQueue.global(qos: .userInitiated).async {
@@ -118,7 +118,7 @@ extension FileOperationCenter {
                     }
                 }
                 if let expected, hasher.finalize().map({ String(format: "%02x", $0) }).joined() != expected {
-                    throw self.splitError("La somme SHA-256 ne correspond pas : un morceau est abîmé ou manquant.")
+                    throw self.splitError(L("La somme SHA-256 ne correspond pas : un morceau est abîmé ou manquant."))
                 }
             } catch is CancellationError {
                 failure = ""
@@ -129,11 +129,11 @@ extension FileOperationCenter {
                 self.removeJob(job)
                 if let failure {
                     try? FileManager.default.removeItem(at: output)
-                    if !failure.isEmpty { self.showError("Le réassemblage a échoué.\n\(failure)") }
+                    if !failure.isEmpty { self.showError(L("Le réassemblage a échoué.\n\(failure)")) }
                     completion(nil)
                     return
                 }
-                if trashParts { self.trash(parts, undoManager: undoManager, actionName: "Réassembler") }
+                if trashParts { self.trash(parts, undoManager: undoManager, actionName: L("Réassembler")) }
                 completion(output)
             }
         }
@@ -146,8 +146,8 @@ extension FileOperationCenter {
 
 extension PanelViewController {
     private static let splitPresets: [(String, Int64)] = [
-        ("100 Mo (pièce jointe)", 100_000_000), ("700 Mo (CD)", 700_000_000),
-        ("4 Go (clé USB en FAT32)", 4_294_967_295), ("Taille personnalisée", 0),
+        (L("100 Mo (pièce jointe)"), 100_000_000), (L("700 Mo (CD)"), 700_000_000),
+        (L("4 Go (clé USB en FAT32)"), 4_294_967_295), (L("Taille personnalisée"), 0),
     ]
 
     var splitCandidate: FileItem? {
@@ -165,32 +165,32 @@ extension PanelViewController {
         guard let item = splitCandidate, let window = view.window else { return }
         let size = item.size ?? 0
         let alert = NSAlert()
-        alert.messageText = "Découper « \(item.name) »"
-        alert.informativeText = "\(Format.size(size)). Les morceaux s’appellent « \(item.name).001 », « .002 »… et se recollent avec iExplorer, 7-Zip ou « cat »."
+        alert.messageText = L("Découper « \(item.name) »")
+        alert.informativeText = L("\(Format.size(size)). Les morceaux s’appellent « \(item.name).001 », « .002 »… et se recollent avec iExplorer, 7-Zip ou « cat ».")
         let presets = NSPopUpButton(frame: NSRect(x: 0, y: 84, width: 300, height: 26))
         presets.addItems(withTitles: Self.splitPresets.map(\.0))
         presets.selectItem(at: 2)
         let custom = NSTextField(frame: NSRect(x: 0, y: 56, width: 120, height: 22))
-        custom.placeholderString = "Taille en Mo"
+        custom.placeholderString = L("Taille en Mo")
         let destination = NSPopUpButton(frame: NSRect(x: 0, y: 26, width: 300, height: 26))
-        destination.addItems(withTitles: ["Dans ce dossier", "Dans l’autre panneau"])
+        destination.addItems(withTitles: [L("Dans ce dossier"), L("Dans l’autre panneau")])
         destination.item(at: 1)?.isEnabled = host?.targetPanels(for: self).first != nil
         destination.autoenablesItems = false
-        let checksum = NSButton(checkboxWithTitle: "Écrire une somme SHA-256 pour vérifier le réassemblage", target: nil, action: nil)
+        let checksum = NSButton(checkboxWithTitle: L("Écrire une somme SHA-256 pour vérifier le réassemblage"), target: nil, action: nil)
         checksum.frame = NSRect(x: 0, y: 0, width: 340, height: 20)
         checksum.state = .on
         let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 112))
         [presets, custom, destination, checksum].forEach(accessory.addSubview)
         alert.accessoryView = accessory
-        alert.addButton(withTitle: "Découper")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Découper"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn else { return }
             var partSize = Self.splitPresets[presets.indexOfSelectedItem].1
             if partSize == 0 { partSize = Int64((Double(custom.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0) * 1_000_000) }
             guard partSize > 0 else { NSSound.beep(); return }
             guard partSize < size else {
-                FileOperationCenter.shared.showError("Le fichier fait moins de \(Format.size(partSize)) : rien à découper.")
+                FileOperationCenter.shared.showError(L("Le fichier fait moins de \(Format.size(partSize)) : rien à découper."))
                 return
             }
             let target = destination.indexOfSelectedItem == 1 ? host?.targetPanels(for: self).first ?? self : self
@@ -205,14 +205,14 @@ extension PanelViewController {
         let name = parts[0].deletingPathExtension().lastPathComponent
         let hasChecksum = FileManager.default.fileExists(atPath: parts[0].deletingPathExtension().appendingPathExtension("sha256").path)
         let alert = NSAlert()
-        alert.messageText = "Réassembler « \(name) »"
-        alert.informativeText = "\(parts.count) morceau\(parts.count > 1 ? "x" : "") trouvé\(parts.count > 1 ? "s" : "") (\(parts.first!.pathExtension) à \(parts.last!.pathExtension))."
-            + (hasChecksum ? "\nLa somme SHA-256 sera vérifiée." : "")
-        let trash = NSButton(checkboxWithTitle: "Mettre les morceaux à la corbeille ensuite", target: nil, action: nil)
+        alert.messageText = L("Réassembler « \(name) »")
+        alert.informativeText = (parts.count > 1 ? L("\(parts.count) morceaux trouvés (\(parts.first!.pathExtension) à \(parts.last!.pathExtension)).") : L("\(parts.count) morceau trouvé (\(parts.first!.pathExtension) à \(parts.last!.pathExtension))."))
+            + (hasChecksum ? "\n" + L("La somme SHA-256 sera vérifiée.") : "")
+        let trash = NSButton(checkboxWithTitle: L("Mettre les morceaux à la corbeille ensuite"), target: nil, action: nil)
         trash.frame = NSRect(x: 0, y: 0, width: 320, height: 20)
         alert.accessoryView = trash
-        alert.addButton(withTitle: "Réassembler")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Réassembler"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn else { return }
             let folder = currentURL

@@ -5,7 +5,7 @@ struct CustomAction: Codable, Equatable {
     enum Mode: Int, Codable { case terminal, background }
 
     var id = UUID()
-    var name = "Nouvelle action"
+    var name = L("Nouvelle action")
     var command = "echo %sélection"
     var mode = Mode.background
     var confirm = false
@@ -29,17 +29,12 @@ struct CustomAction: Codable, Equatable {
 
     /// Exemples proposés au premier lancement.
     static let examples: [CustomAction] = [
-        CustomAction(name: "Compiler ce .tex (latexmk)", command: "latexmk -pdf -interaction=nonstopmode %fichier", mode: .terminal),
-        CustomAction(name: "Ouvrir dans Visual Studio Code", command: "open -a \"Visual Studio Code\" %sélection", mode: .background),
-        CustomAction(name: "rsync vers un serveur", command: "rsync -av --progress %sélection utilisateur@serveur:/chemin/", mode: .terminal, confirm: true),
+        CustomAction(name: L("Compiler ce .tex (latexmk)"), command: "latexmk -pdf -interaction=nonstopmode %fichier", mode: .terminal),
+        CustomAction(name: L("Ouvrir dans Visual Studio Code"), command: "open -a \"Visual Studio Code\" %sélection", mode: .background),
+        CustomAction(name: L("rsync vers un serveur"), command: "rsync -av --progress %sélection utilisateur@serveur:/chemin/", mode: .terminal, confirm: true),
     ]
 
-    static let variablesHelp = """
-    %chemin     dossier du panneau actif
-    %autre      dossier de l’autre panneau
-    %sélection  éléments sélectionnés
-    %fichier    premier élément (%nom, %base, %ext)
-    """
+    static let variablesHelp = L("%chemin     dossier du panneau actif\n%autre      dossier de l’autre panneau\n%sélection  éléments sélectionnés\n%fichier    premier élément (%nom, %base, %ext)")
 
     /// Commande avec les variables remplacées par des valeurs protégées pour le shell.
     func expanded(folder: URL, selection: [URL], otherFolder: URL?) -> String {
@@ -83,17 +78,17 @@ extension PanelViewController {
         guard let id = sender.representedObject as? String,
               let action = CustomAction.all.first(where: { $0.id.uuidString == id }) else { return }
         guard !currentURL.isRemote else {
-            presentMessage("Les actions personnalisées s’exécutent sur des dossiers locaux.")
+            presentMessage(L("Les actions personnalisées s’exécutent sur des dossiers locaux."))
             return
         }
         let other = host?.targetPanels(for: self).first?.currentURL
         let command = action.expanded(folder: currentURL, selection: selectedURLs, otherFolder: other?.isFileURL == true ? other : nil)
         if action.confirm {
             let alert = NSAlert()
-            alert.messageText = "Exécuter « \(action.name) » ?"
+            alert.messageText = L("Exécuter « \(action.name) » ?")
             alert.informativeText = command
-            alert.addButton(withTitle: "Exécuter")
-            alert.addButton(withTitle: "Annuler")
+            alert.addButton(withTitle: L("Exécuter"))
+            alert.addButton(withTitle: L("Annuler"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
         switch action.mode {
@@ -132,7 +127,7 @@ extension PanelViewController {
                 let failed = process.terminationStatus != 0
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 if failed || !trimmed.isEmpty {
-                    presentMessage((failed ? "« \(title) » a échoué (code \(process.terminationStatus))." : "« \(title) » terminé.")
+                    presentMessage((failed ? L("« \(title) » a échoué (code \(process.terminationStatus)).") : L("« \(title) » terminé."))
                                    + (trimmed.isEmpty ? "" : "\n\n" + String(trimmed.suffix(1500))), warning: failed)
                 }
                 reload()
@@ -153,7 +148,7 @@ extension PanelViewController {
     func customActionsMenuItem() -> NSMenuItem? {
         let actions = CustomAction.all
         guard !actions.isEmpty, !currentURL.isRemote else { return nil }
-        let item = NSMenuItem(title: "Actions", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L("Actions"), action: nil, keyEquivalent: "")
         item.image = NSImage(systemSymbolName: "bolt", accessibilityDescription: nil)
         let menu = NSMenu()
         for action in actions {
@@ -182,15 +177,15 @@ final class CustomActionsController: NSViewController, NSTableViewDataSource, NS
         (.shift, NSButton(checkboxWithTitle: "⇧", target: nil, action: nil)),
         (.command, NSButton(checkboxWithTitle: "⌘", target: nil, action: nil)),
     ]
-    private let confirmBox = NSButton(checkboxWithTitle: "Demander confirmation avant d’exécuter", target: nil, action: nil)
+    private let confirmBox = NSButton(checkboxWithTitle: L("Demander confirmation avant d’exécuter"), target: nil, action: nil)
     private var editor: NSView!
 
     override func loadView() {
-        let title = NSTextField(labelWithString: "Actions personnalisées")
+        let title = NSTextField(labelWithString: L("Actions personnalisées"))
         title.font = .systemFont(ofSize: 15, weight: .semibold)
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
-        column.title = "Action"
+        column.title = L("Action")
         table.addTableColumn(column)
         table.headerView = nil
         table.dataSource = self
@@ -201,11 +196,11 @@ final class CustomActionsController: NSViewController, NSTableViewDataSource, NS
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
         scroll.widthAnchor.constraint(equalToConstant: 230).isActive = true
-        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Ajouter")!, target: self, action: #selector(addAction))
-        let remove = NSButton(image: NSImage(systemSymbolName: "minus", accessibilityDescription: "Supprimer")!, target: self, action: #selector(removeAction))
+        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: L("Ajouter"))!, target: self, action: #selector(addAction))
+        let remove = NSButton(image: NSImage(systemSymbolName: "minus", accessibilityDescription: L("Supprimer"))!, target: self, action: #selector(removeAction))
         for button in [add, remove] { button.bezelStyle = .accessoryBarAction }
-        add.toolTip = "Nouvelle action"
-        remove.toolTip = "Supprimer l’action sélectionnée"
+        add.toolTip = L("Nouvelle action")
+        remove.toolTip = L("Supprimer l’action sélectionnée")
         let listButtons = NSStackView(views: [add, remove])
         let list = NSStackView(views: [scroll, listButtons])
         list.orientation = .vertical
@@ -226,10 +221,10 @@ final class CustomActionsController: NSViewController, NSTableViewDataSource, NS
         commandView.textContainer?.widthTracksTextView = true
         commandScroll.heightAnchor.constraint(equalToConstant: 90).isActive = true
         commandScroll.widthAnchor.constraint(equalToConstant: 380).isActive = true
-        modePopup.addItems(withTitles: ["Dans le terminal intégré", "En arrière-plan (résultat affiché à la fin)"])
+        modePopup.addItems(withTitles: [L("Dans le terminal intégré"), L("En arrière-plan (résultat affiché à la fin)")])
         modePopup.target = self
         modePopup.action = #selector(fieldChanged)
-        keyField.placeholderString = "touche"
+        keyField.placeholderString = L("touche")
         keyField.delegate = self
         keyField.widthAnchor.constraint(equalToConstant: 60).isActive = true
         for (_, button) in modifierButtons { button.target = self; button.action = #selector(fieldChanged) }
@@ -246,11 +241,11 @@ final class CustomActionsController: NSViewController, NSTableViewDataSource, NS
             return field
         }
         let grid = NSGridView(views: [
-            [label("Nom"), nameField],
-            [label("Commande"), commandScroll],
+            [label(L("Nom")), nameField],
+            [label(L("Commande")), commandScroll],
             [NSGridCell.emptyContentView, help],
-            [label("Exécution"), modePopup],
-            [label("Raccourci"), shortcut],
+            [label(L("Exécution")), modePopup],
+            [label(L("Raccourci")), shortcut],
             [NSGridCell.emptyContentView, confirmBox],
         ])
         grid.rowSpacing = 8
@@ -258,7 +253,7 @@ final class CustomActionsController: NSViewController, NSTableViewDataSource, NS
         grid.column(at: 0).xPlacement = .trailing
         editor = grid
 
-        let close = NSButton(title: "Terminé", target: self, action: #selector(closeWindow))
+        let close = NSButton(title: L("Terminé"), target: self, action: #selector(closeWindow))
         close.keyEquivalent = "\r"
         let body = NSStackView(views: [list, grid])
         body.alignment = .top

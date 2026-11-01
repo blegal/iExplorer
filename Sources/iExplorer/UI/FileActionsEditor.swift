@@ -11,7 +11,7 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         if window == nil {
             let controller = FileActionsEditorController()
             let window = NSWindow(contentViewController: controller)
-            window.title = "Actions par type de fichier"
+            window.title = L("Actions par type de fichier")
             window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
             window.setContentSize(NSSize(width: 980, height: 640))
             window.contentMinSize = NSSize(width: 820, height: 520)
@@ -41,7 +41,7 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
     private let pathLabel = NSTextField(labelWithString: "")
     private var editor: NSTextView!
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
-    private let saveButton = NSButton(title: "Enregistrer", target: nil, action: nil)
+    private let saveButton = NSButton(title: L("Enregistrer"), target: nil, action: nil)
     private let removeButton = NSButton()
     private var detail: NSView!
 
@@ -59,15 +59,15 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         listScroll.hasVerticalScroller = true
         listScroll.drawsBackground = false
 
-        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Nouvelle règle")!, target: self, action: #selector(addRule(_:)))
-        removeButton.image = NSImage(systemSymbolName: "minus", accessibilityDescription: "Supprimer la règle")
+        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: L("Nouvelle règle"))!, target: self, action: #selector(addRule(_:)))
+        removeButton.image = NSImage(systemSymbolName: "minus", accessibilityDescription: L("Supprimer la règle"))
         removeButton.target = self
         removeButton.action = #selector(removeRule)
-        let more = NSButton(image: NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: "Plus")!, target: self, action: #selector(showMoreMenu(_:)))
+        let more = NSButton(image: NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: L("Plus"))!, target: self, action: #selector(showMoreMenu(_:)))
         for button in [add, removeButton, more] { button.bezelStyle = .accessoryBarAction }
-        add.toolTip = "Nouvelle règle"
-        removeButton.toolTip = "Supprimer la règle sélectionnée"
-        more.toolTip = "Dossier des règles, règles fournies, outils installés"
+        add.toolTip = L("Nouvelle règle")
+        removeButton.toolTip = L("Supprimer la règle sélectionnée")
+        more.toolTip = L("Dossier des règles, règles fournies, outils installés")
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let listButtons = NSStackView(views: [add, removeButton, spacer, more])
@@ -88,8 +88,8 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         titles.alignment = .leading
         titles.spacing = 2
         titles.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let tryButton = NSButton(title: "Essayer sur un fichier…", target: self, action: #selector(tryOnFile(_:)))
-        let openButton = NSButton(title: "Ouvrir dans l’éditeur", target: self, action: #selector(openInEditor))
+        let tryButton = NSButton(title: L("Essayer sur un fichier…"), target: self, action: #selector(tryOnFile(_:)))
+        let openButton = NSButton(title: L("Ouvrir dans l’éditeur"), target: self, action: #selector(openInEditor))
         saveButton.target = self
         saveButton.action = #selector(save)
         saveButton.keyEquivalent = "s"
@@ -104,13 +104,7 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         configure(editor)
 
         statusLabel.font = .systemFont(ofSize: 12)
-        let help = NSTextField(wrappingLabelWithString: """
-        Variables : $FILE (premier fichier)  $DIR (son dossier)  $NAME  $STEM (nom sans extension)  $EXT  $ITEM (élément d’une liste)  \
-        $OTHER (dossier de l’autre panneau)  "$@" (tous les fichiers sélectionnés). \
-        in = terminal | background | open ; then = reveal <fichier> | open <fichier> | output | refresh ; \
-        requires = ["outil"] masque l’action si l’outil manque, missing = ["outil"] la montre seulement dans ce cas. \
-        Règles d’un projet : dossier .iexplorer/actions à sa racine (à approuver avant la première exécution).
-        """)
+        let help = NSTextField(wrappingLabelWithString: L("Variables : $FILE (premier fichier)  $DIR (son dossier)  $NAME  $STEM (nom sans extension)  $EXT  $ITEM (élément d’une liste)  $OTHER (dossier de l’autre panneau)  \"$@\" (tous les fichiers sélectionnés). in = terminal | background | open ; then = reveal <fichier> | open <fichier> | output | refresh ; requires = [\"outil\"] masque l’action si l’outil manque, missing = [\"outil\"] la montre seulement dans ce cas. Règles d’un projet : dossier .iexplorer/actions à sa racine (à approuver avant la première exécution)."))
         help.font = .systemFont(ofSize: 11)
         help.textColor = .secondaryLabelColor
 
@@ -166,13 +160,13 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
 
     private func reloadRules(selecting file: URL?) {
         let store = FileActionStore.shared
-        rows = [.header("Mes règles")] + store.ruleFiles(in: FileActionStore.userFolder).map { .rule($0, isProject: false) }
+        rows = [.header(L("Mes règles"))] + store.ruleFiles(in: FileActionStore.userFolder).map { .rule($0, isProject: false) }
         if let projectDirectory {
             for folder in store.projectFolders(for: projectDirectory) {
                 let files = store.ruleFiles(in: folder)
                 guard !files.isEmpty else { continue }
                 let project = folder.deletingLastPathComponent().deletingLastPathComponent()
-                rows.append(.header("Projet « \(project.lastPathComponent) »"))
+                rows.append(.header(L("Projet « \(project.lastPathComponent) »")))
                 rows += files.map { .rule($0, isProject: true) }
             }
         }
@@ -235,26 +229,28 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
             let name: String
             var detailText = ""
             var symbol = "bolt"
+            var failed = false, untrusted = false
             switch store.load(url, isProject: isProject) {
             case .success(let rule):
-                name = rule.name
+                name = DefaultFileActions.displayText(rule.name)
                 symbol = rule.icon ?? symbol
                 detailText = "\(rule.actionCount)"
-                if isProject, !store.isTrusted(url) { detailText = "à approuver" }
+                if isProject, !store.isTrusted(url) { detailText = L("à approuver"); untrusted = true }
             case .failure:
                 name = url.deletingPathExtension().lastPathComponent
                 symbol = "exclamationmark.triangle"
-                detailText = "erreur"
+                detailText = L("erreur")
+                failed = true
             }
             let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
                                    ?? NSImage(systemSymbolName: "bolt", accessibilityDescription: nil)!)
-            icon.contentTintColor = detailText == "erreur" ? .systemOrange : .secondaryLabelColor
+            icon.contentTintColor = failed ? .systemOrange : .secondaryLabelColor
             let label = NSTextField(labelWithString: name)
             label.lineBreakMode = .byTruncatingTail
             label.textColor = store.isEnabled(url) ? .labelColor : .tertiaryLabelColor
             label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             let count = NSTextField(labelWithString: detailText)
-            count.textColor = detailText == "à approuver" || detailText == "erreur" ? .systemOrange : .tertiaryLabelColor
+            count.textColor = untrusted || failed ? .systemOrange : .tertiaryLabelColor
             count.font = .systemFont(ofSize: 11)
             let stack = NSStackView(views: [checkbox, icon, label, count])
             stack.spacing = 5
@@ -283,11 +279,12 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         guard let file = currentFile else { return }
         do {
             let rule = try FileActionRule(url: file, text: editor.string)
-            titleLabel.stringValue = rule.name
+            titleLabel.stringValue = DefaultFileActions.displayText(rule.name)
             let missing = Set(rule.requires + rule.entries.flatMap(\.requires)).filter { !ShellEnvironment.has($0) }.sorted()
             statusLabel.textColor = .secondaryLabelColor
-            statusLabel.stringValue = "✓ \(rule.actionCount) action\(rule.actionCount > 1 ? "s" : "") · s’applique à : \(rule.matchDescription)"
-                + (missing.isEmpty ? "" : "\nOutils absents (actions masquées) : " + missing.joined(separator: ", "))
+            statusLabel.stringValue = (rule.actionCount > 1 ? L("✓ \(rule.actionCount) actions · s’applique à : \(rule.matchDescription)")
+                                                              : L("✓ \(rule.actionCount) action · s’applique à : \(rule.matchDescription)"))
+                + (missing.isEmpty ? "" : "\n" + L("Outils absents (actions masquées) : \(missing.joined(separator: ", "))"))
         } catch {
             titleLabel.stringValue = file.deletingPathExtension().lastPathComponent
             statusLabel.textColor = .systemRed
@@ -346,8 +343,8 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
 
     @objc private func addRule(_ sender: NSButton) {
         let alert = NSAlert()
-        alert.messageText = "Nouvelle règle"
-        alert.informativeText = "Nom de la règle et extensions concernées (séparées par des virgules) :"
+        alert.messageText = L("Nouvelle règle")
+        alert.informativeText = L("Nom de la règle et extensions concernées (séparées par des virgules) :")
         let name = NSTextField(string: "")
         name.placeholderString = "Graphviz"
         let extensions = NSTextField(string: "")
@@ -359,10 +356,10 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         extensions.widthAnchor.constraint(equalToConstant: 300).isActive = true
         alert.accessoryView = fields
         alert.window.initialFirstResponder = name
-        alert.addButton(withTitle: "Créer")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Créer"))
+        alert.addButton(withTitle: L("Annuler"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let title = name.stringValue.trimmingCharacters(in: .whitespaces).isEmpty ? "Nouvelle règle" : name.stringValue.trimmingCharacters(in: .whitespaces)
+        let title = name.stringValue.trimmingCharacters(in: .whitespaces).isEmpty ? L("Nouvelle règle") : name.stringValue.trimmingCharacters(in: .whitespaces)
         let list = extensions.stringValue.split(separator: ",").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " ."))
         }.filter { !$0.isEmpty }
         let folder = FileActionStore.userFolder
@@ -388,9 +385,9 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
     @objc private func removeRule() {
         guard let file = currentFile else { return }
         let alert = NSAlert()
-        alert.messageText = "Mettre « \(file.lastPathComponent) » à la corbeille ?"
-        alert.addButton(withTitle: "Mettre à la corbeille")
-        alert.addButton(withTitle: "Annuler")
+        alert.messageText = L("Mettre « \(file.lastPathComponent) » à la corbeille ?")
+        alert.addButton(withTitle: L("Mettre à la corbeille"))
+        alert.addButton(withTitle: L("Annuler"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         isModified = false
         do {
@@ -405,9 +402,9 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
 
     @objc private func showMoreMenu(_ sender: NSButton) {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Afficher le dossier des règles", action: #selector(revealFolder), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Restaurer les règles fournies", action: #selector(restoreDefaults), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Rechercher de nouveau les outils installés", action: #selector(rescanTools), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L("Afficher le dossier des règles"), action: #selector(revealFolder), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L("Restaurer les règles fournies"), action: #selector(restoreDefaults), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L("Rechercher de nouveau les outils installés"), action: #selector(rescanTools), keyEquivalent: "").target = self
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
     }
 
@@ -441,7 +438,7 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         let panel = NSOpenPanel()
         panel.canChooseDirectories = rule.folderContains
         panel.allowsMultipleSelection = true
-        panel.message = "Choisissez un ou plusieurs fichiers concernés par « \(rule.name) »."
+        panel.message = L("Choisissez un ou plusieurs fichiers concernés par « \(DefaultFileActions.displayText(rule.name)) ».")
         panel.beginSheetModal(for: view.window!) { [weak self] response in
             guard let self, response == .OK, !panel.urls.isEmpty else { return }
             let selection = panel.urls
@@ -452,10 +449,10 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
                     menu.addItem(item)
                 }
                 if menu.items.isEmpty {
-                    menu.addItem(withTitle: "Aucune action disponible (outil manquant ou nombre de fichiers)", action: nil, keyEquivalent: "")
+                    menu.addItem(withTitle: L("Aucune action disponible (outil manquant ou nombre de fichiers)"), action: nil, keyEquivalent: "")
                 }
             } else {
-                menu.addItem(withTitle: "La règle ne s’applique pas à cette sélection", action: nil, keyEquivalent: "")
+                menu.addItem(withTitle: L("La règle ne s’applique pas à cette sélection"), action: nil, keyEquivalent: "")
             }
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
         }
@@ -465,8 +462,8 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
         guard let invocation = sender.representedObject as? FileActionInvocation else { return }
         let variables = invocation.context.variables(item: invocation.item)
         let alert = NSAlert()
-        alert.messageText = "Aperçu : « \(sender.title) »"
-        alert.informativeText = "Commande exécutée dans \(invocation.context.directory.path) :\n\n"
+        alert.messageText = L("Aperçu : « \(sender.title) »")
+        alert.informativeText = L("Commande exécutée dans \(invocation.context.directory.path) :") + "\n\n"
             + PanelViewController.terminalCommand(invocation.entry.run, variables: variables, files: invocation.context.files)
         alert.runModal()
     }

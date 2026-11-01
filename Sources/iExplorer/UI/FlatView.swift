@@ -32,7 +32,7 @@ extension PanelViewController {
     }
 
     func flatViewMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "Vue à plat", action: #selector(toggleFlatView(_:)), keyEquivalent: "")
+        let item = NSMenuItem(title: L("Vue à plat"), action: #selector(toggleFlatView(_:)), keyEquivalent: "")
         item.target = self
         item.image = NSImage(systemSymbolName: "list.bullet.indent", accessibilityDescription: nil)
         item.state = isFlatView ? .on : .off

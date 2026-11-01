@@ -16,10 +16,10 @@ enum PanelViewMode: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .icons: "Icônes"
-        case .list: "Liste"
-        case .details: "Liste détaillée"
-        case .columns: "Colonnes"
+        case .icons: L("Icônes")
+        case .list: L("Liste")
+        case .details: L("Liste détaillée")
+        case .columns: L("Colonnes")
         }
     }
 
@@ -320,7 +320,7 @@ final class PanelViewController: NSViewController {
 
     private func configureTable() {
         let columns: [(NSUserInterfaceItemIdentifier, String, CGFloat, CGFloat)] = [
-            (.name, "Nom", 260, 120), (.size, "Taille", 72, 50), (.date, "Modifié le", 128, 70), (.kind, "Type", 110, 50),
+            (.name, L("Nom"), 260, 120), (.size, L("Taille"), 72, 50), (.date, L("Modifié le"), 128, 70), (.kind, L("Type"), 110, 50),
         ]
         for (identifier, title, width, minWidth) in columns {
             let column = NSTableColumn(identifier: identifier)
@@ -622,10 +622,10 @@ final class PanelViewController: NSViewController {
         navigationControl.controlSize = .small
         navigationControl.target = self
         navigationControl.action = #selector(navigationClicked(_:))
-        for (segment, symbol, label, provider) in [(0, "chevron.left", "Précédent (⌘[)", backMenu), (1, "chevron.right", "Suivant (⌘])", forwardMenu)] {
+        for (segment, symbol, label, provider) in [(0, "chevron.left", L("Précédent (⌘[)"), backMenu), (1, "chevron.right", L("Suivant (⌘])"), forwardMenu)] {
             navigationControl.setImage(NSImage(systemSymbolName: symbol, accessibilityDescription: label), forSegment: segment)
             navigationControl.setWidth(24, forSegment: segment)
-            navigationControl.setToolTip(label + " — maintenir le clic pour tout l’historique de l’onglet", forSegment: segment)
+            navigationControl.setToolTip(label + " — " + L("maintenir le clic pour tout l’historique de l’onglet"), forSegment: segment)
             let menu = NSMenu()
             menu.delegate = provider
             navigationControl.setMenu(menu, forSegment: segment)
@@ -634,13 +634,13 @@ final class PanelViewController: NSViewController {
         navigationControl.setContentHuggingPriority(.required, for: .horizontal)
         navigationControl.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        diskUsageToggle.image = NSImage(systemSymbolName: "chart.pie", accessibilityDescription: "Occupation du disque")
+        diskUsageToggle.image = NSImage(systemSymbolName: "chart.pie", accessibilityDescription: L("Occupation du disque"))
         diskUsageToggle.setButtonType(.pushOnPushOff)
         diskUsageToggle.bezelStyle = .accessoryBarAction
         diskUsageToggle.controlSize = .small
         diskUsageToggle.target = self
         diskUsageToggle.action = #selector(diskUsageToggleClicked(_:))
-        diskUsageToggle.toolTip = "Occupation du disque (⌘5) — cliquer de nouveau pour revenir aux fichiers"
+        diskUsageToggle.toolTip = L("Occupation du disque (⌘5) — cliquer de nouveau pour revenir aux fichiers")
         diskUsageToggle.setContentHuggingPriority(.required, for: .horizontal)
         diskUsageToggle.setContentCompressionResistancePriority(.required, for: .horizontal)
     }
@@ -692,7 +692,7 @@ final class PanelViewController: NSViewController {
                                             by: descriptor),
                                 expanded: expanded, showHidden: showHidden, by: descriptor)
             }
-            let free = url.isRemote ? url.host.map { "connecté à \($0)" } : Format.freeSpace(at: url)
+            let free = url.isRemote ? url.host.map { L("connecté à \($0)") } : Format.freeSpace(at: url)
             DispatchQueue.main.async { [weak self] in
                 guard let self, generation == loadGeneration, url.isSameLocation(as: currentURL) else { return }
                 apply(result, freeSpace: free, selecting: wanted, scroll: scrollToSelection, fallbackRow: fallbackRow)
@@ -721,7 +721,7 @@ final class PanelViewController: NSViewController {
             items = []
             allItems = []
             loadError = (error as NSError).code == NSFileReadNoPermissionError
-                ? "Accès refusé" : error.localizedDescription
+                ? L("Accès refusé") : error.localizedDescription
             if currentURL.isRemote {
                 NotificationCenter.default.post(name: SFTPManager.sessionsChanged, object: nil)
             }
@@ -772,33 +772,36 @@ final class PanelViewController: NSViewController {
         let selection = selectedItems
         var text: String
         if isShowingSearchResults {
-            text = items.count <= 1 ? "\(items.count) résultat" : "\(items.count) résultats"
-            if searchResultsTruncated { text += " (limité à 2 000)" }
-            if !selection.isEmpty { text += " — \(selection.count) sélectionné\(selection.count > 1 ? "s" : "")" }
+            text = items.count <= 1 ? L("\(items.count) résultat") : L("\(items.count) résultats")
+            if searchResultsTruncated { text += " " + L("(limité à 2 000)") }
+            if !selection.isEmpty { text += " — " + (selection.count > 1 ? L("\(selection.count) sélectionnés") : L("\(selection.count) sélectionné")) }
             infoText = text
             return
         }
         if isFlatView {
-            text = "Vue à plat : " + (items.count <= 1 ? "\(items.count) fichier" : "\(items.count) fichiers")
-            if items.count >= FileItem.flatLimit { text += " (limité à 10 000)" }
+            text = items.count <= 1 ? L("Vue à plat : \(items.count) fichier") : L("Vue à plat : \(items.count) fichiers")
+            if items.count >= FileItem.flatLimit { text += " " + L("(limité à 10 000)") }
             if !selection.isEmpty {
                 let bytes = selection.compactMap(\.effectiveSize).reduce(0, +)
-                text += " — \(selection.count) sélectionné\(selection.count > 1 ? "s" : "") (\(Format.size(bytes)))"
+                let size = Format.size(bytes)
+                text += " — " + (selection.count > 1 ? L("\(selection.count) sélectionnés (\(size))") : L("\(selection.count) sélectionné (\(size))"))
             }
             infoText = text
             return
         }
         if let (archive, _) = ArchiveBrowser.archive(containing: currentURL) {
             // Pas d'espace libre ici : on rappelle que le contenu n'est qu'une copie de l'archive.
-            text = selection.isEmpty ? Format.items(items.count) : "\(selection.count) sur \(items.count) sélectionné\(selection.count > 1 ? "s" : "")"
-            infoText = text + " — dans « \(archive.lastPathComponent) », modifications non enregistrées dans l’archive"
+            text = selection.isEmpty ? Format.itemCount(items.count)
+                : selection.count > 1 ? L("\(selection.count) sur \(items.count) sélectionnés") : L("\(selection.count) sur \(items.count) sélectionné")
+            infoText = text + " — " + L("dans « \(archive.lastPathComponent) », modifications non enregistrées dans l’archive")
             return
         }
         if selection.isEmpty {
-            text = Format.items(items.count)
+            text = Format.itemCount(items.count)
         } else {
             let bytes = selection.compactMap(\.effectiveSize).reduce(0, +)
-            text = "\(selection.count) sur \(items.count) sélectionné\(selection.count > 1 ? "s" : "") (\(Format.size(bytes)))"
+            let size = Format.size(bytes)
+            text = selection.count > 1 ? L("\(selection.count) sur \(items.count) sélectionnés (\(size))") : L("\(selection.count) sur \(items.count) sélectionné (\(size))")
             if selection.count > 1 { text += " — " + Self.describeKinds(selection) }
         }
         if let freeSpace { text += ", \(freeSpace)" }
@@ -915,14 +918,15 @@ final class PanelViewController: NSViewController {
         if summary.ahead > 0 { add("↑\(summary.ahead)", .systemBlue) }
         if summary.behind > 0 { add("↓\(summary.behind)", .systemPurple) }
         if summary.isClean { add("✓", GitFileState.added.color) }
-        if includeBranch, !summary.hasUpstream { add("sans branche distante", .tertiaryLabelColor) }
+        if includeBranch, !summary.hasUpstream { add(L("sans branche distante"), .tertiaryLabelColor) }
         return text
     }
 
     private func redrawGit() {
         if let summary = gitStatus?.summary {
             gitLabel.attributedStringValue = Self.badge(for: summary, includeBranch: true)
-            gitLabel.toolTip = "Dépôt Git : \(gitStatus?.root.path ?? "")\n● fichiers modifiés · ↑ commits à pousser · ↓ commits à tirer (depuis le dernier fetch)"
+            let root = gitStatus?.root.path ?? ""
+            gitLabel.toolTip = L("Dépôt Git : \(root)\n● fichiers modifiés · ↑ commits à pousser · ↓ commits à tirer (depuis le dernier fetch)")
             gitLabel.isHidden = false
         } else {
             gitLabel.isHidden = true
@@ -1006,13 +1010,13 @@ final class PanelViewController: NSViewController {
     @objc func goToFolder(_ sender: Any?) {
         guard let window = view.window else { return }
         let alert = NSAlert()
-        alert.messageText = "Aller au dossier"
-        alert.informativeText = "Saisissez un chemin (« ~ » désigne votre dossier de départ)."
+        alert.messageText = L("Aller au dossier")
+        alert.informativeText = L("Saisissez un chemin (« ~ » désigne votre dossier de départ).")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 380, height: 24))
         field.stringValue = currentURL.isRemote ? currentURL.path : (currentURL.path as NSString).abbreviatingWithTildeInPath
         alert.accessoryView = field
-        alert.addButton(withTitle: "Aller")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Aller"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = field
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }
@@ -1319,10 +1323,10 @@ final class PanelViewController: NSViewController {
             guard let window = view.window else { return }
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = urls.count == 1 ? "Supprimer « \(urls[0].lastPathComponent) » du serveur ?" : "Supprimer \(urls.count) éléments du serveur ?"
-            alert.informativeText = "Il n’y a pas de corbeille en SFTP : la suppression est définitive."
-            alert.addButton(withTitle: "Supprimer").hasDestructiveAction = true
-            alert.addButton(withTitle: "Annuler")
+            alert.messageText = urls.count == 1 ? L("Supprimer « \(urls[0].lastPathComponent) » du serveur ?") : L("Supprimer \(urls.count) éléments du serveur ?")
+            alert.informativeText = L("Il n’y a pas de corbeille en SFTP : la suppression est définitive.")
+            alert.addButton(withTitle: L("Supprimer")).hasDestructiveAction = true
+            alert.addButton(withTitle: L("Annuler"))
             alert.beginSheetModal(for: window) { [weak self] response in
                 guard response == .alertFirstButtonReturn else { return }
                 FileOperationCenter.shared.deleteRemote(urls) { self?.reload(selecting: [], fallbackRow: firstRow) }
@@ -1477,12 +1481,12 @@ final class PanelViewController: NSViewController {
     private func renameWithSheet(_ item: FileItem) {
         guard let window = view.window else { return }
         let alert = NSAlert()
-        alert.messageText = "Renommer « \(item.name) »"
+        alert.messageText = L("Renommer « \(item.name) »")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
         field.stringValue = item.name
         alert.accessoryView = field
-        alert.addButton(withTitle: "Renommer")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Renommer"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = field
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn else { return }
@@ -1653,8 +1657,8 @@ final class PanelViewController: NSViewController {
         }
         let files = selection.filter { !$0.isNavigableDirectory }
         if !selection.isEmpty {
-            header("Ouvrir")
-            if !files.isEmpty { tinted("Ouvrir", #selector(openSelection(_:)), "arrow.up.forward.app", MenuTint.open) }
+            header(L("Ouvrir"))
+            if !files.isEmpty { tinted(L("Ouvrir"), #selector(openSelection(_:)), "arrow.up.forward.app", MenuTint.open) }
             if let first = files.first, files.count == selection.count, !first.url.isRemote {
                 let openWith = openWithMenu(for: first.url)
                 openWith.image = MenuTint.icon("square.grid.2x2", MenuTint.open)
@@ -1662,43 +1666,43 @@ final class PanelViewController: NSViewController {
                 menu.addItem(openWith)
             }
             if selection.contains(where: \.isNavigableDirectory) {
-                tinted("Ouvrir dans un nouvel onglet", #selector(openInNewTab(_:)), "plus.square.on.square", MenuTint.open)
+                tinted(L("Ouvrir dans un nouvel onglet"), #selector(openInNewTab(_:)), "plus.square.on.square", MenuTint.open)
             }
             if selection.count == 1, selection[0].isPackage {
-                tinted("Afficher le contenu du paquet", #selector(showPackageContents(_:)), "shippingbox", MenuTint.open)
+                tinted(L("Afficher le contenu du paquet"), #selector(showPackageContents(_:)), "shippingbox", MenuTint.open)
             }
             if !currentURL.isRemote {
                 let transform = transformMenuItems(for: selection)
                 if !transform.isEmpty {
-                    header("Transformer")
+                    header(L("Transformer"))
                     transform.forEach(menu.addItem)
                 }
             }
         }
 
-        header("Organiser")
+        header(L("Organiser"))
         if !selection.isEmpty {
             if selection.count > 1, !currentURL.isRemote {
-                add("Nouveau dossier avec la sélection (\(selection.count) éléments)", #selector(newFolderWithSelection(_:)), "folder.badge.plus")
+                add(L("Nouveau dossier avec la sélection (\(selection.count) éléments)"), #selector(newFolderWithSelection(_:)), "folder.badge.plus")
             }
             let targets = host?.targetPanels(for: self) ?? []
             if !targets.isEmpty {
-                menu.addItem(panelSubmenu("Copier vers", #selector(copyToOtherPanel(_:)), targets, "arrow.right.doc.on.clipboard"))
-                menu.addItem(panelSubmenu("Déplacer vers", #selector(moveToOtherPanel(_:)), targets, "arrow.right.square"))
+                menu.addItem(panelSubmenu(L("Copier vers"), #selector(copyToOtherPanel(_:)), targets, "arrow.right.doc.on.clipboard"))
+                menu.addItem(panelSubmenu(L("Déplacer vers"), #selector(moveToOtherPanel(_:)), targets, "arrow.right.square"))
             }
             if !currentURL.isRemote {
-                let links = NSMenuItem(title: "Créer un lien", action: nil, keyEquivalent: "")
+                let links = NSMenuItem(title: L("Créer un lien"), action: nil, keyEquivalent: "")
                 links.image = NSImage(systemSymbolName: "link.badge.plus", accessibilityDescription: nil)
                 links.submenu = NSMenu()
-                for (title, action) in [("Lien symbolique ici", #selector(symlinkHere(_:))), ("Lien symbolique dans l’autre panneau", #selector(symlinkInOtherPanel(_:))),
-                                        ("Lien physique ici", #selector(hardLinkHere(_:))), ("Lien physique dans l’autre panneau", #selector(hardLinkInOtherPanel(_:)))] {
+                for (title, action) in [(L("Lien symbolique ici"), #selector(symlinkHere(_:))), (L("Lien symbolique dans l’autre panneau"), #selector(symlinkInOtherPanel(_:))),
+                                        (L("Lien physique ici"), #selector(hardLinkHere(_:))), (L("Lien physique dans l’autre panneau"), #selector(hardLinkInOtherPanel(_:)))] {
                     let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
                     entry.target = self
                     links.submenu?.addItem(entry)
                 }
                 menu.addItem(links)
             }
-            add("Copier le chemin", #selector(copyPath(_:)), "link")
+            add(L("Copier le chemin"), #selector(copyPath(_:)), "link")
             if !currentURL.isRemote {
                 menu.addItem(tagsMenuItem())
                 if let actions = customActionsMenuItem() { menu.addItem(actions) }
@@ -1706,15 +1710,15 @@ final class PanelViewController: NSViewController {
             }
             separator()
         }
-        add("Nouveau dossier", #selector(newFolder(_:)), "folder.badge.plus")
+        add(L("Nouveau dossier"), #selector(newFolder(_:)), "folder.badge.plus")
         if !currentURL.isRemote {
             menu.addItem(newDocumentMenuItem())
-            add("Ouvrir dans le Terminal", #selector(openInTerminal(_:)), "terminal")
-            if selection.isEmpty { add("Occupation du disque", #selector(toggleDiskUsage(_:)), "chart.pie") }
+            add(L("Ouvrir dans le Terminal"), #selector(openInTerminal(_:)), "terminal")
+            if selection.isEmpty { add(L("Occupation du disque"), #selector(toggleDiskUsage(_:)), "chart.pie") }
         }
         if !selection.isEmpty {
             separator()
-            tinted("Placer dans la corbeille", #selector(moveToTrash(_:)), "trash", MenuTint.danger)
+            tinted(L("Placer dans la corbeille"), #selector(moveToTrash(_:)), "trash", MenuTint.danger)
         }
         if selection.isEmpty, isFlatView || canShowFlatView {
             menu.addItem(.separator())
@@ -1728,7 +1732,7 @@ final class PanelViewController: NSViewController {
     }
 
     private func openWithMenu(for url: URL) -> NSMenuItem {
-        let item = NSMenuItem(title: "Ouvrir avec", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L("Ouvrir avec"), action: nil, keyEquivalent: "")
         item.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
         let submenu = NSMenu()
         let defaultApp = NSWorkspace.shared.urlForApplication(toOpen: url)
@@ -1739,7 +1743,7 @@ final class PanelViewController: NSViewController {
         }
         for (index, app) in apps.prefix(20).enumerated() {
             var title = FileManager.default.displayName(atPath: app.path)
-            if index == 0, defaultApp != nil { title += " (par défaut)" }
+            if index == 0, defaultApp != nil { title += " " + L("(par défaut)") }
             let entry = NSMenuItem(title: title, action: #selector(openWithApplication(_:)), keyEquivalent: "")
             entry.target = self
             entry.representedObject = app
@@ -1758,7 +1762,7 @@ final class PanelViewController: NSViewController {
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         let submenu = NSMenu()
         for target in targets {
-            let entry = NSMenuItem(title: "Panneau \(target.index + 1) — \(BreadcrumbView.displayName(target.currentURL))", action: action, keyEquivalent: "")
+            let entry = NSMenuItem(title: L("Panneau \(target.index + 1) — \(BreadcrumbView.displayName(target.currentURL))"), action: action, keyEquivalent: "")
             entry.target = self
             entry.representedObject = target
             entry.toolTip = target.currentURL.path
@@ -1832,7 +1836,7 @@ extension PanelViewController: NSMenuItemValidation {
         case #selector(increaseIconSize(_:)), #selector(decreaseIconSize(_:)), #selector(resetZoom(_:)):
             return true
         case #selector(toggleStatusBar(_:)):
-            menuItem.title = PanelStatusBar.isVisible ? "Masquer la barre d’état" : "Afficher la barre d’état"
+            menuItem.title = PanelStatusBar.isVisible ? L("Masquer la barre d’état") : L("Afficher la barre d’état")
             return true
         case #selector(toggleFlatView(_:)):
             menuItem.state = isFlatView ? .on : .off
@@ -1941,7 +1945,7 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
             field.alignment = .left
         default:
             // Dans les résultats de recherche, la colonne indique le dossier de chaque élément.
-            field.stringValue = isShowingSearchResults || isFlatView ? searchLocation(of: item) : (item.isNavigableDirectory ? "Dossier" : item.kind)
+            field.stringValue = isShowingSearchResults || isFlatView ? searchLocation(of: item) : (item.isNavigableDirectory ? L("Dossier") : item.kind)
             field.alignment = .left
         }
         field.toolTip = isShowingSearchResults || isFlatView ? item.url.deletingLastPathComponent().path : nil
@@ -1974,7 +1978,7 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
         disclosure.controlSize = .small
         disclosure.target = self
         disclosure.action = #selector(toggleDisclosure(_:))
-        disclosure.toolTip = "Déplier / replier (→ / ←)"
+        disclosure.toolTip = L("Déplier / replier (→ / ←)")
         cell.indent = disclosure.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2)
         cell.disclosureWidth = disclosure.widthAnchor.constraint(equalToConstant: 0)
         for view in [disclosure, image, field, dots, badge] as [NSView] {

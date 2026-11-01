@@ -30,10 +30,10 @@ enum AnimationMode: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .none: "Sans animation"
-        case .light: "Animations légères"
-        case .full: "Animations complètes"
-        case .wow: "Whaouh+++"
+        case .none: L("Sans animation")
+        case .light: L("Animations légères")
+        case .full: L("Animations complètes")
+        case .wow: L("Whaouh+++")
         }
     }
 
@@ -105,28 +105,28 @@ enum AnimationEffect: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .fadeNavigation: "Fondu au changement de dossier ou d’onglet"
-        case .accentFade: "Liseré du panneau actif en fondu"
-        case .rowAnimation: "Dossiers dépliés animés"
-        case .pushNavigation: "Le contenu glisse quand on descend ou remonte"
-        case .cascade: "Les éléments apparaissent en cascade"
-        case .trashFade: "Les fichiers s’effacent avant la corbeille"
-        case .accentSpring: "Le liseré du panneau actif se déploie avec un rebond"
-        case .sparkles: "Étincelles quand une opération se termine"
-        case .portal: "Effet portail : on plonge dans le dossier ouvert"
-        case .spiral: "Les icônes du dossier ouvert apparaissent en spirale"
-        case .hoverGlow: "Halo et icône qui grossit au survol"
-        case .selectionRipple: "Onde lumineuse au clic"
-        case .iconPop: "« Pop » des icônes sélectionnées et créées"
-        case .panelDim: "Panneau inactif légèrement estompé"
-        case .flyingFiles: "Les fichiers volent vers l’autre panneau (F5, F6)"
-        case .dropParticles: "Particules au dépôt d’un glisser-déposer"
-        case .crumple: "Fichiers froissés qui tombent à la corbeille"
-        case .typewriter: "Nouveau nom écrit lettre par lettre"
-        case .stamps: "Cadenas qui apparaît au chiffrement"
-        case .fireworks: "Feu d’artifice après une opération de plus de 30 s"
-        case .themeWave: "Nouveau thème en vague circulaire"
-        case .sidebarBounce: "Icônes de la barre latérale qui rebondissent au survol"
+        case .fadeNavigation: L("Fondu au changement de dossier ou d’onglet")
+        case .accentFade: L("Liseré du panneau actif en fondu")
+        case .rowAnimation: L("Dossiers dépliés animés")
+        case .pushNavigation: L("Le contenu glisse quand on descend ou remonte")
+        case .cascade: L("Les éléments apparaissent en cascade")
+        case .trashFade: L("Les fichiers s’effacent avant la corbeille")
+        case .accentSpring: L("Le liseré du panneau actif se déploie avec un rebond")
+        case .sparkles: L("Étincelles quand une opération se termine")
+        case .portal: L("Effet portail : on plonge dans le dossier ouvert")
+        case .spiral: L("Les icônes du dossier ouvert apparaissent en spirale")
+        case .hoverGlow: L("Halo et icône qui grossit au survol")
+        case .selectionRipple: L("Onde lumineuse au clic")
+        case .iconPop: L("« Pop » des icônes sélectionnées et créées")
+        case .panelDim: L("Panneau inactif légèrement estompé")
+        case .flyingFiles: L("Les fichiers volent vers l’autre panneau (F5, F6)")
+        case .dropParticles: L("Particules au dépôt d’un glisser-déposer")
+        case .crumple: L("Fichiers froissés qui tombent à la corbeille")
+        case .typewriter: L("Nouveau nom écrit lettre par lettre")
+        case .stamps: L("Cadenas qui apparaît au chiffrement")
+        case .fireworks: L("Feu d’artifice après une opération de plus de 30 s")
+        case .themeWave: L("Nouveau thème en vague circulaire")
+        case .sidebarBounce: L("Icônes de la barre latérale qui rebondissent au survol")
         }
     }
 

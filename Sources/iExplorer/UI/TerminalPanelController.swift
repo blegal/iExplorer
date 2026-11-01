@@ -25,12 +25,12 @@ final class TerminalPanelController: NSViewController, LocalProcessTerminalViewD
         titleLabel.lineBreakMode = .byTruncatingHead
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        followButton.image = NSImage(systemSymbolName: "link", accessibilityDescription: "Suivre le panneau actif")
+        followButton.image = NSImage(systemSymbolName: "link", accessibilityDescription: L("Suivre le panneau actif"))
         followButton.setButtonType(.pushOnPushOff)
         followButton.bezelStyle = .accessoryBarAction
         followButton.isBordered = true
         followButton.state = Self.followsPanel ? .on : .off
-        followButton.toolTip = "Suivre le dossier du panneau actif"
+        followButton.toolTip = L("Suivre le dossier du panneau actif")
         followButton.target = self
         followButton.action = #selector(toggleFollow(_:))
 
@@ -40,8 +40,8 @@ final class TerminalPanelController: NSViewController, LocalProcessTerminalViewD
             button.toolTip = tip
             return button
         }
-        let goButton = button("arrow.down.right.and.arrow.up.left", "Aller au dossier du panneau actif", #selector(goToPanelDirectory(_:)))
-        let restartButton = button("arrow.clockwise", "Redémarrer le shell", #selector(restart(_:)))
+        let goButton = button("arrow.down.right.and.arrow.up.left", L("Aller au dossier du panneau actif"), #selector(goToPanelDirectory(_:)))
+        let restartButton = button("arrow.clockwise", L("Redémarrer le shell"), #selector(restart(_:)))
 
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -184,6 +184,6 @@ final class TerminalPanelController: NSViewController, LocalProcessTerminalViewD
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         started = false
-        titleLabel.stringValue = "Shell terminé — cliquez sur ↻ pour le redémarrer"
+        titleLabel.stringValue = L("Shell terminé — cliquez sur ↻ pour le redémarrer")
     }
 }

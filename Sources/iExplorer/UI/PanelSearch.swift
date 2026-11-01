@@ -17,7 +17,7 @@ final class PanelSearchBar: NSView, NSSearchFieldDelegate {
     var onMoveDown: (() -> Void)?
 
     let field = NSSearchField()
-    private let scopeControl = NSSegmentedControl(labels: ["Ce dossier", "Sous-dossiers", "Contenu"], trackingMode: .selectOne, target: nil, action: nil)
+    private let scopeControl = NSSegmentedControl(labels: [L("Ce dossier"), L("Sous-dossiers"), L("Contenu")], trackingMode: .selectOne, target: nil, action: nil)
     private let spinner = NSProgressIndicator()
     /// « 12 sur 240 » quand le filtre du dossier est actif.
     private let countLabel = NSTextField(labelWithString: "")
@@ -39,8 +39,8 @@ final class PanelSearchBar: NSView, NSSearchFieldDelegate {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        field.placeholderString = "Rechercher (ex. rapport, *.pdf)"
-        field.toolTip = "Nom ou motif : * remplace plusieurs caractères, ? un seul"
+        field.placeholderString = L("Rechercher (ex. rapport, *.pdf)")
+        field.toolTip = L("Nom ou motif : * remplace plusieurs caractères, ? un seul")
         field.controlSize = .small
         field.font = .systemFont(ofSize: 12)
         field.delegate = self
@@ -51,27 +51,27 @@ final class PanelSearchBar: NSView, NSSearchFieldDelegate {
         scopeControl.selectedSegment = 0
         scopeControl.target = self
         scopeControl.action = #selector(changed)
-        scopeControl.setToolTip("Filtrer le dossier affiché", forSegment: 0)
-        scopeControl.setToolTip("Chercher par nom dans tous les sous-dossiers", forSegment: 1)
-        scopeControl.setToolTip("Chercher dans le contenu des fichiers (Spotlight)", forSegment: 2)
+        scopeControl.setToolTip(L("Filtrer le dossier affiché"), forSegment: 0)
+        scopeControl.setToolTip(L("Chercher par nom dans tous les sous-dossiers"), forSegment: 1)
+        scopeControl.setToolTip(L("Chercher dans le contenu des fichiers (Spotlight)"), forSegment: 2)
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
-        let close = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Fermer la recherche")!,
+        let close = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: L("Fermer la recherche"))!,
                              target: self, action: #selector(closeSearch))
         close.isBordered = false
         close.contentTintColor = .tertiaryLabelColor
-        close.toolTip = "Fermer la recherche (Échap)"
+        close.toolTip = L("Fermer la recherche (Échap)")
 
         countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         countLabel.textColor = .secondaryLabelColor
         countLabel.setContentHuggingPriority(.required, for: .horizontal)
-        pinButton.image = NSImage(systemSymbolName: "pin", accessibilityDescription: "Garder le filtre")
-        pinButton.alternateImage = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Garder le filtre")
+        pinButton.image = NSImage(systemSymbolName: "pin", accessibilityDescription: L("Garder le filtre"))
+        pinButton.alternateImage = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: L("Garder le filtre"))
         pinButton.setButtonType(.toggle)
         pinButton.isBordered = false
         pinButton.contentTintColor = .secondaryLabelColor
-        pinButton.toolTip = "Garder le filtre en changeant de dossier"
+        pinButton.toolTip = L("Garder le filtre en changeant de dossier")
 
         let stack = NSStackView(views: [field, countLabel, scopeControl, pinButton, spinner, close])
         stack.spacing = 8
@@ -106,7 +106,7 @@ final class PanelSearchBar: NSView, NSSearchFieldDelegate {
     }
 
     func setCount(shown: Int, total: Int, active: Bool) {
-        countLabel.stringValue = active ? "\(shown) sur \(total)" : ""
+        countLabel.stringValue = active ? L("\(shown) sur \(total)") : ""
         countLabel.isHidden = !active
     }
     @objc private func closeSearch() { onClose?() }

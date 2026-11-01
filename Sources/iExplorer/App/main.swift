@@ -6,6 +6,7 @@ import AppKit
 if AskPass.isRequested { AskPass.run() }
 
 Preferences.migrateLegacyDefaults()
+AppLanguage.applyAtLaunch()
 
 let app = NSApplication.shared
 let delegate = AppDelegate()

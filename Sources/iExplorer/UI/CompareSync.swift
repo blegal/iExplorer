@@ -106,14 +106,14 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
     private var visibleRows: [Int] = []
     private var generation = 0
 
-    private let recursiveBox = NSButton(checkboxWithTitle: "Sous-dossiers", target: nil, action: nil)
-    private let hideIdenticalBox = NSButton(checkboxWithTitle: "Masquer les identiques", target: nil, action: nil)
-    private let deleteBox = NSButton(checkboxWithTitle: "Supprimer les éléments absents de la source", target: nil, action: nil)
+    private let recursiveBox = NSButton(checkboxWithTitle: L("Sous-dossiers"), target: nil, action: nil)
+    private let hideIdenticalBox = NSButton(checkboxWithTitle: L("Masquer les identiques"), target: nil, action: nil)
+    private let deleteBox = NSButton(checkboxWithTitle: L("Supprimer les éléments absents de la source"), target: nil, action: nil)
     private let modePopup = NSPopUpButton()
     private let table = NSTableView()
-    private let summary = NSTextField(labelWithString: "Comparaison…")
+    private let summary = NSTextField(labelWithString: L("Comparaison…"))
     private let spinner = NSProgressIndicator()
-    private let syncButton = NSButton(title: "Synchroniser", target: nil, action: nil)
+    private let syncButton = NSButton(title: L("Synchroniser"), target: nil, action: nil)
 
     init(left: URL, right: URL) {
         leftRoot = left
@@ -128,9 +128,9 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
     }
 
     override func loadView() {
-        let title = NSTextField(labelWithString: "Comparer et synchroniser")
+        let title = NSTextField(labelWithString: L("Comparer et synchroniser"))
         title.font = .systemFont(ofSize: 15, weight: .semibold)
-        let paths = NSTextField(labelWithString: "Gauche : \(Self.display(leftRoot))\nDroite : \(Self.display(rightRoot))")
+        let paths = NSTextField(labelWithString: L("Gauche : \(Self.display(leftRoot))\nDroite : \(Self.display(rightRoot))"))
         paths.textColor = .secondaryLabelColor
         paths.font = .systemFont(ofSize: 11)
         paths.lineBreakMode = .byTruncatingMiddle
@@ -143,13 +143,13 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         recursiveBox.action = #selector(compare)
         hideIdenticalBox.action = #selector(filterChanged)
         deleteBox.action = #selector(modeChanged)
-        modePopup.addItems(withTitles: ["Dans les deux sens (le plus récent gagne)", "Miroir : gauche → droite", "Miroir : droite → gauche"])
+        modePopup.addItems(withTitles: [L("Dans les deux sens (le plus récent gagne)"), L("Miroir : gauche → droite"), L("Miroir : droite → gauche")])
         modePopup.target = self
         modePopup.action = #selector(modeChanged)
         let options = NSStackView(views: [modePopup, recursiveBox, hideIdenticalBox])
         options.spacing = 14
 
-        let columns: [(String, String, CGFloat)] = [("path", "Élément", 300), ("left", "Gauche", 150), ("action", "Action", 60), ("right", "Droite", 150)]
+        let columns: [(String, String, CGFloat)] = [("path", L("Élément"), 300), ("left", L("Gauche"), 150), ("action", L("Action"), 60), ("right", L("Droite"), 150)]
         for (id, title, width) in columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
@@ -170,7 +170,7 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         scroll.borderType = .bezelBorder
         scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
 
-        let hint = NSTextField(labelWithString: "Cliquez sur une action pour la changer : → copier vers la droite, ← vers la gauche, ✕ ignorer.")
+        let hint = NSTextField(labelWithString: L("Cliquez sur une action pour la changer : → copier vers la droite, ← vers la gauche, ✕ ignorer."))
         hint.font = .systemFont(ofSize: 11)
         hint.textColor = .tertiaryLabelColor
 
@@ -179,7 +179,7 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         spinner.isDisplayedWhenStopped = false
         summary.font = .systemFont(ofSize: 11)
         summary.textColor = .secondaryLabelColor
-        let close = NSButton(title: "Fermer", target: self, action: #selector(closeWindow))
+        let close = NSButton(title: L("Fermer"), target: self, action: #selector(closeWindow))
         close.keyEquivalent = "\u{1b}"
         syncButton.target = self
         syncButton.action = #selector(synchronize)
@@ -211,7 +211,7 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         let recursive = recursiveBox.state == .on
         let showHidden = Preferences.showHiddenFiles
         spinner.startAnimation(nil)
-        summary.stringValue = "Comparaison…"
+        summary.stringValue = L("Comparaison…")
         syncButton.isEnabled = false
         let leftRoot = leftRoot, rightRoot = rightRoot
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -228,7 +228,7 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
                     self.rows = rows
                     applyDefaultActions()
                 case .failure(let error):
-                    summary.stringValue = "Comparaison impossible : \(error.localizedDescription)"
+                    summary.stringValue = L("Comparaison impossible : \(error.localizedDescription)")
                 }
             }
         }
@@ -280,17 +280,17 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         let pending = rows.filter { $0.action != .skip }
         let identical = rows.filter { $0.state == .identical }.count
         if rows.isEmpty {
-            summary.stringValue = "Les deux dossiers sont vides."
+            summary.stringValue = L("Les deux dossiers sont vides.")
         } else if pending.isEmpty {
-            summary.stringValue = identical == rows.count ? "Les deux côtés sont identiques (\(identical) éléments)." : "Aucune action sélectionnée."
+            summary.stringValue = identical == rows.count ? L("Les deux côtés sont identiques (\(identical) éléments).") : L("Aucune action sélectionnée.")
         } else {
             let right = pending.filter { $0.action == .toRight }.count, left = pending.filter { $0.action == .toLeft }.count
             let deletions = pending.filter { $0.action == .deleteLeft || $0.action == .deleteRight }.count
             var parts: [String] = []
-            if right > 0 { parts.append("\(right) → droite") }
-            if left > 0 { parts.append("\(left) ← gauche") }
-            if deletions > 0 { parts.append("\(deletions) suppression(s)") }
-            summary.stringValue = parts.joined(separator: ", ") + " — \(identical) identique(s)"
+            if right > 0 { parts.append(L("\(right) → droite")) }
+            if left > 0 { parts.append(L("\(left) ← gauche")) }
+            if deletions > 0 { parts.append(deletions > 1 ? L("\(deletions) suppressions") : L("\(deletions) suppression")) }
+            summary.stringValue = parts.joined(separator: ", ") + " — " + (identical > 1 ? L("\(identical) identiques") : L("\(identical) identique"))
         }
         syncButton.isEnabled = !pending.isEmpty
     }
@@ -306,7 +306,7 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         field.font = .systemFont(ofSize: 12)
         func describe(_ side: TreeEntry?) -> String {
             guard let side else { return "—" }
-            if side.isDirectory { return "dossier" }
+            if side.isDirectory { return L("dossier") }
             return "\(Format.size(side.size)) · \(side.date.map { Format.dateFormatter.string(from: $0) } ?? "")"
         }
         let newer: NSColor = .systemGreen
@@ -339,12 +339,12 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
 
     private static func describe(_ state: CompareRow.State) -> String {
         switch state {
-        case .onlyLeft: "Seulement à gauche"
-        case .onlyRight: "Seulement à droite"
-        case .leftNewer: "Plus récent à gauche"
-        case .rightNewer: "Plus récent à droite"
-        case .different: "Différent (même date)"
-        case .identical: "Identique"
+        case .onlyLeft: L("Seulement à gauche")
+        case .onlyRight: L("Seulement à droite")
+        case .leftNewer: L("Plus récent à gauche")
+        case .rightNewer: L("Plus récent à droite")
+        case .different: L("Différent (même date)")
+        case .identical: L("Identique")
         }
     }
 
@@ -372,10 +372,10 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
         if !deletions.isEmpty {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Supprimer \(deletions.count) élément(s) ?"
-            alert.informativeText = "En local, ils sont placés dans la corbeille ; sur un serveur SFTP, la suppression est définitive."
-            alert.addButton(withTitle: "Synchroniser").hasDestructiveAction = true
-            alert.addButton(withTitle: "Annuler")
+            alert.messageText = (deletions.count > 1 ? L("Supprimer \(deletions.count) éléments ?") : L("Supprimer \(deletions.count) élément ?"))
+            alert.informativeText = L("En local, ils sont placés dans la corbeille ; sur un serveur SFTP, la suppression est définitive.")
+            alert.addButton(withTitle: L("Synchroniser")).hasDestructiveAction = true
+            alert.addButton(withTitle: L("Annuler"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
         FileOperationCenter.shared.synchronize(pending, left: leftRoot, right: rightRoot) { [weak self] in
@@ -395,7 +395,7 @@ final class CompareController: NSViewController, NSTableViewDataSource, NSTableV
 extension FileOperationCenter {
     /// Applique les actions d'une comparaison en tâche de fond, en conservant les dates de modification.
     func synchronize(_ actions: [CompareRow], left: URL, right: URL, completion: @escaping () -> Void) {
-        let job = FileJob(title: "Synchronisation de « \(left.lastPathComponent) » et « \(right.lastPathComponent) »")
+        let job = FileJob(title: L("Synchronisation de « \(left.lastPathComponent) » et « \(right.lastPathComponent) »"))
         job.countsItems = true
         job.setTotal(Int64(actions.count))
         addJob(job)
@@ -467,14 +467,14 @@ extension FileOperationCenter {
                     case .skip: break
                     }
                 } catch {
-                    failures.append("\(row.path) : \(error.localizedDescription)")
+                    failures.append(L("\(row.path) : \(error.localizedDescription)"))
                 }
                 job.setDone(Int64(index + 1))
             }
             DispatchQueue.main.async {
                 self.removeJob(job)
                 if !failures.isEmpty {
-                    self.showError("Synchronisation terminée avec \(failures.count) erreur(s).\n" + failures.prefix(10).joined(separator: "\n"))
+                    self.showError((failures.count > 1 ? L("Synchronisation terminée avec \(failures.count) erreurs.") : L("Synchronisation terminée avec \(failures.count) erreur.")) + "\n" + failures.prefix(10).joined(separator: "\n"))
                 }
                 completion()
             }

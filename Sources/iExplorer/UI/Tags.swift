@@ -75,7 +75,7 @@ enum FinderTags {
 extension PanelViewController {
     /// Sous-menu « Tags » du menu contextuel.
     func tagsMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "Tags", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L("Tags"), action: nil, keyEquivalent: "")
         item.image = NSImage(systemSymbolName: "tag", accessibilityDescription: nil)
         let menu = NSMenu()
         let selection = selectedItems.filter { !$0.url.isRemote }
@@ -100,11 +100,11 @@ extension PanelViewController {
             menu.addItem(entry)
         }
         menu.addItem(.separator())
-        let other = NSMenuItem(title: "Ajouter un tag…", action: #selector(addCustomTag(_:)), keyEquivalent: "")
+        let other = NSMenuItem(title: L("Ajouter un tag…"), action: #selector(addCustomTag(_:)), keyEquivalent: "")
         other.target = self
         other.image = NSImage(systemSymbolName: "plus.circle", accessibilityDescription: nil)
         menu.addItem(other)
-        let clear = NSMenuItem(title: "Retirer tous les tags", action: #selector(clearTags(_:)), keyEquivalent: "")
+        let clear = NSMenuItem(title: L("Retirer tous les tags"), action: #selector(clearTags(_:)), keyEquivalent: "")
         clear.target = self
         clear.image = NSImage(systemSymbolName: "tag.slash", accessibilityDescription: nil)
         menu.addItem(clear)
@@ -117,7 +117,7 @@ extension PanelViewController {
         guard let standard = FinderTags.standard.first(where: { $0.index == sender.tag }) else { return }
         let selection = selectedItems.filter { !$0.url.isRemote }
         let add = !selection.allSatisfy { $0.finderTags.contains { $0.colorIndex == standard.index } }
-        updateTags(of: selection, actionName: add ? "Ajouter le tag" : "Retirer le tag") { tags in
+        updateTags(of: selection, actionName: add ? L("Ajouter le tag") : L("Retirer le tag")) { tags in
             let others = tags.filter { $0.colorIndex != standard.index }
             return add ? others + [FinderTag(name: standard.name, colorIndex: standard.index)] : others
         }
@@ -127,7 +127,7 @@ extension PanelViewController {
         guard let name = sender.representedObject as? String else { return }
         let selection = selectedItems.filter { !$0.url.isRemote }
         let add = !selection.allSatisfy { $0.tags.contains(name) }
-        updateTags(of: selection, actionName: add ? "Ajouter le tag" : "Retirer le tag") { tags in
+        updateTags(of: selection, actionName: add ? L("Ajouter le tag") : L("Retirer le tag")) { tags in
             let others = tags.filter { $0.name != name }
             return add ? others + [FinderTag(name: name, colorIndex: 0)] : others
         }
@@ -136,12 +136,12 @@ extension PanelViewController {
     @objc func addCustomTag(_ sender: Any?) {
         guard let window = view.window else { return }
         let alert = NSAlert()
-        alert.messageText = "Ajouter un tag"
+        alert.messageText = L("Ajouter un tag")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        field.placeholderString = "Nom du tag"
+        field.placeholderString = L("Nom du tag")
         alert.accessoryView = field
-        alert.addButton(withTitle: "Ajouter")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Ajouter"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = field
         let selection = selectedItems.filter { !$0.url.isRemote }
         alert.beginSheetModal(for: window) { [weak self] response in
@@ -149,14 +149,14 @@ extension PanelViewController {
             guard response == .alertFirstButtonReturn, !name.isEmpty else { return }
             // Un nom de couleur standard prend sa couleur.
             let index = FinderTags.standard.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.index ?? 0
-            self?.updateTags(of: selection, actionName: "Ajouter le tag") { tags in
+            self?.updateTags(of: selection, actionName: L("Ajouter le tag")) { tags in
                 tags.contains { $0.name.caseInsensitiveCompare(name) == .orderedSame } ? tags : tags + [FinderTag(name: name, colorIndex: index)]
             }
         }
     }
 
     @objc func clearTags(_ sender: Any?) {
-        updateTags(of: selectedItems.filter { !$0.url.isRemote }, actionName: "Retirer les tags") { _ in [] }
+        updateTags(of: selectedItems.filter { !$0.url.isRemote }, actionName: L("Retirer les tags")) { _ in [] }
     }
 
     /// Applique une transformation aux tags d'éléments, avec annulation.

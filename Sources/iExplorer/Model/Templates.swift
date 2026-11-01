@@ -10,10 +10,10 @@ enum DocumentTemplates {
 
     /// Modèles fournis, écrits une seule fois : un dossier vidé par l'utilisateur reste vide.
     private static let defaults: [(name: String, content: String, executable: Bool)] = [
-        ("Document texte.txt", "", false),
-        ("Document Markdown.md", "# Titre\n\n", false),
-        ("Document Typst.typ", "#set page(paper: \"a4\")\n#set text(lang: \"fr\")\n\n= Titre\n\n", false),
-        ("Document LaTeX.tex", """
+        (L("Document texte") + ".txt", "", false),
+        (L("Document Markdown") + ".md", "# Titre\n\n", false),
+        (L("Document Typst") + ".typ", "#set page(paper: \"a4\")\n#set text(lang: \"fr\")\n\n= Titre\n\n", false),
+        (L("Document LaTeX") + ".tex", """
             \\documentclass[a4paper,11pt]{article}
             \\usepackage[french]{babel}
 
@@ -26,7 +26,7 @@ enum DocumentTemplates {
             \\end{document}
 
             """, false),
-        ("Page HTML.html", """
+        (L("Page HTML") + ".html", """
             <!doctype html>
             <html lang="fr">
             <head>
@@ -40,9 +40,9 @@ enum DocumentTemplates {
 
             """, false),
         ("Makefile", ".PHONY: all clean\n\nall:\n\t@echo \"À compléter\"\n\nclean:\n\trm -f *.o\n", false),
-        ("Script shell.sh", "#!/bin/zsh\nset -euo pipefail\n\n", true),
-        ("Script Python.py", "#!/usr/bin/env python3\n\n\ndef main():\n    pass\n\n\nif __name__ == \"__main__\":\n    main()\n", true),
-        ("Tableau CSV.csv", "colonne 1,colonne 2\n", false),
+        (L("Script shell") + ".sh", "#!/bin/zsh\nset -euo pipefail\n\n", true),
+        (L("Script Python") + ".py", "#!/usr/bin/env python3\n\n\ndef main():\n    pass\n\n\nif __name__ == \"__main__\":\n    main()\n", true),
+        (L("Tableau CSV") + ".csv", "colonne 1,colonne 2\n", false),
     ]
 
     static func installDefaults() {
@@ -98,8 +98,8 @@ extension FileOperationCenter {
     func create(fromTemplate template: URL, in directory: URL, undoManager: UndoManager?) throws -> URL {
         let url = uniqueURL(for: directory.appendingPathComponent(template.lastPathComponent), suffix: "")
         try FileManager.default.copyItem(at: template, to: url)
-        undoManager?.registerUndo(withTarget: self) { $0.trash([url], undoManager: undoManager, actionName: "Nouveau document") }
-        undoManager?.setActionName("Nouveau document")
+        undoManager?.registerUndo(withTarget: self) { $0.trash([url], undoManager: undoManager, actionName: L("Nouveau document")) }
+        undoManager?.setActionName(L("Nouveau document"))
         return url
     }
 }

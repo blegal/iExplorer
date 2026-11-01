@@ -49,15 +49,18 @@ enum KeyboardShortcuts {
             case 8, 127: return "⌫"
             case 9: return "⇥"
             case 13, 3: return "↩"
-            case 27: return "Échap"
-            case 32: return "Espace"
+            case 27: return L("Échap")
+            case 32: return L("Espace")
             default: return key.uppercased()
             }
         }
     }
 
     struct Command {
+        /// Chemin affiché, dans la langue de l'interface.
         let path: String
+        /// Chemin enregistré, en français quelle que soit la langue : les personnalisations survivent à un changement de langue.
+        let key: String
         let item: NSMenuItem
         let original: Shortcut
     }
@@ -72,17 +75,19 @@ enum KeyboardShortcuts {
     }
 
     /// Commandes du menu principal (hors menus construits à la volée), avec leur chemin.
-    static func commands(in menu: NSMenu? = NSApp.mainMenu, prefix: String = "") -> [Command] {
+    static func commands(in menu: NSMenu? = NSApp.mainMenu, prefix: String = "", keyPrefix: String = "") -> [Command] {
         guard let menu else { return [] }
         var result: [Command] = []
         for item in menu.items where !item.isSeparatorItem && !item.isSectionHeader {
             let path = prefix.isEmpty ? item.title : prefix + " › " + item.title
+            let source = AppLanguage.sourceText(item.title)
+            let key = keyPrefix.isEmpty ? source : keyPrefix + " › " + source
             if let submenu = item.submenu {
                 // Les sous-menus remplis par un délégué changent à chaque ouverture : on les laisse.
-                if submenu.delegate == nil, item.title != "Services" { result += commands(in: submenu, prefix: path) }
+                if submenu.delegate == nil, item.title != "Services" { result += commands(in: submenu, prefix: path, keyPrefix: key) }
             } else if item.action != nil {
                 let current = Shortcut(key: item.keyEquivalent, modifiers: item.keyEquivalentModifierMask)
-                result.append(Command(path: path, item: item, original: originals[path] ?? current))
+                result.append(Command(path: path, key: key, item: item, original: originals[key] ?? current))
             }
         }
         return result
@@ -92,9 +97,9 @@ enum KeyboardShortcuts {
     static func apply() {
         let saved = overrides
         let all = commands()
-        for command in all where originals[command.path] == nil { originals[command.path] = command.original }
-        for command in all where saved[command.path] == nil { set(command.original, on: command.item) }
-        for command in all { if let shortcut = saved[command.path] { set(shortcut, on: command.item, freeingIn: all) } }
+        for command in all where originals[command.key] == nil { originals[command.key] = command.original }
+        for command in all where saved[command.key] == nil { set(command.original, on: command.item) }
+        for command in all { if let shortcut = saved[command.key] { set(shortcut, on: command.item, freeingIn: all) } }
     }
 
     static func set(_ shortcut: Shortcut, on item: NSMenuItem) {
@@ -116,7 +121,7 @@ enum KeyboardShortcuts {
     static func update(_ command: Command, to shortcut: Shortcut?) {
         var saved = overrides
         let value = shortcut ?? command.original
-        saved[command.path] = value == command.original ? nil : value
+        saved[command.key] = value == command.original ? nil : value
         overrides = saved
         set(value, on: command.item, freeingIn: commands())
     }
@@ -145,7 +150,7 @@ final class KeyboardShortcutsWindowController: NSWindowController, NSTableViewDa
     private init() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 540), styleMask: [.titled, .closable, .resizable],
                               backing: .buffered, defer: false)
-        window.title = "Raccourcis clavier"
+        window.title = L("Raccourcis clavier")
         window.minSize = NSSize(width: 480, height: 320)
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -157,9 +162,9 @@ final class KeyboardShortcutsWindowController: NSWindowController, NSTableViewDa
 
     private func build() {
         guard let content = window?.contentView else { return }
-        search.placeholderString = "Rechercher une commande ou un raccourci"
+        search.placeholderString = L("Rechercher une commande ou un raccourci")
         search.delegate = self
-        for (identifier, title, width) in [("command", "Commande", 400.0), ("shortcut", "Raccourci", 150.0)] {
+        for (identifier, title, width) in [("command", L("Commande"), 400.0), ("shortcut", L("Raccourci"), 150.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.title = title
             column.width = width
@@ -176,9 +181,9 @@ final class KeyboardShortcutsWindowController: NSWindowController, NSTableViewDa
         scroll.hasVerticalScroller = true
         hint.textColor = .secondaryLabelColor
         hint.font = .systemFont(ofSize: 11)
-        hint.stringValue = "Double-clic sur une commande, puis tapez la combinaison. ⌫ : aucun raccourci, Échap : annuler."
-        let reset = NSButton(title: "Rétablir celui-ci", target: self, action: #selector(resetSelected))
-        let resetAll = NSButton(title: "Tout rétablir…", target: self, action: #selector(resetAll))
+        hint.stringValue = L("Double-clic sur une commande, puis tapez la combinaison. ⌫ : aucun raccourci, Échap : annuler.")
+        let reset = NSButton(title: L("Rétablir celui-ci"), target: self, action: #selector(resetSelected))
+        let resetAll = NSButton(title: L("Tout rétablir…"), target: self, action: #selector(resetAll))
         let buttons = NSStackView(views: [hint, NSView(), reset, resetAll])
         let stack = NSStackView(views: [search, scroll, buttons])
         stack.orientation = .vertical
@@ -225,13 +230,14 @@ final class KeyboardShortcutsWindowController: NSWindowController, NSTableViewDa
         if tableColumn?.identifier.rawValue == "command" {
             field.stringValue = command.path
         } else if recordingRow == row {
-            field.stringValue = "Tapez la combinaison…"
+            field.stringValue = L("Tapez la combinaison…")
             field.textColor = .controlAccentColor
         } else {
             let shortcut = current(command)
             field.stringValue = shortcut.display.isEmpty ? "—" : shortcut.display
             field.font = shortcut != command.original ? .boldSystemFont(ofSize: 13) : .systemFont(ofSize: 13)
-            field.toolTip = shortcut != command.original ? "Modifié (d’origine : \(command.original.display.isEmpty ? "aucun" : command.original.display))" : nil
+            let original = command.original.display.isEmpty ? L("aucun") : command.original.display
+            field.toolTip = shortcut != command.original ? L("Modifié (d’origine : \(original))") : nil
         }
         return field
     }
@@ -270,10 +276,10 @@ final class KeyboardShortcutsWindowController: NSWindowController, NSTableViewDa
         let command = shown[row]
         if !shortcut.key.isEmpty, let other = all.first(where: { $0.item !== command.item && current($0) == shortcut }) {
             let alert = NSAlert()
-            alert.messageText = "\(shortcut.display) est déjà utilisé par « \(other.path) »"
-            alert.informativeText = "Le raccourci sera retiré de cette commande."
-            alert.addButton(withTitle: "Réattribuer")
-            alert.addButton(withTitle: "Annuler")
+            alert.messageText = L("\(shortcut.display) est déjà utilisé par « \(other.path) »")
+            alert.informativeText = L("Le raccourci sera retiré de cette commande.")
+            alert.addButton(withTitle: L("Réattribuer"))
+            alert.addButton(withTitle: L("Annuler"))
             stopRecording()
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             KeyboardShortcuts.update(other, to: .none)
@@ -298,9 +304,9 @@ final class KeyboardShortcutsWindowController: NSWindowController, NSTableViewDa
 
     @objc private func resetAll() {
         let alert = NSAlert()
-        alert.messageText = "Rétablir tous les raccourcis d’origine ?"
-        alert.addButton(withTitle: "Rétablir")
-        alert.addButton(withTitle: "Annuler")
+        alert.messageText = L("Rétablir tous les raccourcis d’origine ?")
+        alert.addButton(withTitle: L("Rétablir"))
+        alert.addButton(withTitle: L("Annuler"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         for command in all { KeyboardShortcuts.update(command, to: nil) }
         table.reloadData()

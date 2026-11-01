@@ -401,4 +401,47 @@ enum DefaultFileActions {
 
         """#
     }
+
+    /// Les règles fournies sont écrites en français dans les fichiers .toml de l'utilisateur (données qu'il modifie) :
+    /// leurs noms, titres et confirmations d'origine sont traduits à l'affichage seulement ; tout autre texte reste tel quel.
+    static func displayText(_ text: String) -> String {
+        switch text {
+        case "Compiler en PDF": L("Compiler en PDF")
+        case "Compiler et ouvrir le PDF": L("Compiler et ouvrir le PDF")
+        case "Surveiller (typst watch)": L("Surveiller (typst watch)")
+        case "Convertir en PDF": L("Convertir en PDF")
+        case "Convertir en HTML": L("Convertir en HTML")
+        case "Convertir en Word (.docx)": L("Convertir en Word (.docx)")
+        case "Aperçu dans le navigateur": L("Aperçu dans le navigateur")
+        case "Installer pandoc (Homebrew)": L("Installer pandoc (Homebrew)")
+        case "Compiler en continu (latexmk -pvc)": L("Compiler en continu (latexmk -pvc)")
+        case "Nettoyer les fichiers auxiliaires": L("Nettoyer les fichiers auxiliaires")
+        case "Supprimer les fichiers .aux, .log, .fls… produits par latexmk ?": L("Supprimer les fichiers .aux, .log, .fls… produits par latexmk ?")
+        case "Convertir en JPEG": L("Convertir en JPEG")
+        case "Convertir en PNG": L("Convertir en PNG")
+        case "Convertir en HEIC": L("Convertir en HEIC")
+        case "Copie réduite (1600 px)": L("Copie réduite (1600 px)")
+        case "Pivoter de 90°": L("Pivoter de 90°")
+        case "Les images sont modifiées sur place.": L("Les images sont modifiées sur place.")
+        case "Vidéos": L("Vidéos")
+        case "Compresser en HEVC 1080p": L("Compresser en HEVC 1080p")
+        case "Convertir en MP4 (H.264)": L("Convertir en MP4 (H.264)")
+        case "Créer un GIF animé": L("Créer un GIF animé")
+        case "Extraire l’audio (M4A)": L("Extraire l’audio (M4A)")
+        case "Convertir en M4A (AAC)": L("Convertir en M4A (AAC)")
+        case "Convertir en WAV": L("Convertir en WAV")
+        case "Fusionner les PDF": L("Fusionner les PDF")
+        case "Compresser (qualité écran)": L("Compresser (qualité écran)")
+        case "Exécuter dans le terminal": L("Exécuter dans le terminal")
+        case "Rendre exécutable": L("Rendre exécutable")
+        case "Supprimer le dossier target ?": L("Supprimer le dossier target ?")
+        case "Configurer et compiler": L("Configurer et compiler")
+        case "Compiler": L("Compiler")
+        case "Vérifier la syntaxe": L("Vérifier la syntaxe")
+        case "Mettre en forme": L("Mettre en forme")
+        case "Le fichier est réécrit, indenté.": L("Le fichier est réécrit, indenté.")
+        case "Afficher la taille": L("Afficher la taille")
+        default: text
+        }
+    }
 }

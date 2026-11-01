@@ -110,7 +110,7 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
     func showBanner(_ text: String, error: Bool, log: String? = nil, line: Int? = nil) {
         banner.title = text
         banner.layer?.backgroundColor = (error ? NSColor.systemRed : NSColor.systemGreen).withAlphaComponent(0.88).cgColor
-        banner.toolTip = log == nil ? nil : "Afficher le journal"
+        banner.toolTip = log == nil ? nil : L("Afficher le journal")
         bannerLog = log
         bannerLine = line
         banner.isHidden = false
@@ -141,8 +141,8 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
             text.scrollToEndOfDocument(nil)
         }
         alert.accessoryView = scroll
-        if let line = bannerLine { alert.addButton(withTitle: "Aller à la ligne \(line)") }
-        alert.addButton(withTitle: "Fermer")
+        if let line = bannerLine { alert.addButton(withTitle: L("Aller à la ligne \(line)")) }
+        alert.addButton(withTitle: L("Fermer"))
         if alert.runModal() == .alertFirstButtonReturn, let line = bannerLine { onJumpToLine?(line) }
     }
 
@@ -253,7 +253,7 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
             pdfView = view
         }
         guard let pdfView, let document = PDFDocument(url: url) else {
-            showMessage("Le PDF « \(url.lastPathComponent) » est illisible.")
+            showMessage(L("Le PDF « \(url.lastPathComponent) » est illisible."))
             return
         }
         if shownPDF == url { pdfView.replaceDocument(document) } else { pdfView.document = document }
@@ -336,7 +336,9 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
         rows = parsed
         tableView.reloadData()
         activate(tableScroll)
-        showBanner("\(parsed.count) ligne\(parsed.count > 1 ? "s" : "") · \(count) colonne\(count > 1 ? "s" : "")", error: false)
+        let rowsText = parsed.count > 1 ? L("\(parsed.count) lignes") : L("\(parsed.count) ligne")
+        let columnsText = count > 1 ? L("\(count) colonnes") : L("\(count) colonne")
+        showBanner("\(rowsText) · \(columnsText)", error: false)
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
@@ -353,7 +355,7 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
             let outline = NSOutlineView()
             outline.style = .plain
             outline.usesAlternatingRowBackgroundColors = true
-            for (identifier, title, width) in [("key", "Clé", 180.0), ("value", "Valeur", 260.0), ("type", "Type", 80.0)] {
+            for (identifier, title, width) in [("key", L("Clé"), 180.0), ("value", L("Valeur"), 260.0), ("type", "Type", 80.0)] {
                 let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
                 column.title = title
                 column.width = width
@@ -372,16 +374,16 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
         }
         do {
             let object = try JSONSerialization.jsonObject(with: Data(text.utf8), options: [.fragmentsAllowed])
-            jsonRoot = JSONNode(key: "racine", value: object)
+            jsonRoot = JSONNode(key: L("racine"), value: object)
             outlineView?.reloadData()
             outlineView?.expandItem(jsonRoot)
             hideBanner()
         } catch {
             // Le dernier arbre valide reste affiché sous le bandeau.
             let detail = ((error as NSError).userInfo[NSDebugDescriptionErrorKey] as? String) ?? error.localizedDescription
-            showBanner("JSON invalide : \(detail)", error: true)
+            showBanner(L("JSON invalide : \(detail)"), error: true)
             if jsonRoot == nil {
-                showMessage("JSON invalide.")
+                showMessage(L("JSON invalide."))
                 return
             }
         }
@@ -444,19 +446,19 @@ private final class JSONNode {
 
     var type: String {
         switch value {
-        case is [String: Any]: "objet"
-        case is [Any]: "tableau"
-        case is String: "texte"
+        case is [String: Any]: L("objet")
+        case is [Any]: L("tableau")
+        case is String: L("texte")
         case is NSNull: "null"
-        case let number as NSNumber: CFGetTypeID(number) == CFBooleanGetTypeID() ? "booléen" : "nombre"
+        case let number as NSNumber: CFGetTypeID(number) == CFBooleanGetTypeID() ? L("booléen") : L("nombre")
         default: ""
         }
     }
 
     var summary: String {
         switch value {
-        case let dictionary as [String: Any]: "{ \(dictionary.count) clé\(dictionary.count > 1 ? "s" : "") }"
-        case let array as [Any]: "[ \(array.count) élément\(array.count > 1 ? "s" : "") ]"
+        case let dictionary as [String: Any]: dictionary.count > 1 ? L("{ \(dictionary.count) clés }") : L("{ \(dictionary.count) clé }")
+        case let array as [Any]: array.count > 1 ? L("[ \(array.count) éléments ]") : L("[ \(array.count) élément ]")
         case let string as String: "\"\(string)\""
         case is NSNull: "null"
         case let number as NSNumber: CFGetTypeID(number) == CFBooleanGetTypeID() ? (number.boolValue ? "true" : "false") : number.stringValue
@@ -823,7 +825,7 @@ enum DocumentCompiler {
     static func compile(_ source: URL, kind: EditorPreviewKind, completion: @escaping (Result<URL, Failure>) -> Void) {
         let tool: ExternalTool = kind == .latex ? .latex : .typst
         guard let executable = tool.path else {
-            completion(.failure(Failure(summary: "\(tool.title) n’est pas installé (Réglages › Outils externes)", log: "", line: nil)))
+            completion(.failure(Failure(summary: L("\(tool.title) n’est pas installé (Réglages › Outils externes)"), log: "", line: nil)))
             return
         }
         let arguments: [String]
@@ -868,16 +870,16 @@ enum DocumentCompiler {
     /// Première erreur lisible du journal : « fichier:ligne: message » (LaTeX) ou « error: … ┌─ fichier:ligne:col » (Typst).
     private static func failure(from log: String, source: URL) -> Failure {
         if let match = log.firstMatch(of: #/(?m)^[^\s:]*\.tex:(\d+):\s*(.+)$/#) {
-            return Failure(summary: "Ligne \(match.1) : \(match.2)", log: log, line: Int(match.1))
+            return Failure(summary: L("Ligne \(match.1) : \(match.2)"), log: log, line: Int(match.1))
         }
         if let error = log.firstMatch(of: #/(?m)^error:\s*(.+)$/#) {
             let line = log.firstMatch(of: #/─\s*\S+\.typ:(\d+):\d+/#).flatMap { Int($0.1) }
-            return Failure(summary: (line.map { "Ligne \($0) : " } ?? "") + String(error.1), log: log, line: line)
+            return Failure(summary: line.map { L("Ligne \($0) : \(error.1)") } ?? String(error.1), log: log, line: line)
         }
         if let error = log.firstMatch(of: #/(?m)^!\s*(.+)$/#) {
             return Failure(summary: String(error.1), log: log, line: nil)
         }
-        return Failure(summary: "La compilation a échoué", log: log, line: nil)
+        return Failure(summary: L("La compilation a échoué"), log: log, line: nil)
     }
 }
 

@@ -17,11 +17,12 @@ enum FinderFavorites {
         var message: String {
             switch self {
             case .accessDenied:
-                return "macOS refuse la lecture de la liste des favoris du Finder. Accordez l’« Accès complet au disque » à iExplorer dans Réglages Système › Confidentialité et sécurité, puis relancez l’app."
+                return L("macOS refuse la lecture de la liste des favoris du Finder. Accordez l’« Accès complet au disque » à iExplorer dans Réglages Système › Confidentialité et sécurité, puis relancez l’app.")
             case .fileNotFound(let names):
-                return "Aucun fichier de favoris trouvé. Contenu du dossier : \(names.isEmpty ? "(vide)" : names.joined(separator: ", "))."
+                let contents = names.isEmpty ? L("(vide)") : names.joined(separator: ", ")
+                return L("Aucun fichier de favoris trouvé. Contenu du dossier : \(contents).")
             case .unreadableFormat(let detail):
-                return "Le fichier des favoris a un format inattendu (\(detail))."
+                return L("Le fichier des favoris a un format inattendu (\(detail)).")
             }
         }
     }
@@ -67,14 +68,14 @@ enum FinderFavorites {
             return .failure(.accessDenied)
         }
         guard let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data) else {
-            return .failure(.unreadableFormat("archive illisible"))
+            return .failure(.unreadableFormat(L("archive illisible")))
         }
         unarchiver.requiresSecureCoding = false
         unarchiver.decodingFailurePolicy = .setErrorAndReturn
         let root = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey)
         let items = (root as? NSDictionary)?["items"] as? [Any] ?? (root as? [Any])
         guard let items else {
-            return .failure(.unreadableFormat("racine \(root.map { String(describing: type(of: $0)) } ?? "absente")"))
+            return .failure(.unreadableFormat(root.map { L("racine \(String(describing: type(of: $0)))") } ?? L("racine absente")))
         }
 
         let entries: [Entry] = items.compactMap { element in
@@ -91,7 +92,7 @@ enum FinderFavorites {
                 ?? FileManager.default.displayName(atPath: url.path)
             return Entry(name: name, url: url)
         }
-        return entries.isEmpty ? .failure(.unreadableFormat("aucun favori exploitable parmi \(items.count) entrées")) : .success(entries)
+        return entries.isEmpty ? .failure(.unreadableFormat(L("aucun favori exploitable parmi \(items.count) entrées"))) : .success(entries)
     }
 
     /// Ouvre le réglage « Accès complet au disque ».
@@ -104,14 +105,14 @@ enum FinderFavorites {
     /// Fenêtre de diagnostic (menu Aide).
     static func showDiagnostic() {
         let alert = NSAlert()
-        alert.messageText = "Favoris du Finder"
+        alert.messageText = L("Favoris du Finder")
         switch read() {
         case .success(let entries):
-            alert.informativeText = "\(entries.count) favoris lus dans \(lastFile ?? "?") :\n" + entries.map { "• \($0.name) — \($0.url.path)" }.joined(separator: "\n")
+            alert.informativeText = L("\(entries.count) favoris lus dans \(lastFile ?? "?") :") + "\n" + entries.map { "• \($0.name) — \($0.url.path)" }.joined(separator: "\n")
         case .failure(let failure):
             alert.alertStyle = .warning
-            alert.informativeText = failure.message + (lastFile.map { "\nFichier : \($0)" } ?? "")
-            if case .accessDenied = failure { alert.addButton(withTitle: "Ouvrir les Réglages"); alert.addButton(withTitle: "Fermer") }
+            alert.informativeText = failure.message + (lastFile.map { "\n" + L("Fichier : \($0)") } ?? "")
+            if case .accessDenied = failure { alert.addButton(withTitle: L("Ouvrir les Réglages")); alert.addButton(withTitle: L("Fermer")) }
         }
         if alert.runModal() == .alertFirstButtonReturn, alert.buttons.count > 1 { openPrivacySettings() }
     }

@@ -124,13 +124,13 @@ enum TabColor: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .red: "Rouge"
-        case .orange: "Orange"
-        case .yellow: "Jaune"
-        case .green: "Vert"
-        case .blue: "Bleu"
-        case .purple: "Violet"
-        case .gray: "Gris"
+        case .red: L("Rouge")
+        case .orange: L("Orange")
+        case .yellow: L("Jaune")
+        case .green: L("Vert")
+        case .blue: L("Bleu")
+        case .purple: L("Violet")
+        case .gray: L("Gris")
         }
     }
 
@@ -151,7 +151,7 @@ enum TabColor: Int, CaseIterable {
             return true
         }
         image.isTemplate = false
-        image.accessibilityDescription = color?.title ?? "Aucune couleur"
+        image.accessibilityDescription = color?.title ?? L("Aucune couleur")
         return image
     }
 
@@ -187,10 +187,10 @@ final class TabBarView: NSView {
         setContentHuggingPriority(.defaultLow, for: .horizontal)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Nouvel onglet")!, target: self, action: #selector(addTab))
+        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: L("Nouvel onglet"))!, target: self, action: #selector(addTab))
         add.isBordered = false
         add.contentTintColor = .secondaryLabelColor
-        add.toolTip = "Nouvel onglet (⌘T)"
+        add.toolTip = L("Nouvel onglet (⌘T)")
         add.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(stack)
@@ -254,8 +254,8 @@ private final class TabItemView: NSView {
 
     init(title: String) {
         label = NSTextField(labelWithString: title)
-        closeButton = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Fermer l’onglet")!, target: nil, action: nil)
-        closeButton.toolTip = "Fermer l’onglet (⌘W)"
+        closeButton = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: L("Fermer l’onglet"))!, target: nil, action: nil)
+        closeButton.toolTip = L("Fermer l’onglet (⌘W)")
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 6
@@ -305,7 +305,7 @@ private final class TabItemView: NSView {
     /// Clic droit : couleur de l'onglet.
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
-        let none = NSMenuItem(title: "Aucune couleur", action: #selector(pickColor(_:)), keyEquivalent: "")
+        let none = NSMenuItem(title: L("Aucune couleur"), action: #selector(pickColor(_:)), keyEquivalent: "")
         none.target = self
         none.tag = -1
         none.state = tabColor == nil ? .on : .off
@@ -321,7 +321,7 @@ private final class TabItemView: NSView {
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        let close = NSMenuItem(title: "Fermer l’onglet", action: #selector(closeTab), keyEquivalent: "")
+        let close = NSMenuItem(title: L("Fermer l’onglet"), action: #selector(closeTab), keyEquivalent: "")
         close.target = self
         close.image = NSImage(systemSymbolName: "xmark.square", accessibilityDescription: nil)
         menu.addItem(close)

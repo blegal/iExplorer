@@ -81,26 +81,26 @@ enum AskPass {
         let alert = NSAlert()
         alert.icon = NSImage(systemSymbolName: isConfirmation ? "lock.shield" : "key.fill", accessibilityDescription: nil)
         if isConfirmation {
-            alert.messageText = "Première connexion à ce serveur"
-            alert.informativeText = prompt + "\n\nVérifiez l’empreinte auprès de l’administrateur du serveur avant d’accepter."
-            alert.addButton(withTitle: "Faire confiance et se connecter")
-            alert.addButton(withTitle: "Annuler")
+            alert.messageText = L("Première connexion à ce serveur")
+            alert.informativeText = prompt + "\n\n" + L("Vérifiez l’empreinte auprès de l’administrateur du serveur avant d’accepter.")
+            alert.addButton(withTitle: L("Faire confiance et se connecter"))
+            alert.addButton(withTitle: L("Annuler"))
             alert.window.level = .floating
             let accepted = alert.runModal() == .alertFirstButtonReturn
             print(accepted ? "yes" : "no")
             exit(accepted ? 0 : 1)
         }
 
-        alert.messageText = account.map { "Connexion à \($0)" } ?? "Connexion SFTP"
+        alert.messageText = account.map { L("Connexion à \($0)") } ?? L("Connexion SFTP")
         alert.informativeText = prompt
         let field: NSTextField = isSecret ? NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
                                           : NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         alert.accessoryView = field
-        alert.addButton(withTitle: "Se connecter")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Se connecter"))
+        alert.addButton(withTitle: L("Annuler"))
         if isSecret, account != nil {
             alert.showsSuppressionButton = true
-            alert.suppressionButton?.title = "Enregistrer dans le trousseau"
+            alert.suppressionButton?.title = L("Enregistrer dans le trousseau")
         }
         alert.window.initialFirstResponder = field
         alert.window.level = .floating

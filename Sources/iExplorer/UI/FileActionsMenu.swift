@@ -17,7 +17,7 @@ extension PanelViewController {
             matched.append(rule)
         }
         for file in untrusted {
-            let item = NSMenuItem(title: "Actions du projet « \(file.deletingPathExtension().lastPathComponent) » à approuver…",
+            let item = NSMenuItem(title: L("Actions du projet « \(file.deletingPathExtension().lastPathComponent) » à approuver…"),
                                   action: #selector(approveProjectActions(_:)), keyEquivalent: "")
             item.target = self
             item.image = NSImage(systemSymbolName: "exclamationmark.shield", accessibilityDescription: nil)
@@ -25,7 +25,7 @@ extension PanelViewController {
             items.append(item)
         }
         if let rule = matched.first {
-            let edit = NSMenuItem(title: matched.count == 1 ? "Personnaliser les actions « \(rule.name) »…" : "Personnaliser les actions…",
+            let edit = NSMenuItem(title: matched.count == 1 ? L("Personnaliser les actions « \(DefaultFileActions.displayText(rule.name)) »…") : L("Personnaliser les actions…"),
                                   action: #selector(AppDelegate.manageFileActions(_:)), keyEquivalent: "")
             edit.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)
             edit.representedObject = rule.url
@@ -40,13 +40,13 @@ extension PanelViewController {
         let context = invocation.context
         let other = host?.targetPanels(for: self).first?.currentURL
         let variables = context.variables(item: invocation.item, other: other?.isFileURL == true ? other : nil)
-        let title = expandFileActionVariables(entry.title, variables)
+        let title = expandFileActionVariables(DefaultFileActions.displayText(entry.title), variables)
         if let message = entry.confirm {
             let alert = NSAlert()
-            alert.messageText = "\(title) ?"
-            alert.informativeText = message.isEmpty ? entry.run : message
-            alert.addButton(withTitle: "Exécuter")
-            alert.addButton(withTitle: "Annuler")
+            alert.messageText = L("\(title) ?")
+            alert.informativeText = message.isEmpty ? entry.run : DefaultFileActions.displayText(message)
+            alert.addButton(withTitle: L("Exécuter"))
+            alert.addButton(withTitle: L("Annuler"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
         switch entry.mode {
@@ -82,7 +82,7 @@ extension PanelViewController {
         if entry.mode == .open {
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
-            do { try process.run() } catch { presentMessage("« \(title) » n’a pas pu être lancé.\n\n\(error.localizedDescription)", warning: true) }
+            do { try process.run() } catch { presentMessage(L("« \(title) » n’a pas pu être lancé.\n\n\(error.localizedDescription)"), warning: true) }
             return
         }
         let output = Pipe()
@@ -106,7 +106,7 @@ extension PanelViewController {
                 guard let self, !job.isCancelled else { return }
                 let trimmed = String(text.trimmingCharacters(in: .whitespacesAndNewlines).suffix(2000))
                 guard process.terminationReason == .exit, process.terminationStatus == 0 else {
-                    presentMessage("« \(title) » a échoué (code \(process.terminationStatus)).\n\n" + (trimmed.isEmpty ? entry.run : trimmed), warning: true)
+                    presentMessage(L("« \(title) » a échoué (code \(process.terminationStatus)).") + "\n\n" + (trimmed.isEmpty ? entry.run : trimmed), warning: true)
                     reload()
                     return
                 }
@@ -123,7 +123,7 @@ extension PanelViewController {
         switch parts.first {
         case "output":
             reload()
-            presentMessage("« \(title) » terminé.\n\n" + (output.isEmpty ? "Aucune sortie." : output))
+            presentMessage(L("« \(title) » terminé.") + "\n\n" + (output.isEmpty ? L("Aucune sortie.") : output))
         case "open" where !argument.isEmpty:
             reload()
             NSWorkspace.shared.open(target)
@@ -144,8 +144,8 @@ extension PanelViewController {
         let text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Autoriser les actions de « \(file.lastPathComponent) » ?"
-        alert.informativeText = "Ce fichier vient du projet \(file.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().path) et peut exécuter n’importe quelle commande. Vérifiez son contenu ; il faudra l’approuver de nouveau s’il change."
+        alert.messageText = L("Autoriser les actions de « \(file.lastPathComponent) » ?")
+        alert.informativeText = L("Ce fichier vient du projet \(file.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().path) et peut exécuter n’importe quelle commande. Vérifiez son contenu ; il faudra l’approuver de nouveau s’il change.")
         let scroll = NSTextView.scrollableTextView()
         scroll.frame = NSRect(x: 0, y: 0, width: 520, height: 260)
         if let textView = scroll.documentView as? NSTextView {
@@ -154,8 +154,8 @@ extension PanelViewController {
             textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         }
         alert.accessoryView = scroll
-        alert.addButton(withTitle: "Autoriser")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Autoriser"))
+        alert.addButton(withTitle: L("Annuler"))
         if alert.runModal() == .alertFirstButtonReturn { FileActionStore.shared.trust(file) }
     }
 }

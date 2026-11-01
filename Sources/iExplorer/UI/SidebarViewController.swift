@@ -132,13 +132,13 @@ final class SidebarViewController: NSViewController {
         let home = fm.homeDirectoryForCurrentUser
         let entries: [(String, String, NSColor, URL?)] = [
             (home.lastPathComponent, "house", .systemOrange, home),
-            ("Bureau", "menubar.dock.rectangle", .systemBlue, dir(.desktopDirectory)),
-            ("Documents", "doc.text", .systemBlue, dir(.documentDirectory)),
-            ("Téléchargements", "arrow.down.circle", .systemGreen, dir(.downloadsDirectory)),
-            ("Applications", "square.grid.2x2", .systemPurple, URL(fileURLWithPath: "/Applications")),
-            ("Images", "photo", .systemPink, dir(.picturesDirectory)),
-            ("Musique", "music.note", .systemRed, dir(.musicDirectory)),
-            ("Vidéos", "film", .systemIndigo, dir(.moviesDirectory)),
+            (L("Bureau"), "menubar.dock.rectangle", .systemBlue, dir(.desktopDirectory)),
+            (L("Documents"), "doc.text", .systemBlue, dir(.documentDirectory)),
+            (L("Téléchargements"), "arrow.down.circle", .systemGreen, dir(.downloadsDirectory)),
+            (L("Applications"), "square.grid.2x2", .systemPurple, URL(fileURLWithPath: "/Applications")),
+            (L("Images"), "photo", .systemPink, dir(.picturesDirectory)),
+            (L("Musique"), "music.note", .systemRed, dir(.musicDirectory)),
+            (AppLanguage.current == "fr" ? "Vidéos" : "Movies", "film", .systemIndigo, dir(.moviesDirectory)),
         ]
         var styles: [String: (title: String, symbol: String, tint: NSColor)] = [:]
         for (title, symbol, tint, url) in entries {
@@ -162,7 +162,7 @@ final class SidebarViewController: NSViewController {
         guard !isRebuilding else { return }
         let fm = FileManager.default
 
-        let favorites = SidebarItem(kind: .section, title: "Favoris")
+        let favorites = SidebarItem(kind: .section, title: L("Favoris"))
         favoritesSection = favorites
         // Favoris modifiables : initialisés une fois depuis le Finder (ou la liste par défaut), puis gérés ici.
         let urls = Preferences.sidebarFavorites ?? {
@@ -188,12 +188,12 @@ final class SidebarViewController: NSViewController {
         }
         if case .accessDenied? = FinderFavorites.lastFailure, Preferences.sidebarFavorites?.isEmpty ?? true {
             // Les favoris du Finder sont protégés : on propose d'ouvrir le bon réglage.
-            let hint = SidebarItem(kind: .finderAccess, title: "Afficher les favoris du Finder…", symbol: "lock.open", tint: .secondaryLabelColor)
+            let hint = SidebarItem(kind: .finderAccess, title: L("Afficher les favoris du Finder…"), symbol: "lock.open", tint: .secondaryLabelColor)
             favorites.children.append(hint)
         }
 
-        let devices = SidebarItem(kind: .section, title: "Appareils")
-        let network = SidebarItem(kind: .section, title: "Réseau")
+        let devices = SidebarItem(kind: .section, title: L("Appareils"))
+        let network = SidebarItem(kind: .section, title: L("Réseau"))
         let keys: [URLResourceKey] = [.volumeLocalizedNameKey, .volumeIsLocalKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey]
         for url in fm.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? [] {
             let values = try? url.resourceValues(forKeys: Set(keys))
@@ -227,20 +227,20 @@ final class SidebarViewController: NSViewController {
             item.isEjectable = true
             network.children.append(item)
         }
-        network.children.append(SidebarItem(kind: .connect, title: "Se connecter au serveur…", symbol: "plus.circle", tint: .secondaryLabelColor))
+        network.children.append(SidebarItem(kind: .connect, title: L("Se connecter au serveur…"), symbol: "plus.circle", tint: .secondaryLabelColor))
 
-        let tags = SidebarItem(kind: .section, title: "Tags")
+        let tags = SidebarItem(kind: .section, title: L("Tags"))
         tags.children = FinderTags.standard.map { standard in
             SidebarItem(kind: .tag, title: standard.name, symbol: "circle.fill", tint: standard.color)
         }
-        let recents = SidebarItem(kind: .section, title: "Récents")
+        let recents = SidebarItem(kind: .section, title: L("Récents"))
         recentsSection = recents
         recents.children = Self.recentItems()
         sections = [favorites, recents, devices, network, tags]
         isRestoringExpansion = true
         outlineView.reloadData()
         let collapsed = Preferences.collapsedSidebarSections
-        sections.filter { !collapsed.contains($0.title) }.forEach { outlineView.expandItem($0) }
+        sections.filter { !collapsed.contains(AppLanguage.sourceText($0.title)) }.forEach { outlineView.expandItem($0) }
         isRestoringExpansion = false
     }
 
@@ -326,10 +326,10 @@ final class SidebarViewController: NSViewController {
 
     @objc private func resetFavorites(_ sender: NSMenuItem) {
         let alert = NSAlert()
-        alert.messageText = "Rétablir les favoris par défaut ?"
-        alert.informativeText = "Vos ajouts, votre ordre et vos noms personnalisés seront remplacés par les favoris du Finder (ou les dossiers standard)."
-        alert.addButton(withTitle: "Rétablir")
-        alert.addButton(withTitle: "Annuler")
+        alert.messageText = L("Rétablir les favoris par défaut ?")
+        alert.informativeText = L("Vos ajouts, votre ordre et vos noms personnalisés seront remplacés par les favoris du Finder (ou les dossiers standard).")
+        alert.addButton(withTitle: L("Rétablir"))
+        alert.addButton(withTitle: L("Annuler"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Preferences.favoriteNames = [:]
         Preferences.sidebarFavorites = Self.defaultFavorites()
@@ -341,8 +341,8 @@ final class SidebarViewController: NSViewController {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.prompt = "Ajouter aux favoris"
-        panel.message = "Choisissez les dossiers à ajouter à la barre latérale."
+        panel.prompt = L("Ajouter aux favoris")
+        panel.message = L("Choisissez les dossiers à ajouter à la barre latérale.")
         guard let window = view.window else { return }
         panel.beginSheetModal(for: window) { response in
             if response == .OK { Preferences.addFavorites(panel.urls) }
@@ -360,13 +360,13 @@ final class SidebarViewController: NSViewController {
         let path = url.standardizedFileURL.path
         let current = favoritesSection?.children.first { $0.url?.isSameLocation(as: url) == true }?.title ?? url.lastPathComponent
         let alert = NSAlert()
-        alert.messageText = "Renommer le favori"
-        alert.informativeText = "Le dossier lui-même n’est pas renommé. Laissez vide pour reprendre son nom."
+        alert.messageText = L("Renommer le favori")
+        alert.informativeText = L("Le dossier lui-même n’est pas renommé. Laissez vide pour reprendre son nom.")
         let field = NSTextField(string: current)
         field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
         alert.accessoryView = field
-        alert.addButton(withTitle: "Renommer")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Renommer"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let name = field.stringValue.trimmingCharacters(in: .whitespaces)
@@ -398,10 +398,10 @@ final class SidebarViewController: NSViewController {
     @objc private func deleteConnection(_ sender: NSMenuItem) {
         guard let connection = (sender.representedObject as? ConnectionBox)?.connection else { return }
         let alert = NSAlert()
-        alert.messageText = "Supprimer la connexion « \(connection.displayName) » ?"
-        alert.informativeText = "Le mot de passe enregistré dans le trousseau sera aussi supprimé."
-        alert.addButton(withTitle: "Supprimer").hasDestructiveAction = true
-        alert.addButton(withTitle: "Annuler")
+        alert.messageText = L("Supprimer la connexion « \(connection.displayName) » ?")
+        alert.informativeText = L("Le mot de passe enregistré dans le trousseau sera aussi supprimé.")
+        alert.addButton(withTitle: L("Supprimer")).hasDestructiveAction = true
+        alert.addButton(withTitle: L("Annuler"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Keychain.delete(connection.keychainAccount)
         SavedConnections.remove(connection)
@@ -437,7 +437,9 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
     private func rememberExpansion(_ notification: Notification, collapsed: Bool) {
         guard !isRestoringExpansion, let section = notification.userInfo?["NSObject"] as? SidebarItem, section.kind == .section else { return }
         var sections = Preferences.collapsedSidebarSections
-        if collapsed { sections.insert(section.title) } else { sections.remove(section.title) }
+        // Titre français, quelle que soit la langue de l'interface.
+        let name = AppLanguage.sourceText(section.title)
+        if collapsed { sections.insert(name) } else { sections.remove(name) }
         Preferences.collapsedSidebarSections = sections
     }
 
@@ -473,12 +475,12 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
             ])
             if item === favoritesSection {
                 // « + » : ajouter des dossiers (on peut aussi les glisser dans la section).
-                let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Ajouter des favoris")!,
+                let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: L("Ajouter des favoris"))!,
                                    target: self, action: #selector(addFavoriteFolders(_:)))
                 add.isBordered = false
                 add.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
                 add.contentTintColor = Theme.secondaryText
-                add.toolTip = "Ajouter des dossiers aux favoris — ou glissez-les ici ; clic droit pour renommer, réordonner, retirer"
+                add.toolTip = L("Ajouter des dossiers aux favoris — ou glissez-les ici ; clic droit pour renommer, réordonner, retirer")
                 add.translatesAutoresizingMaskIntoConstraints = false
                 cell.addSubview(add)
                 NSLayoutConstraint.activate([
@@ -548,16 +550,16 @@ extension SidebarViewController: NSMenuDelegate {
         menu.removeAllItems()
         guard let item = outlineView.item(atRow: outlineView.clickedRow) as? SidebarItem else { return }
         if let url = item.url, url.isFileURL {
-            let open = NSMenuItem(title: "Afficher dans le Finder", action: #selector(revealItem(_:)), keyEquivalent: "")
+            let open = NSMenuItem(title: L("Afficher dans le Finder"), action: #selector(revealItem(_:)), keyEquivalent: "")
             open.target = self
             open.representedObject = url
             open.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
             menu.addItem(open)
         }
         if item === favoritesSection {
-            for (title, action, symbol) in [("Ajouter des dossiers…", #selector(addFavoriteFolders(_:)), "plus"),
-                                            ("Importer les favoris du Finder", #selector(importFinderFavorites(_:)), "square.and.arrow.down"),
-                                            ("Rétablir les favoris par défaut…", #selector(resetFavorites(_:)), "arrow.counterclockwise")] {
+            for (title, action, symbol) in [(L("Ajouter des dossiers…"), #selector(addFavoriteFolders(_:)), "plus"),
+                                            (L("Importer les favoris du Finder"), #selector(importFinderFavorites(_:)), "square.and.arrow.down"),
+                                            (L("Rétablir les favoris par défaut…"), #selector(resetFavorites(_:)), "arrow.counterclockwise")] {
                 let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
                 entry.target = self
                 entry.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
@@ -565,15 +567,15 @@ extension SidebarViewController: NSMenuDelegate {
             }
         }
         if item === recentsSection {
-            let clear = NSMenuItem(title: "Effacer l’historique", action: #selector(AppDelegate.clearRecentFolders(_:)), keyEquivalent: "")
+            let clear = NSMenuItem(title: L("Effacer l’historique"), action: #selector(AppDelegate.clearRecentFolders(_:)), keyEquivalent: "")
             clear.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
             menu.addItem(clear)
         }
         if item.isRecent, let url = item.url {
             menu.addItem(.separator())
             let isFavorite = (Preferences.sidebarFavorites ?? []).contains { $0.isSameLocation(as: url) }
-            for (title, action, symbol) in [("Ajouter aux favoris", isFavorite ? nil : #selector(addRecentToFavorites(_:)), "star"),
-                                            ("Retirer de l’historique", #selector(removeRecent(_:)), "minus.circle")] {
+            for (title, action, symbol) in [(L("Ajouter aux favoris"), isFavorite ? nil : #selector(addRecentToFavorites(_:)), "star"),
+                                            (L("Retirer de l’historique"), #selector(removeRecent(_:)), "minus.circle")] {
                 let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
                 entry.target = self
                 entry.representedObject = url
@@ -582,13 +584,13 @@ extension SidebarViewController: NSMenuDelegate {
             }
         }
         if item.kind == .volume, item.sftpEndpoint == nil, let url = item.url {
-            let analyze = NSMenuItem(title: "Analyser l’espace disque", action: #selector(analyzeVolume(_:)), keyEquivalent: "")
+            let analyze = NSMenuItem(title: L("Analyser l’espace disque"), action: #selector(analyzeVolume(_:)), keyEquivalent: "")
             analyze.target = self
             analyze.representedObject = url
             analyze.image = NSImage(systemSymbolName: "chart.pie", accessibilityDescription: nil)
             menu.addItem(analyze)
             if item.isEjectable {
-                let eject = NSMenuItem(title: "Éjecter « \(item.title) »", action: #selector(ejectVolume(_:)), keyEquivalent: "")
+                let eject = NSMenuItem(title: L("Éjecter « \(item.title) »"), action: #selector(ejectVolume(_:)), keyEquivalent: "")
                 eject.target = self
                 eject.representedObject = url
                 eject.image = NSImage(systemSymbolName: "eject", accessibilityDescription: nil)
@@ -599,10 +601,10 @@ extension SidebarViewController: NSMenuDelegate {
             let favorites = favoritesSection?.children ?? []
             let index = favorites.firstIndex { $0 === item } ?? 0
             menu.addItem(.separator())
-            for (title, action, symbol, enabled) in [("Renommer…", #selector(renameFavorite(_:)), "pencil", true),
-                                                     ("Monter", #selector(moveFavoriteUp(_:)), "arrow.up", index > 0),
-                                                     ("Descendre", #selector(moveFavoriteDown(_:)), "arrow.down", index < favorites.count - 1),
-                                                     ("Retirer de la barre latérale", #selector(removeFavorite(_:)), "star.slash", true)] {
+            for (title, action, symbol, enabled) in [(L("Renommer…"), #selector(renameFavorite(_:)), "pencil", true),
+                                                     (L("Monter"), #selector(moveFavoriteUp(_:)), "arrow.up", index > 0),
+                                                     (L("Descendre"), #selector(moveFavoriteDown(_:)), "arrow.down", index < favorites.count - 1),
+                                                     (L("Retirer de la barre latérale"), #selector(removeFavorite(_:)), "star.slash", true)] {
                 let entry = NSMenuItem(title: title, action: enabled ? action : nil, keyEquivalent: "")
                 entry.target = self
                 entry.representedObject = url
@@ -611,8 +613,8 @@ extension SidebarViewController: NSMenuDelegate {
             }
         }
         if let connection = item.connection {
-            for (title, action, symbol) in [("Se connecter", #selector(connectSaved(_:)), "link"), ("Modifier…", #selector(editConnection(_:)), "pencil"),
-                                            ("Supprimer…", #selector(deleteConnection(_:)), "trash")] {
+            for (title, action, symbol) in [(L("Se connecter"), #selector(connectSaved(_:)), "link"), (L("Modifier…"), #selector(editConnection(_:)), "pencil"),
+                                            (L("Supprimer…"), #selector(deleteConnection(_:)), "trash")] {
                 let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
                 entry.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
                 entry.target = self
@@ -621,7 +623,7 @@ extension SidebarViewController: NSMenuDelegate {
             }
         }
         if let endpoint = item.sftpEndpoint {
-            let entry = NSMenuItem(title: "Se déconnecter", action: #selector(disconnect(_:)), keyEquivalent: "")
+            let entry = NSMenuItem(title: L("Se déconnecter"), action: #selector(disconnect(_:)), keyEquivalent: "")
             entry.image = NSImage(systemSymbolName: "eject", accessibilityDescription: nil)
             entry.target = self
             entry.representedObject = endpoint.key
@@ -665,11 +667,11 @@ private final class SidebarCell: NSTableCellView {
             trailing.addArrangedSubview(label)
         }
         if item.isEjectable {
-            let eject = NSButton(image: NSImage(systemSymbolName: "eject.fill", accessibilityDescription: "Éjecter")!, target: target, action: ejectAction)
+            let eject = NSButton(image: NSImage(systemSymbolName: "eject.fill", accessibilityDescription: L("Éjecter"))!, target: target, action: ejectAction)
             eject.isBordered = false
             eject.symbolConfiguration = .init(pointSize: 10, weight: .regular)
             eject.contentTintColor = .secondaryLabelColor
-            eject.toolTip = "Éjecter"
+            eject.toolTip = L("Éjecter")
             trailing.addArrangedSubview(eject)
         }
 
@@ -703,7 +705,7 @@ private final class SidebarCell: NSTableCellView {
                 gauge.heightAnchor.constraint(equalToConstant: 4),
             ])
             let used = Double(capacity.total - capacity.available) / Double(capacity.total)
-            toolTip = (toolTip.map { $0 + "\n" } ?? "") + "\(Format.size(capacity.available)) disponibles sur \(Format.size(capacity.total)) (\(Int((used * 100).rounded())) % utilisés)"
+            toolTip = (toolTip.map { $0 + "\n" } ?? "") + L("\(Format.size(capacity.available)) disponibles sur \(Format.size(capacity.total)) (\(Int((used * 100).rounded())) % utilisés)")
         }
     }
 

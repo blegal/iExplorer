@@ -32,21 +32,21 @@ extension PanelViewController {
     private func askPattern(select: Bool) {
         guard let window = view.window else { return }
         let alert = NSAlert()
-        alert.messageText = select ? "Sélectionner selon un motif" : "Désélectionner selon un motif"
-        alert.informativeText = "Exemples : *.pdf   ·   *.jpg; *.png   ·   rapport-202?-*   ·   *brouillon*\nPlusieurs motifs séparés par « ; ». Majuscules et minuscules confondues."
+        alert.messageText = select ? L("Sélectionner selon un motif") : L("Désélectionner selon un motif")
+        alert.informativeText = L("Exemples : *.pdf   ·   *.jpg; *.png   ·   rapport-202?-*   ·   *brouillon*\nPlusieurs motifs séparés par « ; ». Majuscules et minuscules confondues.")
         let combo = NSComboBox(frame: NSRect(x: 0, y: 26, width: 320, height: 26))
         combo.addItems(withObjectValues: Self.recentPatterns)
         let ext = selectedItems.first.map(\.url.pathExtension) ?? ""
         combo.stringValue = Self.recentPatterns.first ?? (ext.isEmpty ? "*" : "*.\(ext)")
-        let folders = NSButton(checkboxWithTitle: "Inclure les dossiers", target: nil, action: nil)
+        let folders = NSButton(checkboxWithTitle: L("Inclure les dossiers"), target: nil, action: nil)
         folders.frame = NSRect(x: 0, y: 0, width: 320, height: 20)
         folders.state = .off
         let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 54))
         accessory.addSubview(combo)
         accessory.addSubview(folders)
         alert.accessoryView = accessory
-        alert.addButton(withTitle: select ? "Sélectionner" : "Désélectionner")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: select ? L("Sélectionner") : L("Désélectionner"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = combo
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn else { return }

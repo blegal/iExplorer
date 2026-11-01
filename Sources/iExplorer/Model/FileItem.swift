@@ -51,7 +51,7 @@ final class FileItem: NSObject {
         isHidden = entry.name.hasPrefix(".")
         size = entry.isDirectory ? nil : entry.size
         modificationDate = entry.date
-        remoteKind = entry.isDirectory ? "Dossier" : entry.isSymlink ? "Lien symbolique" : nil
+        remoteKind = entry.isDirectory ? L("Dossier") : entry.isSymlink ? L("Lien symbolique") : nil
         super.init()
     }
 
@@ -89,6 +89,7 @@ final class FileItem: NSObject {
 extension Format {
     static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = AppLanguage.locale
         f.dateStyle = .short
         f.timeStyle = .short
         f.doesRelativeDateFormatting = true
@@ -97,6 +98,7 @@ extension Format {
 
     static let dateOnlyFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = AppLanguage.locale
         f.dateStyle = .short
         f.timeStyle = .none
         f.doesRelativeDateFormatting = true
@@ -105,6 +107,7 @@ extension Format {
 
     static let compactDateFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = AppLanguage.locale
         f.setLocalizedDateFormatFromTemplate("ddMMyy")
         return f
     }()
@@ -116,10 +119,10 @@ extension Format {
 
     /// Taille arrondie à l'unité du dessus, sans décimale : 737 octets → 1 ko, 6,2 ko → 7 ko.
     static func compactSize(_ bytes: Int64) -> String {
-        guard bytes > 0 else { return "0 ko" }
+        guard bytes > 0 else { return L("0 ko") }
         var value = Double(bytes) / 1000
         var unit = 0
-        let units = ["ko", "Mo", "Go", "To", "Po"]
+        let units = [L("ko"), L("Mo"), L("Go"), L("To"), L("Po")]
         while value.rounded(.up) >= 1000, unit < units.count - 1 {
             value /= 1000
             unit += 1
@@ -133,8 +136,11 @@ extension Format {
         return variants.first { ($0 as NSString).size(withAttributes: attributes).width <= width } ?? variants.last ?? ""
     }
 
+    /// Nombre d'éléments dans la langue de l'interface (Format.items de DiskUsageKit reste en français).
+    static func itemCount(_ count: Int) -> String { count <= 1 ? L("\(count) élément") : L("\(count) éléments") }
+
     static func freeSpace(at url: URL) -> String? {
-        availableCapacity(at: url).map { "\(size($0)) disponibles" }
+        availableCapacity(at: url).map { L("\(size($0)) disponibles") }
     }
 }
 
@@ -207,11 +213,11 @@ enum IconCache {
     }
 
     static func kind(forExtension ext: String, isDirectory: Bool, isPackage: Bool) -> String {
-        if isDirectory && !isPackage { return "Dossier" }
+        if isDirectory && !isPackage { return L("Dossier") }
         let key = ext.lowercased()
         return lock.withLock {
             if let cached = kinds[key] { return cached }
-            let description = UTType(filenameExtension: key)?.localizedDescription ?? (key.isEmpty ? "Document" : "Document \(key.uppercased())")
+            let description = UTType(filenameExtension: key)?.localizedDescription ?? (key.isEmpty ? L("Document") : L("Document \(key.uppercased())"))
             kinds[key] = description
             return description
         }

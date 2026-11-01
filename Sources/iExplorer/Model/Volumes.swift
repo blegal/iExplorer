@@ -52,7 +52,7 @@ enum Volumes {
                 DispatchQueue.main.async {
                     if process.terminationStatus != 0 {
                         let alert = NSAlert()
-                        alert.messageText = "Impossible de monter « \(image.lastPathComponent) »."
+                        alert.messageText = L("Impossible de monter « \(image.lastPathComponent) ».")
                         alert.informativeText = message.trimmingCharacters(in: .whitespacesAndNewlines)
                         alert.runModal()
                     }
@@ -65,8 +65,8 @@ enum Volumes {
     /// Choisit des images disque et les monte.
     static func chooseAndMount(completion: ((URL?) -> Void)? = nil) {
         let panel = NSOpenPanel()
-        panel.title = "Monter une image disque"
-        panel.prompt = "Monter"
+        panel.title = L("Monter une image disque")
+        panel.prompt = L("Monter le volume")
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowedContentTypes = imageExtensions.compactMap { .init(filenameExtension: $0) }

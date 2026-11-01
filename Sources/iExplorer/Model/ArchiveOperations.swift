@@ -94,12 +94,12 @@ enum ArchiveFormat: Int, CaseIterable {
 
     func levelDescription(_ level: CompressionLevel) -> String {
         switch self {
-        case .tarZst: "zstd niveau \(self.level(level))"
-        case .tarLz4: level == .light ? "LZ4 rapide" : "LZ4 HC niveau \(self.level(level))"
+        case .tarZst: L("zstd niveau \(self.level(level))")
+        case .tarLz4: level == .light ? L("LZ4 rapide") : L("LZ4 HC niveau \(self.level(level))")
         case .rar: "rar -m\(self.level(level))"
-        case .tarBz3: "blocs de \(self.level(level)) Mo"
-        case .tarBr: "Brotli qualité \(self.level(level))"
-        default: "niveau \(self.level(level))"
+        case .tarBz3: L("blocs de \(self.level(level)) Mo")
+        case .tarBr: L("Brotli qualité \(self.level(level))")
+        default: L("niveau \(self.level(level))")
         }
     }
 
@@ -121,9 +121,9 @@ enum CompressionLevel: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .light: "Légère"
-        case .normal: "Normale"
-        case .strong: "Forte"
+        case .light: L("Légère")
+        case .normal: L("Normale")
+        case .strong: L("Forte")
         }
     }
 }
@@ -166,8 +166,8 @@ extension FileOperationCenter {
         let names = request.urls.map(\.lastPathComponent)
         let format = request.format
         let target = uniqueURL(for: request.destination.appendingPathComponent("\(request.name).\(format.fileExtension)"), suffix: "")
-        let what = request.urls.count == 1 ? first.lastPathComponent : "\(request.urls.count) éléments"
-        let title = (request.password == nil ? "Compression" : "Compression chiffrée") + " de « \(what) »"
+        let what = request.urls.count == 1 ? first.lastPathComponent : L("\(request.urls.count) éléments")
+        let title = request.password == nil ? L("Compression de « \(what) »") : L("Compression chiffrée de « \(what) »")
         let level = format.level(request.level)
         format.lastLevel = request.level
         ArchiveFormat.lastUsed = format
@@ -180,7 +180,7 @@ extension FileOperationCenter {
             return
         }
         if let tool = format.requiredTool, !tool.isInstalled {
-            showError("Le format .\(format.fileExtension) demande \(tool.title) : installez-le dans Réglages › Outils externes.")
+            showError(L("Le format .\(format.fileExtension) demande \(tool.title) : installez-le dans Réglages › Outils externes."))
             return
         }
         // tar.gz : pigz compresse sur tous les cœurs quand il est installé.
@@ -200,7 +200,7 @@ extension FileOperationCenter {
             return
         }
         if format == .sevenZ, let password = request.password {
-            guard let tool = Self.sevenZip else { showError("Le 7z chiffré demande 7-Zip (brew install sevenzip)."); return }
+            guard let tool = Self.sevenZip else { showError(L("Le 7z chiffré demande 7-Zip (brew install sevenzip).")); return }
             var arguments = ["a", "-t7z", "-y", "-mx=\(level)", "-p" + password] + (request.hideNames ? ["-mhe=on"] : [])
             if request.excludeSystemFiles { arguments += systemFiles.map { "-xr!" + $0 } }
             runArchiveTool(tool.path, arguments + ["--", target.path] + names, title: title, output: target, currentDirectory: source,
@@ -240,12 +240,12 @@ extension FileOperationCenter {
                 self.removeJob(job)
                 guard failure == nil, !job.isCancelled else {
                     try? FileManager.default.removeItem(at: target)
-                    if let failure { self.showError("\(title) a échoué.\n\(failure)") }
+                    if let failure { self.showError(L("\(title) a échoué.\n\(failure)")) }
                     completion(nil)
                     return
                 }
-                undoManager?.registerUndo(withTarget: self) { $0.trash([target], undoManager: undoManager, actionName: "Archive") }
-                undoManager?.setActionName("Compression")
+                undoManager?.registerUndo(withTarget: self) { $0.trash([target], undoManager: undoManager, actionName: L("Archive")) }
+                undoManager?.setActionName(L("Compression"))
                 completion(target)
             }
         }
@@ -287,13 +287,13 @@ extension FileOperationCenter {
                 self.removeJob(job)
                 guard failure == nil, !job.isCancelled else {
                     try? FileManager.default.removeItem(at: target)
-                    if let failure { self.showError("\(title) a échoué.\n\(failure)") }
+                    if let failure { self.showError(L("\(title) a échoué.\n\(failure)")) }
                     completion(nil)
                     return
                 }
                 let result = isTar ? self.flattenSingleItem(target) : target
-                undoManager?.registerUndo(withTarget: self) { $0.trash([result], undoManager: undoManager, actionName: "Décompression") }
-                undoManager?.setActionName("Décompression")
+                undoManager?.registerUndo(withTarget: self) { $0.trash([result], undoManager: undoManager, actionName: L("Décompression")) }
+                undoManager?.setActionName(L("Décompression"))
                 completion(result)
             }
         }
@@ -304,7 +304,7 @@ extension FileOperationCenter {
     private func compressExternal(_ names: [String], in directory: URL, codec: ExternalCodec, level: Int, exclude: [String], target: URL,
                                   total: Int64, title: String, undoManager: UndoManager?, completion: @escaping (URL?) -> Void) {
         runPipelineJob(title: title, status: target.lastPathComponent, total: total, output: target, undoManager: undoManager,
-                       actionName: "Compression", completion: completion) { job in
+                       actionName: L("Compression"), completion: completion) { job in
             try codec.createTar(names, in: directory, to: target, level: level, exclude: exclude, job: job)
             return target
         }
@@ -323,7 +323,7 @@ extension FileOperationCenter {
         }
         let total = Int64((try? archive.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
         runPipelineJob(title: title, status: archive.lastPathComponent, total: total, output: target, undoManager: undoManager,
-                       actionName: "Décompression", completion: completion) { [weak self] job in
+                       actionName: L("Décompression"), completion: completion) { [weak self] job in
             if isTar {
                 try codec.extractTar(archive, into: target, job: job)
                 return self?.flattenSingleItem(target) ?? target
@@ -354,7 +354,7 @@ extension FileOperationCenter {
                 self.removeJob(job)
                 guard let result, failure == nil, !job.isCancelled else {
                     try? FileManager.default.removeItem(at: output)
-                    if let failure { self.showError("\(title) a échoué.\n\(failure)") }
+                    if let failure { self.showError(L("\(title) a échoué.\n\(failure)")) }
                     completion(nil)
                     return
                 }
@@ -385,12 +385,12 @@ extension FileOperationCenter {
     /// Demande le mot de passe d'une archive ; `nil` si l'utilisateur renonce.
     static func askPassword(for archive: URL, retry: Bool) -> String? {
         let alert = NSAlert()
-        alert.messageText = retry ? "Mot de passe incorrect" : "« \(archive.lastPathComponent) » est protégée par un mot de passe"
-        alert.informativeText = "Saisissez le mot de passe de l’archive."
+        alert.messageText = retry ? L("Mot de passe incorrect") : L("« \(archive.lastPathComponent) » est protégée par un mot de passe")
+        alert.informativeText = L("Saisissez le mot de passe de l’archive.")
         let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
         alert.accessoryView = field
-        alert.addButton(withTitle: "Décompresser")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Décompresser"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn, !field.stringValue.isEmpty else { return nil }
         return field.stringValue
@@ -409,7 +409,7 @@ extension FileOperationCenter {
             base = String(base.dropLast(suffix.count + 1))
             break
         }
-        let title = "Décompression de « \(archive.lastPathComponent) »"
+        let title = L("Décompression de « \(archive.lastPathComponent) »")
         if let codec = StreamCodec(archive: archive) {
             extractStreamed(archive, codec: codec, base: base, into: directory, title: title, undoManager: undoManager, completion: completion)
             return
@@ -464,8 +464,8 @@ extension FileOperationCenter {
         }, onFailure: fallback) { [weak self] folder in
             guard let self, let folder else { completion(nil); return }
             let result = flattenSingleItem(folder)
-            undoManager?.registerUndo(withTarget: self) { $0.trash([result], undoManager: undoManager, actionName: "Décompression") }
-            undoManager?.setActionName("Décompression")
+            undoManager?.registerUndo(withTarget: self) { $0.trash([result], undoManager: undoManager, actionName: L("Décompression")) }
+            undoManager?.setActionName(L("Décompression"))
             completion(result)
         }
     }
@@ -538,12 +538,13 @@ extension FileOperationCenter {
                         onFailure()
                         return
                     }
-                    if let failure { self.showError("\(title) a échoué.\n\(String(failure.suffix(600)))") }
+                    if let failure { self.showError(L("\(title) a échoué.\n\(String(failure.suffix(600)))")) }
                     completion(nil)
                     return
                 }
-                undoManager?.registerUndo(withTarget: self) { $0.trash([output], undoManager: undoManager, actionName: "Archive") }
-                undoManager?.setActionName(title.components(separatedBy: " ").first ?? "Archive")
+                undoManager?.registerUndo(withTarget: self) { $0.trash([output], undoManager: undoManager, actionName: L("Archive")) }
+                // Nom court du menu Annuler : « Compression » ou « Extraction », sans le nom du fichier.
+                undoManager?.setActionName(stdoutTo != nil ? L("Extraction") : L("Compression"))
                 completion(output)
             }
         }

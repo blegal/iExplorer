@@ -65,18 +65,18 @@ final class BatchRenameController: NSViewController, NSTableViewDataSource, NSTa
 
     private let findField = NSTextField()
     private let replaceField = NSTextField()
-    private let regexBox = NSButton(checkboxWithTitle: "Expression régulière", target: nil, action: nil)
-    private let caseBox = NSButton(checkboxWithTitle: "Ignorer la casse", target: nil, action: nil)
+    private let regexBox = NSButton(checkboxWithTitle: L("Expression régulière"), target: nil, action: nil)
+    private let caseBox = NSButton(checkboxWithTitle: L("Ignorer la casse"), target: nil, action: nil)
     private let casePopup = NSPopUpButton()
     private let prefixField = NSTextField()
     private let suffixField = NSTextField()
     private let startField = NSTextField()
     private let stepField = NSTextField()
     private let digitsField = NSTextField()
-    private let extensionBox = NSButton(checkboxWithTitle: "Inclure l’extension", target: nil, action: nil)
+    private let extensionBox = NSButton(checkboxWithTitle: L("Inclure l’extension"), target: nil, action: nil)
     private let table = NSTableView()
     private let summary = NSTextField(labelWithString: "")
-    private let applyButton = NSButton(title: "Renommer", target: nil, action: nil)
+    private let applyButton = NSButton(title: L("Renommer"), target: nil, action: nil)
 
     /// `siblings` : noms déjà présents dans le dossier (pour signaler les conflits).
     init(files: [FileItem], siblings: Set<String>) {
@@ -88,22 +88,22 @@ final class BatchRenameController: NSViewController, NSTableViewDataSource, NSTa
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        let title = NSTextField(labelWithString: "Renommer \(files.count) éléments")
+        let title = NSTextField(labelWithString: files.count > 1 ? L("Renommer \(files.count) éléments") : L("Renommer \(files.count) élément"))
         title.font = .systemFont(ofSize: 15, weight: .semibold)
 
         for field in [findField, replaceField, prefixField, suffixField, startField, stepField, digitsField] {
             field.delegate = self
         }
-        findField.placeholderString = "Texte à rechercher"
-        replaceField.placeholderString = "Remplacer par ($1 pour un groupe)"
-        prefixField.placeholderString = "ex. {date}_ ou Photo-{n}-"
-        suffixField.placeholderString = "ex. _v{n}"
+        findField.placeholderString = L("Texte à rechercher")
+        replaceField.placeholderString = L("Remplacer par ($1 pour un groupe)")
+        prefixField.placeholderString = L("ex. {date}_ ou Photo-{n}-")
+        suffixField.placeholderString = L("ex. _v{n}")
         startField.stringValue = "1"
         stepField.stringValue = "1"
         digitsField.stringValue = "2"
         for field in [startField, stepField, digitsField] { field.widthAnchor.constraint(equalToConstant: 50).isActive = true }
         for field in [findField, replaceField, prefixField, suffixField] { field.widthAnchor.constraint(greaterThanOrEqualToConstant: 260).isActive = true }
-        casePopup.addItems(withTitles: ["Casse inchangée", "minuscules", "MAJUSCULES", "Première Lettre En Majuscule"])
+        casePopup.addItems(withTitles: [L("Casse inchangée"), L("minuscules"), L("MAJUSCULES"), L("Première Lettre En Majuscule")])
         caseBox.state = .on
         for control in [regexBox, caseBox, extensionBox] as [NSButton] { control.target = self; control.action = #selector(changed) }
         casePopup.target = self
@@ -114,18 +114,18 @@ final class BatchRenameController: NSViewController, NSTableViewDataSource, NSTa
             field.textColor = .secondaryLabelColor
             return field
         }
-        let numbering = NSStackView(views: [label("Départ"), startField, label("Pas"), stepField, label("Chiffres"), digitsField])
+        let numbering = NSStackView(views: [label(L("Début")), startField, label(L("Pas")), stepField, label(L("Chiffres")), digitsField])
         numbering.spacing = 6
         let options = NSStackView(views: [regexBox, caseBox])
         options.spacing = 14
         let grid = NSGridView(views: [
-            [label("Rechercher"), findField],
-            [label("Remplacer par"), replaceField],
+            [label(L("Rechercher")), findField],
+            [label(L("Remplacer par")), replaceField],
             [NSGridCell.emptyContentView, options],
-            [label("Casse"), casePopup],
-            [label("Préfixe"), prefixField],
-            [label("Suffixe"), suffixField],
-            [label("Numéro {n}"), numbering],
+            [label(L("Casse")), casePopup],
+            [label(L("Préfixe")), prefixField],
+            [label(L("Suffixe")), suffixField],
+            [label(L("Numéro {n}")), numbering],
             [NSGridCell.emptyContentView, extensionBox],
         ])
         grid.rowSpacing = 8
@@ -133,7 +133,7 @@ final class BatchRenameController: NSViewController, NSTableViewDataSource, NSTa
         grid.column(at: 0).xPlacement = .trailing
         grid.rowAlignment = .firstBaseline
 
-        for (identifier, title) in [("old", "Nom actuel"), ("new", "Nouveau nom")] {
+        for (identifier, title) in [("old", L("Nom actuel")), ("new", L("Nouveau nom"))] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.title = title
             column.width = 260
@@ -152,7 +152,7 @@ final class BatchRenameController: NSViewController, NSTableViewDataSource, NSTa
 
         summary.textColor = .secondaryLabelColor
         summary.font = .systemFont(ofSize: 11)
-        let cancel = NSButton(title: "Annuler", target: self, action: #selector(cancel))
+        let cancel = NSButton(title: L("Annuler"), target: self, action: #selector(cancel))
         cancel.keyEquivalent = "\u{1b}"
         applyButton.target = self
         applyButton.action = #selector(apply)
@@ -203,7 +203,9 @@ final class BatchRenameController: NSViewController, NSTableViewDataSource, NSTa
         table.reloadData()
         let conflicts = preview.filter(\.conflict).count
         let changes = preview.filter { !$0.conflict && $0.name != $0.item.name }.count
-        summary.stringValue = conflicts > 0 ? "\(conflicts) conflit(s) à corriger" : "\(changes) élément(s) seront renommés"
+        summary.stringValue = conflicts > 0
+            ? (conflicts > 1 ? L("\(conflicts) conflits à corriger") : L("\(conflicts) conflit à corriger"))
+            : (changes > 1 ? L("\(changes) éléments seront renommés") : L("\(changes) élément sera renommé"))
         summary.textColor = conflicts > 0 ? .systemRed : .secondaryLabelColor
         applyButton.isEnabled = conflicts == 0 && changes > 0
     }
@@ -213,7 +215,7 @@ final class BatchRenameController: NSViewController, NSTableViewDataSource, NSTa
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let entry = preview[row]
         let isNew = tableColumn?.identifier.rawValue == "new"
-        let field = NSTextField(labelWithString: isNew ? (entry.name ?? "expression invalide") : entry.item.name)
+        let field = NSTextField(labelWithString: isNew ? (entry.name ?? L("expression invalide")) : entry.item.name)
         field.lineBreakMode = .byTruncatingMiddle
         if isNew {
             field.textColor = entry.conflict ? .systemRed : (entry.name == entry.item.name ? .secondaryLabelColor : .labelColor)
@@ -252,7 +254,7 @@ extension FileOperationCenter {
                 try fm.moveItem(at: url, to: temporary)
                 staged.append((url, temporary, url.deletingLastPathComponent().appendingPathComponent(name)))
             } catch {
-                showError("« \(url.lastPathComponent) » : \(error.localizedDescription)")
+                showError(L("« \(url.lastPathComponent) » : \(error.localizedDescription)"))
             }
         }
         var done: [(from: URL, to: URL)] = []
@@ -262,14 +264,14 @@ extension FileOperationCenter {
                 done.append((entry.original, entry.target))
             } catch {
                 try? fm.moveItem(at: entry.temporary, to: entry.original)
-                showError("« \(entry.original.lastPathComponent) » : \(error.localizedDescription)")
+                showError(L("« \(entry.original.lastPathComponent) » : \(error.localizedDescription)"))
             }
         }
         if !done.isEmpty, let undoManager {
             undoManager.registerUndo(withTarget: self) { center in
                 _ = center.batchRename(done.map { ($0.to, $0.from.lastPathComponent) }, undoManager: undoManager)
             }
-            undoManager.setActionName("Renommage par lot")
+            undoManager.setActionName(L("Renommage par lot"))
         }
         return done.map(\.to)
     }
@@ -293,7 +295,7 @@ extension FileOperationCenter {
                 }
             }
             DispatchQueue.main.async {
-                if !errors.isEmpty { self.showError("Certains éléments n’ont pas été renommés.\n" + errors.joined(separator: "\n")) }
+                if !errors.isEmpty { self.showError(L("Certains éléments n’ont pas été renommés.") + "\n" + errors.joined(separator: "\n")) }
                 completion(renamed)
             }
         }

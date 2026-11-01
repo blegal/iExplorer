@@ -88,20 +88,20 @@ enum IconTheme: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .system: "Système (macOS)"
-        case .material: "Matériau coloré"
-        case .catppuccin: "Catppuccin pastel"
-        case .seti: "Seti minimal"
-        case .thin: "Trait fin"
-        case .duotone: "Duotone"
-        case .fluent: "Fluent doux"
-        case .badges: "Badges d’extension"
-        case .nord: "Nord givré"
-        case .papirus: "Papirus plat"
-        case .dracula: "Néon Dracula"
-        case .candy: "Bonbons dégradés"
-        case .steel: "Acier doux"
-        case .sur: "Bleu Sur"
+        case .system: L("Système (macOS)")
+        case .material: L("Matériau coloré")
+        case .catppuccin: L("Catppuccin pastel")
+        case .seti: L("Seti minimal")
+        case .thin: L("Trait fin")
+        case .duotone: L("Duotone")
+        case .fluent: L("Fluent doux")
+        case .badges: L("Badges d’extension")
+        case .nord: L("Nord givré")
+        case .papirus: L("Papirus plat")
+        case .dracula: L("Néon Dracula")
+        case .candy: L("Bonbons dégradés")
+        case .steel: L("Acier doux")
+        case .sur: L("Bleu Sur")
         }
     }
 
@@ -141,7 +141,7 @@ enum IconThemeRenderer {
             if let label { drawBadgeLabel(label, in: rect, kind: kind) }
             return true
         }
-        image.accessibilityDescription = kind.isFolder ? "Dossier" : label
+        image.accessibilityDescription = kind.isFolder ? L("Dossier") : label
         return image
     }
 

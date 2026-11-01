@@ -27,7 +27,7 @@ final class InspectorViewController: NSViewController {
         subtitleLabel.font = .systemFont(ofSize: 12)
         subtitleLabel.textColor = Theme.secondaryText
 
-        generalHeader = sectionHeader("Général")
+        generalHeader = sectionHeader(L("Général"))
         permissionsHeader = sectionHeader("Permissions")
         for grid in [generalGrid, permissionsGrid] {
             grid.rowSpacing = 7
@@ -122,29 +122,29 @@ final class InspectorViewController: NSViewController {
         }
 
         if url.isRemote {
-            subtitleLabel.stringValue = item.isNavigableDirectory ? "Dossier" : [item.kind, item.size.map(Format.size)].compactMap { $0 }.joined(separator: " — ")
-            fillGeneral([("Chemin", url.path), ("Serveur", url.host ?? ""),
-                         ("Modifié", item.modificationDate.map { Format.dateFormatter.string(from: $0) } ?? "—")])
+            subtitleLabel.stringValue = item.isNavigableDirectory ? L("Dossier") : [item.kind, item.size.map(Format.size)].compactMap { $0 }.joined(separator: " — ")
+            fillGeneral([(L("Chemin"), url.path), (L("Serveur"), url.host ?? ""),
+                         (L("Modifié"), item.modificationDate.map { Format.dateFormatter.string(from: $0) } ?? "—")])
             showRemotePermissions(for: url)
             return
         }
         let values = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey, .addedToDirectoryDateKey,
                                                          .fileSizeKey, .localizedTypeDescriptionKey, .isHiddenKey])
-        let sizeText = item.size.map { "\(Format.size($0)) (\($0.formatted()) octets)" }
-        subtitleLabel.stringValue = [item.isNavigableDirectory ? "Dossier" : values?.localizedTypeDescription,
+        let sizeText = item.size.map { L("\(Format.size($0)) (\($0.formatted()) octets)") }
+        subtitleLabel.stringValue = [item.isNavigableDirectory ? L("Dossier") : values?.localizedTypeDescription,
                                      item.size.map(Format.size)].compactMap { $0 }.joined(separator: " — ")
         let ext = url.pathExtension
         var rows: [(String, String)] = [
-            ("Chemin", url.deletingLastPathComponent().path),
-            ("Taille", sizeText ?? "Calcul…"),
-            ("Modifié", date(values?.contentModificationDate)),
-            ("Créé", date(values?.creationDate)),
-            ("Ajouté", date(values?.addedToDirectoryDate)),
+            (L("Chemin"), url.deletingLastPathComponent().path),
+            (L("Taille"), sizeText ?? L("Calcul…")),
+            (L("Modifié"), date(values?.contentModificationDate)),
+            (L("Créé"), date(values?.creationDate)),
+            (L("Ajouté"), date(values?.addedToDirectoryDate)),
         ]
         if !ext.isEmpty, !item.isNavigableDirectory { rows.append(("Extension", ext)) }
-        rows.append(("Masqué", (values?.isHidden ?? false) ? "Oui" : "Non"))
+        rows.append((L("Masqué"), (values?.isHidden ?? false) ? L("Oui") : L("Non")))
         let tags = FinderTags.read(url)
-        if !tags.isEmpty { rows.append(("Tags", tags.map(\.name).joined(separator: ", "))) }
+        if !tags.isEmpty { rows.append((L("Tags"), tags.map(\.name).joined(separator: ", "))) }
         fillGeneral(rows)
         showPermissions(for: url)
         if item.isNavigableDirectory { computeFolderSize(url) }
@@ -156,11 +156,11 @@ final class InspectorViewController: NSViewController {
         let image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: nil)
         previewPane.showImage(image)
         preview.contentTintColor = .secondaryLabelColor
-        titleLabel.stringValue = "\(items.count) éléments"
+        titleLabel.stringValue = L("\(items.count) éléments")
         let bytes = items.compactMap(\.size).reduce(0, +)
         let folders = items.filter(\.isNavigableDirectory).count
-        subtitleLabel.stringValue = folders > 0 ? "\(folders) dossier(s), \(items.count - folders) fichier(s)" : Format.size(bytes)
-        fillGeneral([("Taille des fichiers", Format.size(bytes))])
+        subtitleLabel.stringValue = folders > 0 ? L("\(folders) dossier(s), \(items.count - folders) fichier(s)") : Format.size(bytes)
+        fillGeneral([(L("Taille des fichiers"), Format.size(bytes))])
         setPermissionsVisible(false)
     }
 
@@ -198,7 +198,7 @@ final class InspectorViewController: NSViewController {
             }
             DispatchQueue.main.async {
                 guard let self, current == self.generation else { return }
-                self.updateGeneral("Taille", "\(Format.size(total)) (\(Format.items(count)))")
+                self.updateGeneral(L("Taille"), "\(Format.size(total)) (\(Format.itemCount(count)))")
             }
         }
     }
@@ -311,7 +311,7 @@ final class InspectorViewController: NSViewController {
             return field
         }
         permissionsGrid.addRow(with: [NSGridCell.emptyContentView, label("R"), label("W"), label("X")])
-        for (title, shift) in [("Propriétaire", 6), ("Groupe", 3), ("Autres", 0)] {
+        for (title, shift) in [(L("Propriétaire"), 6), (L("Groupe"), 3), (AppLanguage.current == "fr" ? "Autres" : "Everyone", 0)] {
             var cells: [NSView] = [label(title)]
             for bit in [4, 2, 1] {
                 let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(togglePermission(_:)))
@@ -328,7 +328,7 @@ final class InspectorViewController: NSViewController {
         octal.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         octal.target = self
         octal.action = #selector(applyOctal(_:))
-        octal.toolTip = "Mode en octal (ex. 644, 755) — Retour pour appliquer"
+        octal.toolTip = L("Mode en octal (ex. 644, 755) — Retour pour appliquer")
         octal.widthAnchor.constraint(equalToConstant: 52).isActive = true
         let symbolicLabel = label(symbolic(info.mode), secondary: false)
         symbolicLabel.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
@@ -336,19 +336,19 @@ final class InspectorViewController: NSViewController {
 
         if url.isRemote {
             // sftp n'accepte que des identifiants numériques pour chown / chgrp.
-            permissionsGrid.addRow(with: [label("Propriétaire"), row(idField(info.ownerID, action: #selector(applyRemoteOwner(_:))), label(info.owner))])
-            permissionsGrid.addRow(with: [label("Groupe"), row(idField(info.groupID, action: #selector(applyRemoteGroup(_:))), label(info.group))])
+            permissionsGrid.addRow(with: [label(L("Propriétaire")), row(idField(info.ownerID, action: #selector(applyRemoteOwner(_:))), label(info.owner))])
+            permissionsGrid.addRow(with: [label(L("Groupe")), row(idField(info.groupID, action: #selector(applyRemoteGroup(_:))), label(info.group))])
         } else {
-            permissionsGrid.addRow(with: [label("Propriétaire"), popup(Self.localUsers(), selected: info.owner, action: #selector(changeOwner(_:)))])
-            permissionsGrid.addRow(with: [label("Groupe"), popup(Self.localGroups(), selected: info.group, action: #selector(changeGroup(_:)))])
+            permissionsGrid.addRow(with: [label(L("Propriétaire")), popup(Self.localUsers(), selected: info.owner, action: #selector(changeOwner(_:)))])
+            permissionsGrid.addRow(with: [label(L("Groupe")), popup(Self.localGroups(), selected: info.group, action: #selector(changeGroup(_:)))])
         }
         if let immutable = info.immutable {
             let locked = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleLocked(_:)))
             locked.state = immutable ? .on : .off
-            permissionsGrid.addRow(with: [label("Verrouillé"), locked])
+            permissionsGrid.addRow(with: [label(L("Verrouillé")), locked])
         }
         if info.isDirectory {
-            let button = NSButton(title: "Appliquer aux éléments inclus…", target: self, action: #selector(applyToEnclosed(_:)))
+            let button = NSButton(title: L("Appliquer aux éléments inclus…"), target: self, action: #selector(applyToEnclosed(_:)))
             button.controlSize = .small
             button.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
             permissionsGrid.addRow(with: [NSGridCell.emptyContentView, button])
@@ -376,7 +376,7 @@ final class InspectorViewController: NSViewController {
         field.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         field.target = self
         field.action = action
-        field.toolTip = "Identifiant numérique — Retour pour appliquer"
+        field.toolTip = L("Identifiant numérique — Retour pour appliquer")
         field.widthAnchor.constraint(equalToConstant: 60).isActive = true
         return field
     }
@@ -477,10 +477,10 @@ final class InspectorViewController: NSViewController {
     @objc private func applyToEnclosed(_ sender: NSButton) {
         guard let url = shownURL, let info = shownPermissions else { return }
         let alert = NSAlert()
-        alert.messageText = "Appliquer les permissions de « \(url.lastPathComponent) » à tous les éléments inclus ?"
-        alert.informativeText = "Mode \(symbolic(info.mode)) (\(String(info.mode & 0o777, radix: 8))), propriétaire \(info.owner), groupe \(info.group). Cette opération ne peut pas être annulée."
-        alert.addButton(withTitle: "Appliquer")
-        alert.addButton(withTitle: "Annuler")
+        alert.messageText = L("Appliquer les permissions de « \(url.lastPathComponent) » à tous les éléments inclus ?")
+        alert.informativeText = L("Mode \(symbolic(info.mode)) (\(String(info.mode & 0o777, radix: 8))), propriétaire \(info.owner), groupe \(info.group). Cette opération ne peut pas être annulée.")
+        alert.addButton(withTitle: L("Appliquer"))
+        alert.addButton(withTitle: L("Annuler"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let changes: [PermissionChange] = url.isRemote ? [.mode(info.mode), .owner(info.ownerID), .group(info.groupID)]
                                                        : [.mode(info.mode), .owner(info.owner), .group(info.group)]
@@ -505,10 +505,10 @@ final class InspectorViewController: NSViewController {
         if !failures.isEmpty {
             // Fichiers d'un autre compte : on propose de recommencer avec les droits d'administrateur.
             let alert = NSAlert()
-            alert.messageText = "Modification refusée pour \(failures.count == 1 ? "« \(failures[0].lastPathComponent) »" : "\(failures.count) éléments")."
-            alert.informativeText = "Vous pouvez réessayer avec les droits d'administrateur (macOS demandera votre mot de passe)."
-            alert.addButton(withTitle: "Réessayer en administrateur")
-            alert.addButton(withTitle: "Annuler")
+            alert.messageText = failures.count == 1 ? L("Modification refusée pour « \(failures[0].lastPathComponent) ».") : L("Modification refusée pour \(failures.count) éléments.")
+            alert.informativeText = L("Vous pouvez réessayer avec les droits d'administrateur (macOS demandera votre mot de passe).")
+            alert.addButton(withTitle: L("Réessayer en administrateur"))
+            alert.addButton(withTitle: L("Annuler"))
             if alert.runModal() == .alertFirstButtonReturn { Self.applyAsAdministrator(changes, to: url, recursive: recursive) }
         }
         showPermissions(for: url)
@@ -550,7 +550,7 @@ final class InspectorViewController: NSViewController {
         NSAppleScript(source: "do shell script \"\(shell)\" with administrator privileges")?.executeAndReturnError(&error)
         if let error, (error[NSAppleScript.errorNumber] as? Int) != -128 {
             let alert = NSAlert()
-            alert.messageText = "La modification a échoué."
+            alert.messageText = L("La modification a échoué.")
             alert.informativeText = error[NSAppleScript.errorMessage] as? String ?? ""
             alert.runModal()
         }

@@ -8,7 +8,7 @@ struct ServerConnection: Codable, Equatable {
         var title: String {
             switch self {
             case .sftp: "SFTP"
-            case .smb: "SMB (partage Windows / macOS)"
+            case .smb: L("SMB (partage Windows / macOS)")
             case .afp: "AFP"
             case .nfs: "NFS"
             case .webdav: "WebDAV"
@@ -133,7 +133,7 @@ enum ConnectionService {
         }
 
         guard let url = connection.url else {
-            completion(.failure(SFTPError.connection("Adresse du serveur incomplète.")))
+            completion(.failure(SFTPError.connection(L("Adresse du serveur incomplète."))))
             return
         }
         let secret = password.flatMap { $0.isEmpty ? nil : $0 } ?? Keychain.password(for: account)
@@ -162,7 +162,7 @@ final class ConnectionPanelController: NSViewController {
     private let passwordField = NSSecureTextField()
     private let pathField = NSTextField()
     private let keyField = NSTextField()
-    private let rememberBox = NSButton(checkboxWithTitle: "Mémoriser le mot de passe dans le trousseau", target: nil, action: nil)
+    private let rememberBox = NSButton(checkboxWithTitle: L("Mémoriser le mot de passe dans le trousseau"), target: nil, action: nil)
     private var colorButtons: [NSButton] = []
     private var keyRow: NSGridRow!
 
@@ -189,18 +189,18 @@ final class ConnectionPanelController: NSViewController {
         kindPopup.target = self
         kindPopup.action = #selector(fieldChanged(_:))
 
-        nameField.placeholderString = "Facultatif"
-        hostField.placeholderString = "serveur.exemple.fr ou 192.168.1.10"
+        nameField.placeholderString = L("Facultatif")
+        hostField.placeholderString = L("serveur.exemple.fr ou 192.168.1.10")
         userField.placeholderString = NSUserName()
-        passwordField.placeholderString = "Demandé à la connexion si vide"
-        pathField.placeholderString = "Dossier de départ (facultatif)"
-        keyField.placeholderString = "~/.ssh/id_ed25519 (facultatif, sinon agent ssh)"
+        passwordField.placeholderString = L("Demandé à la connexion si vide")
+        pathField.placeholderString = L("Dossier de départ (facultatif)")
+        keyField.placeholderString = L("~/.ssh/id_ed25519 (facultatif, sinon agent ssh)")
         for field in [nameField, hostField, portField, userField, passwordField, pathField, keyField] {
             field.delegate = self
             field.widthAnchor.constraint(greaterThanOrEqualToConstant: 300).isActive = true
         }
 
-        let chooseKey = NSButton(title: "Choisir…", target: self, action: #selector(chooseKey(_:)))
+        let chooseKey = NSButton(title: L("Choisir…"), target: self, action: #selector(chooseKey(_:)))
         chooseKey.controlSize = .small
         let keyStack = NSStackView(views: [keyField, chooseKey])
 
@@ -211,7 +211,7 @@ final class ConnectionPanelController: NSViewController {
             button.isBordered = false
             button.contentTintColor = color
             button.tag = index
-            button.toolTip = "Couleur de la connexion dans la barre latérale"
+            button.toolTip = L("Couleur de la connexion dans la barre latérale")
             button.symbolConfiguration = .init(pointSize: 15, weight: .regular)
             colorButtons.append(button)
             colors.addArrangedSubview(button)
@@ -223,16 +223,16 @@ final class ConnectionPanelController: NSViewController {
             return field
         }
         let grid = NSGridView(views: [
-            [label("Protocole"), kindPopup],
-            [label("Nom"), nameField],
-            [label("Serveur"), hostField],
-            [label("Port"), portField],
-            [label("Utilisateur"), userField],
-            [label("Mot de passe"), passwordField],
+            [label(L("Protocole")), kindPopup],
+            [label(L("Nom")), nameField],
+            [label(L("Serveur")), hostField],
+            [label(L("Port")), portField],
+            [label(L("Utilisateur")), userField],
+            [label(L("Mot de passe")), passwordField],
             [NSGridCell.emptyContentView, rememberBox],
-            [label("Chemin"), pathField],
-            [label("Clé privée"), keyStack],
-            [label("Couleur"), colors],
+            [label(L("Chemin")), pathField],
+            [label(L("Clé privée")), keyStack],
+            [label(L("Couleur")), colors],
         ])
         grid.rowSpacing = 10
         grid.columnSpacing = 12
@@ -240,10 +240,10 @@ final class ConnectionPanelController: NSViewController {
         grid.rowAlignment = .firstBaseline
         keyRow = grid.row(at: 8)
 
-        let favorite = NSButton(title: isEditing ? "Enregistrer" : "Ajouter aux favoris", target: self, action: #selector(saveOnly(_:)))
-        let cancel = NSButton(title: "Annuler", target: self, action: #selector(cancel(_:)))
+        let favorite = NSButton(title: isEditing ? L("Enregistrer") : L("Ajouter aux favoris"), target: self, action: #selector(saveOnly(_:)))
+        let cancel = NSButton(title: L("Annuler"), target: self, action: #selector(cancel(_:)))
         cancel.keyEquivalent = "\u{1b}"
-        let connect = NSButton(title: "Se connecter", target: self, action: #selector(connect(_:)))
+        let connect = NSButton(title: L("Se connecter"), target: self, action: #selector(connect(_:)))
         connect.keyEquivalent = "\r"
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)

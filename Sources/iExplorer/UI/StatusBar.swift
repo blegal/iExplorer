@@ -41,13 +41,13 @@ final class PanelStatusBar: NSView {
             button.toolTip = tip
             return button
         }
-        let smaller = button("minus.magnifyingglass", "Réduire (⌘−)", #selector(zoomOut))
-        let larger = button("plus.magnifyingglass", "Agrandir (⌘+)", #selector(zoomIn))
-        let reset = button("arrow.counterclockwise", "Taille par défaut (⌘0)", #selector(resetZoom))
+        let smaller = button("minus.magnifyingglass", L("Réduire (⌘−)"), #selector(zoomOut))
+        let larger = button("plus.magnifyingglass", L("Agrandir (⌘+)"), #selector(zoomIn))
+        let reset = button("arrow.counterclockwise", L("Taille par défaut (⌘0)"), #selector(resetZoom))
         slider.controlSize = .mini
         slider.target = self
         slider.action = #selector(sliderChanged)
-        slider.toolTip = "Zoom du panneau : taille des icônes ou des lignes (⌘ + molette, pincement)"
+        slider.toolTip = L("Zoom du panneau : taille des icônes ou des lignes (⌘ + molette, pincement)")
         slider.widthAnchor.constraint(equalToConstant: 90).isActive = true
         percent.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         percent.textColor = Theme.secondaryText
@@ -109,7 +109,7 @@ final class PanelStatusBar: NSView {
         slider.minValue = range.lowerBound
         slider.maxValue = range.upperBound
         slider.doubleValue = panel.zoomPercent
-        percent.stringValue = "\(Int(panel.zoomPercent.rounded())) %"
+        percent.stringValue = L("\(Int(panel.zoomPercent.rounded())) %")
         let enabled = panel.canZoom
         zoomControls.forEach { $0.isEnabled = enabled }
         percent.textColor = enabled ? Theme.secondaryText : .tertiaryLabelColor
@@ -140,14 +140,14 @@ extension PanelViewController {
 
     /// Texte de la barre d'état : le détail d'un élément sélectionné seul, sinon le résumé du panneau.
     var statusDescription: String {
-        if isShowingDiskUsage { return "Occupation du disque — \(BreadcrumbView.displayName(currentURL))" }
+        if isShowingDiskUsage { return L("Occupation du disque — \(BreadcrumbView.displayName(currentURL))") }
         let selection = selectedItems
         guard selection.count == 1, !infoText.hasPrefix("⚠︎") else { return infoText }
         let item = selection[0]
         var parts = [item.name, item.kind]
         if let size = item.effectiveSize { parts.append(Format.size(size)) }
-        if let date = item.modificationDate { parts.append("modifié le " + Format.dateFormatter.string(from: date)) }
-        if item.isSymlink { parts.append("alias") }
+        if let date = item.modificationDate { parts.append(L("modifié le \(Format.dateFormatter.string(from: date))")) }
+        if item.isSymlink { parts.append(L("alias")) }
         return parts.joined(separator: " — ")
     }
 
@@ -156,8 +156,8 @@ extension PanelViewController {
         let folders = selection.filter(\.isNavigableDirectory).count
         let files = selection.count - folders
         var counts: [String] = []
-        if folders > 0 { counts.append(folders == 1 ? "1 dossier" : "\(folders) dossiers") }
-        if files > 0 { counts.append(files == 1 ? "1 fichier" : "\(files) fichiers") }
+        if folders > 0 { counts.append(folders == 1 ? L("1 dossier") : L("\(folders) dossiers")) }
+        if files > 0 { counts.append(files == 1 ? L("1 fichier") : L("\(files) fichiers")) }
         return counts.joined(separator: ", ")
     }
 

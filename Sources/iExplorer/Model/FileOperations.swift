@@ -3,7 +3,7 @@ import AppKit
 enum TransferKind {
     case copy, move
 
-    var verb: String { self == .copy ? "copier" : "déplacer" }
+    var verb: String { self == .copy ? L("copier") : L("déplacer") }
 }
 
 /// Une opération de copie / déplacement en cours. Thread-safe.
@@ -96,7 +96,7 @@ final class FileOperationCenter {
         var valid: [URL] = []
         for source in sources.map({ $0.isRemote ? $0.standardized : $0.standardizedFileURL }) {
             if destination.isInside(source) {
-                showError("Impossible de \(kind.verb) « \(source.lastPathComponent) » dans lui-même.")
+                showError(L("Impossible de \(kind.verb) « \(source.lastPathComponent) » dans lui-même."))
                 continue
             }
             if kind == .move, source.deletingLastPathComponent().isSameLocation(as: destination) { continue }
@@ -104,10 +104,12 @@ final class FileOperationCenter {
         }
         guard !valid.isEmpty else { completion?([]); return }
 
-        let verb = kind == .copy ? "Copie" : "Déplacement"
+        let verb = kind == .copy ? L("Copie") : L("Déplacement")
         let title = valid.count == 1
-            ? "\(verb) de « \(valid[0].lastPathComponent) » vers « \(destination.lastPathComponent) »"
-            : "\(verb) de \(valid.count) éléments vers « \(destination.lastPathComponent) »"
+            ? (kind == .copy ? L("Copie de « \(valid[0].lastPathComponent) » vers « \(destination.lastPathComponent) »")
+                             : L("Déplacement de « \(valid[0].lastPathComponent) » vers « \(destination.lastPathComponent) »"))
+            : (kind == .copy ? L("Copie de \(valid.count) éléments vers « \(destination.lastPathComponent) »")
+                             : L("Déplacement de \(valid.count) éléments vers « \(destination.lastPathComponent) »"))
         let job = FileJob(title: title)
         addJob(job)
 
@@ -120,8 +122,8 @@ final class FileOperationCenter {
                 if !pairs.isEmpty, !isRemote, let undoManager {
                     undoManager.registerUndo(withTarget: self) { center in
                         switch kind {
-                        case .copy: center.trash(pairs.map(\.to), undoManager: undoManager, actionName: "Copie")
-                        case .move: center.move(pairs.map { ($0.to, $0.from) }, actionName: "Déplacement", undoManager: undoManager)
+                        case .copy: center.trash(pairs.map(\.to), undoManager: undoManager, actionName: L("Copie"))
+                        case .move: center.move(pairs.map { ($0.to, $0.from) }, actionName: L("Déplacement"), undoManager: undoManager)
                         }
                     }
                     undoManager.setActionName(verb)
@@ -198,7 +200,7 @@ final class FileOperationCenter {
     }
 
     private func runTransfer(_ kind: TransferKind, sources: [URL], destination: URL, job: FileJob) -> [(from: URL, to: URL)] {
-        job.setStatus("Préparation…")
+        job.setStatus(L("Préparation…"))
         let plans = sources.map { source -> (source: URL, needsCopy: Bool, size: Int64) in
             let needsCopy = kind == .copy || !Self.sameVolume(source, destination)
             return (source, needsCopy, needsCopy ? totalSize(of: source) : 0)
@@ -218,10 +220,10 @@ final class FileOperationCenter {
             defer { completed += plan.size; job.setDone(completed) }
 
             if source.isSameLocation(as: target) {
-                target = uniqueURL(for: target, suffix: " copie")
+                target = uniqueURL(for: target, suffix: L(" copie"))
             } else if itemExists(target) {
                 if source.isInside(target) {
-                    showErrorSync("« \(target.lastPathComponent) » ne peut pas être remplacé car il contient l’élément à \(kind.verb).")
+                    showErrorSync(L("« \(target.lastPathComponent) » ne peut pas être remplacé car il contient l’élément à \(kind.verb)."))
                     continue
                 }
                 let choice: ConflictChoice
@@ -251,7 +253,7 @@ final class FileOperationCenter {
                     do {
                         try copyItem(at: source, to: target, job: job, alreadyDone: completed)
                         if Preferences.verifyCopies {
-                            job.setStatus("Vérification de « \(source.lastPathComponent) »")
+                            job.setStatus(L("Vérification de « \(source.lastPathComponent) »"))
                             try Self.verifyCopy(source, target, job: job)
                         }
                     } catch {
@@ -290,7 +292,7 @@ final class FileOperationCenter {
             let path = context.failedPath ?? source.path
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [
                 NSFilePathErrorKey: path,
-                NSLocalizedDescriptionKey: "Impossible de copier « \((path as NSString).lastPathComponent) » : \(String(cString: strerror(code))).",
+                NSLocalizedDescriptionKey: L("Impossible de copier « \((path as NSString).lastPathComponent) » : \(String(cString: strerror(code)))."),
             ])
         }
     }
@@ -309,7 +311,7 @@ final class FileOperationCenter {
     // MARK: Corbeille, renommage, création
 
     /// Place les éléments dans la corbeille ; l'annulation les remet en place.
-    func trash(_ urls: [URL], undoManager: UndoManager?, actionName: String = "Placer dans la corbeille") {
+    func trash(_ urls: [URL], undoManager: UndoManager?, actionName: String = L("Placer dans la corbeille")) {
         var restored: [(from: URL, to: URL)] = []
         var failures: [URL] = []
         for url in urls {
@@ -332,11 +334,11 @@ final class FileOperationCenter {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = urls.count == 1
-            ? "« \(urls[0].lastPathComponent) » ne peut pas être placé dans la corbeille."
-            : "\(urls.count) éléments ne peuvent pas être placés dans la corbeille."
-        alert.informativeText = "Voulez-vous les supprimer immédiatement ? Cette action est irréversible."
-        alert.addButton(withTitle: "Annuler")
-        alert.addButton(withTitle: "Supprimer").hasDestructiveAction = true
+            ? L("« \(urls[0].lastPathComponent) » ne peut pas être placé dans la corbeille.")
+            : L("\(urls.count) éléments ne peuvent pas être placés dans la corbeille.")
+        alert.informativeText = L("Voulez-vous les supprimer immédiatement ? Cette action est irréversible.")
+        alert.addButton(withTitle: L("Annuler"))
+        alert.addButton(withTitle: L("Supprimer")).hasDestructiveAction = true
         guard alert.runModal() == .alertSecondButtonReturn else { return }
         for url in urls {
             do { try fm.removeItem(at: url) } catch { showError(error.localizedDescription) }
@@ -361,19 +363,19 @@ final class FileOperationCenter {
 
     func rename(_ url: URL, to newName: String, undoManager: UndoManager?) throws -> URL {
         if newName.isEmpty || newName == url.lastPathComponent { return url }
-        if newName.contains("/") { throw makeError("Le nom ne peut pas contenir « / ».") }
+        if newName.contains("/") { throw makeError(L("Le nom ne peut pas contenir « / ».")) }
         let target = url.deletingLastPathComponent().appendingPathComponent(newName)
         try moveFile(at: url, to: target)
-        undoManager?.registerUndo(withTarget: self) { $0.move([(target, url)], actionName: "Renommer", undoManager: undoManager) }
-        undoManager?.setActionName("Renommer")
+        undoManager?.registerUndo(withTarget: self) { $0.move([(target, url)], actionName: L("Renommer"), undoManager: undoManager) }
+        undoManager?.setActionName(L("Renommer"))
         return target
     }
 
     func createFolder(in directory: URL, undoManager: UndoManager?) throws -> URL {
-        let url = uniqueURL(for: directory.appendingPathComponent("nouveau dossier"), suffix: "")
+        let url = uniqueURL(for: directory.appendingPathComponent(L("nouveau dossier")), suffix: "")
         try fm.createDirectory(at: url, withIntermediateDirectories: false)
-        undoManager?.registerUndo(withTarget: self) { $0.trash([url], undoManager: undoManager, actionName: "Nouveau dossier") }
-        undoManager?.setActionName("Nouveau dossier")
+        undoManager?.registerUndo(withTarget: self) { $0.trash([url], undoManager: undoManager, actionName: L("Nouveau dossier")) }
+        undoManager?.setActionName(L("Nouveau dossier"))
         return url
     }
 
@@ -381,7 +383,7 @@ final class FileOperationCenter {
     private func moveFile(at source: URL, to target: URL) throws {
         if itemExists(target) {
             guard Self.isSameFile(source, target) else {
-                throw makeError("Un élément nommé « \(target.lastPathComponent) » existe déjà.")
+                throw makeError(L("Un élément nommé « \(target.lastPathComponent) » existe déjà."))
             }
             if Darwin.rename(source.path, target.path) != 0 {
                 throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
@@ -423,10 +425,10 @@ final class FileOperationCenter {
         var failures: [String] = []
         for source in sources where source.isFileURL {
             var target = destination.appendingPathComponent(source.lastPathComponent)
-            if itemExists(target) { target = uniqueURL(for: target, suffix: " (lien)") }
+            if itemExists(target) { target = uniqueURL(for: target, suffix: L(" (lien)")) }
             do {
                 if hard {
-                    guard !source.isExistingDirectory else { throw makeError("« \(source.lastPathComponent) » est un dossier : macOS n’accepte pas de lien physique vers un dossier.") }
+                    guard !source.isExistingDirectory else { throw makeError(L("« \(source.lastPathComponent) » est un dossier : macOS n’accepte pas de lien physique vers un dossier.")) }
                     try fm.linkItem(at: source, to: target)
                 } else {
                     try fm.createSymbolicLink(at: target, withDestinationURL: source.standardizedFileURL)
@@ -441,7 +443,7 @@ final class FileOperationCenter {
             undoManager.registerUndo(withTarget: self) { center in
                 for link in links { try? center.fm.removeItem(at: link) }
             }
-            undoManager.setActionName(hard ? "Créer un lien physique" : "Créer un lien symbolique")
+            undoManager.setActionName(hard ? L("Créer un lien physique") : L("Créer un lien symbolique"))
         }
         if !failures.isEmpty { showError(failures.joined(separator: "\n")) }
         return created
@@ -525,11 +527,11 @@ final class FileOperationCenter {
                 let header = NSTextField(labelWithString: title)
                 header.font = .systemFont(ofSize: 10, weight: .semibold)
                 header.textColor = .secondaryLabelColor
-                let info = NSTextField(labelWithString: "\(size)\nmodifié : \(date)")
+                let info = NSTextField(labelWithString: L("\(size)\nmodifié : \(date)"))
                 info.font = .systemFont(ofSize: 12)
                 var views: [NSView] = [header, info]
                 if let newer {
-                    let badge = NSTextField(labelWithString: newer ? "Plus récent" : "Plus ancien")
+                    let badge = NSTextField(labelWithString: newer ? L("Plus récent") : L("Plus ancien"))
                     badge.font = .systemFont(ofSize: 11, weight: .medium)
                     badge.textColor = newer ? .systemGreen : .secondaryLabelColor
                     views.append(badge)
@@ -542,23 +544,23 @@ final class FileOperationCenter {
             }
             let comparable = fromDate != nil && toDate != nil && fromDate != toDate
             let newer = comparable ? fromDate! > toDate! : nil
-            let compare = NSStackView(views: [describe(kind == .copy ? "À COPIER" : "À DÉPLACER", from, newer: newer),
-                                              describe("DÉJÀ PRÉSENT", to, newer: newer.map { !$0 })])
+            let compare = NSStackView(views: [describe(kind == .copy ? L("À COPIER") : L("À DÉPLACER"), from, newer: newer),
+                                              describe(L("DÉJÀ PRÉSENT"), to, newer: newer.map { !$0 })])
             compare.distribution = .fillEqually
             compare.spacing = 20
 
             let options: [(String, ConflictChoice)] = [
-                ("Remplacer (l’élément existant va à la corbeille)", .replace),
-                ("Garder les deux", .keepBoth),
-                ("Ignorer", .skip),
-                ("Garder le plus récent", .keepNewer),
-                ("Remplacer seulement si la taille diffère", .replaceIfDifferent),
+                (L("Remplacer (l’élément existant va à la corbeille)"), .replace),
+                (L("Garder les deux"), .keepBoth),
+                (L("Ignorer"), .skip),
+                (L("Garder le plus récent"), .keepNewer),
+                (L("Remplacer seulement si la taille diffère"), .replaceIfDifferent),
             ]
             let radios = options.map { NSButton(radioButtonWithTitle: $0.0, target: nil, action: nil) }
             radios[0].state = .on
             // Les boutons radio d'une même vue s'excluent ; on les relie à une action commune pour plus de sûreté.
             let group = RadioGroup(radios)
-            let all = NSButton(checkboxWithTitle: "Appliquer aux conflits suivants", target: nil, action: nil)
+            let all = NSButton(checkboxWithTitle: L("Appliquer aux conflits suivants"), target: nil, action: nil)
             all.isHidden = !hasMore
             let stack = NSStackView(views: [compare] + radios + [all])
             stack.orientation = .vertical
@@ -569,11 +571,11 @@ final class FileOperationCenter {
             stack.frame = NSRect(x: 0, y: 0, width: 380, height: stack.fittingSize.height)
 
             let alert = NSAlert()
-            alert.messageText = "« \(target.lastPathComponent) » existe déjà dans « \(folder.lastPathComponent) »"
-            alert.informativeText = "Comparez les deux éléments, puis choisissez quoi faire."
+            alert.messageText = L("« \(target.lastPathComponent) » existe déjà dans « \(folder.lastPathComponent) »")
+            alert.informativeText = L("Comparez les deux éléments, puis choisissez quoi faire.")
             alert.accessoryView = stack
-            alert.addButton(withTitle: "Continuer")
-            alert.addButton(withTitle: "Arrêter")
+            alert.addButton(withTitle: L("Continuer"))
+            alert.addButton(withTitle: L("Arrêter"))
             let response = alert.runModal()
             _ = group
             guard response == .alertFirstButtonReturn else { return (.stop, false) }
@@ -586,11 +588,11 @@ final class FileOperationCenter {
         DispatchQueue.main.sync {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Une erreur est survenue avec « \(item) »."
+            alert.messageText = L("Une erreur est survenue avec « \(item) ».")
             alert.informativeText = error.localizedDescription
             if hasMore {
-                alert.addButton(withTitle: "Continuer")
-                alert.addButton(withTitle: "Arrêter")
+                alert.addButton(withTitle: L("Continuer"))
+                alert.addButton(withTitle: L("Arrêter"))
             }
             return alert.runModal() == .alertFirstButtonReturn && hasMore
         }
@@ -674,7 +676,7 @@ extension FileOperationCenter {
 
     private static func compareFiles(_ a: URL, _ b: URL, job: FileJob) throws {
         let mismatch = NSError(domain: "iExplorer", code: 2, userInfo: [
-            NSLocalizedDescriptionKey: "La copie de « \(a.lastPathComponent) » ne correspond pas à l’original.",
+            NSLocalizedDescriptionKey: L("La copie de « \(a.lastPathComponent) » ne correspond pas à l’original."),
         ])
         guard let left = try? FileHandle(forReadingFrom: a), let right = try? FileHandle(forReadingFrom: b) else { throw mismatch }
         defer { try? left.close(); try? right.close() }

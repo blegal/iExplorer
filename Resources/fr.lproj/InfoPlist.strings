@@ -1,0 +1,5 @@
+NSDesktopFolderUsageDescription = "Afficher et gérer les fichiers du Bureau.";
+NSDocumentsFolderUsageDescription = "Afficher et gérer les fichiers du dossier Documents.";
+NSDownloadsFolderUsageDescription = "Afficher et gérer les fichiers du dossier Téléchargements.";
+NSRemovableVolumesUsageDescription = "Afficher et gérer les fichiers des disques amovibles.";
+NSNetworkVolumesUsageDescription = "Afficher et gérer les fichiers des volumes réseau.";

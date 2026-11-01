@@ -36,7 +36,7 @@ enum FileCipher: UInt8, CaseIterable {
         var errorDescription: String? { message }
     }
 
-    static let wrongPassword = Failure(message: "Mot de passe incorrect, ou fichier abîmé.")
+    static let wrongPassword = Failure(message: L("Mot de passe incorrect, ou fichier abîmé."))
 
     private static let magic = Data("IEXENC1\0".utf8)
     private static let chunkSize = 1 << 20
@@ -51,7 +51,7 @@ enum FileCipher: UInt8, CaseIterable {
                                  saltBytes.bindMemory(to: UInt8.self).baseAddress, salt.count,
                                  CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256), iterations, &key, key.count)
         }
-        guard status == kCCSuccess else { throw Failure(message: "Dérivation de la clé impossible.") }
+        guard status == kCCSuccess else { throw Failure(message: L("Dérivation de la clé impossible.")) }
         return SymmetricKey(data: key)
     }
 
@@ -127,7 +127,7 @@ enum FileCipher: UInt8, CaseIterable {
         let headerSize = magic.count + 1 + 4 + 16 + 8 + 4
         guard let header = try input.read(upToCount: headerSize), header.count == headerSize, header.prefix(magic.count) == magic,
               let cipher = FileCipher(rawValue: header[header.startIndex + magic.count]) else {
-            throw Failure(message: "Ce fichier n’a pas été chiffré par iExplorer.")
+            throw Failure(message: L("Ce fichier n’a pas été chiffré par iExplorer."))
         }
         func uint32(at offset: Int) -> UInt32 { header.subdata(in: offset..<offset + 4).reduce(0) { $0 << 8 | UInt32($1) } }
         let iterations = uint32(at: magic.count + 1)
@@ -171,8 +171,8 @@ extension PanelViewController {
         let files = encryptableFiles
         guard !files.isEmpty, let window = view.window else { return }
         let alert = NSAlert()
-        alert.messageText = files.count == 1 ? "Chiffrer « \(files[0].lastPathComponent) »" : "Chiffrer \(files.count) fichiers"
-        alert.informativeText = "Le fichier chiffré porte l’extension de l’algorithme (.aes256 ou .chacha20) ; iExplorer propose ensuite « Déchiffrer ». Sans le mot de passe, il est irrécupérable."
+        alert.messageText = files.count == 1 ? L("Chiffrer « \(files[0].lastPathComponent) »") : L("Chiffrer \(files.count) fichiers")
+        alert.informativeText = L("Le fichier chiffré porte l’extension de l’algorithme (.aes256 ou .chacha20) ; iExplorer propose ensuite « Déchiffrer ». Sans le mot de passe, il est irrécupérable.")
         let cipher = NSPopUpButton(frame: NSRect(x: 0, y: 86, width: 300, height: 26))
         cipher.addItems(withTitles: FileCipher.allCases.map { "\($0.title) (.\($0.fileExtension))" })
         // Algorithme choisi dans le sous-menu Chiffrer.
@@ -181,25 +181,25 @@ extension PanelViewController {
             cipher.selectItem(at: index)
         }
         let password = NSSecureTextField(frame: NSRect(x: 0, y: 56, width: 300, height: 24))
-        password.placeholderString = "Mot de passe"
+        password.placeholderString = L("Mot de passe")
         let confirm = NSSecureTextField(frame: NSRect(x: 0, y: 26, width: 300, height: 24))
-        confirm.placeholderString = "Confirmer le mot de passe"
-        let trash = NSButton(checkboxWithTitle: "Mettre l’original à la corbeille ensuite", target: nil, action: nil)
+        confirm.placeholderString = L("Confirmer le mot de passe")
+        let trash = NSButton(checkboxWithTitle: L("Mettre l’original à la corbeille ensuite"), target: nil, action: nil)
         trash.frame = NSRect(x: 0, y: 0, width: 300, height: 20)
         let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 114))
         [cipher, password, confirm, trash].forEach(accessory.addSubview)
         alert.accessoryView = accessory
-        alert.addButton(withTitle: "Chiffrer")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Chiffrer"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = password
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn else { return }
             guard !password.stringValue.isEmpty, password.stringValue == confirm.stringValue else {
-                FileOperationCenter.shared.showError(password.stringValue.isEmpty ? "Le mot de passe est vide." : "Les deux mots de passe ne correspondent pas.")
+                FileOperationCenter.shared.showError(password.stringValue.isEmpty ? L("Le mot de passe est vide.") : L("Les deux mots de passe ne correspondent pas."))
                 return
             }
             let algorithm = FileCipher.allCases[cipher.indexOfSelectedItem]
-            runCipherJob(files, title: "Chiffrement", password: password.stringValue, trashOriginals: trash.state == .on,
+            runCipherJob(files, title: L("Chiffrement"), password: password.stringValue, trashOriginals: trash.state == .on,
                          target: { FileOperationCenter.shared.uniqueURL(for: $0.appendingPathExtension(algorithm.fileExtension), suffix: "") }) {
                 try algorithm.encrypt($0, to: $1, password: $3, job: $2)
             }
@@ -215,16 +215,16 @@ extension PanelViewController {
     private func askDecryptionPassword(_ files: [URL], retry: Bool) {
         guard let window = view.window else { return }
         let alert = NSAlert()
-        alert.messageText = retry ? "Mot de passe incorrect" : (files.count == 1 ? "Déchiffrer « \(files[0].lastPathComponent) »" : "Déchiffrer \(files.count) fichiers")
-        alert.informativeText = "Saisissez le mot de passe choisi au chiffrement."
+        alert.messageText = retry ? L("Mot de passe incorrect") : (files.count == 1 ? L("Déchiffrer « \(files[0].lastPathComponent) »") : L("Déchiffrer \(files.count) fichiers"))
+        alert.informativeText = L("Saisissez le mot de passe choisi au chiffrement.")
         let password = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         alert.accessoryView = password
-        alert.addButton(withTitle: "Déchiffrer")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Déchiffrer"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = password
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn, !password.stringValue.isEmpty else { return }
-            runCipherJob(files, title: "Déchiffrement", password: password.stringValue, trashOriginals: false,
+            runCipherJob(files, title: L("Déchiffrement"), password: password.stringValue, trashOriginals: false,
                          onWrongPassword: { [weak self] remaining in self?.askDecryptionPassword(remaining, retry: true) },
                          target: { FileOperationCenter.shared.uniqueURL(for: $0.deletingPathExtension(), suffix: "") }) {
                 try FileCipher.decrypt($0, to: $1, password: $3, job: $2)
@@ -236,7 +236,7 @@ extension PanelViewController {
     private func runCipherJob(_ files: [URL], title: String, password: String, trashOriginals: Bool,
                               onWrongPassword: (([URL]) -> Void)? = nil, target: @escaping (URL) -> URL,
                               work: @escaping (URL, URL, FileJob, String) throws -> Void) {
-        let job = FileJob(title: "\(title) de \(files.count == 1 ? "« \(files[0].lastPathComponent) »" : "\(files.count) fichiers")")
+        let job = FileJob(title: files.count == 1 ? L("\(title) de « \(files[0].lastPathComponent) »") : L("\(title) de \(files.count) fichiers"))
         FileOperationCenter.shared.addJob(job)
         let folder = currentURL
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -257,7 +257,7 @@ extension PanelViewController {
                     if let failure = error as? FileCipher.Failure, failure.message == FileCipher.wrongPassword.message {
                         wrongPassword.append(source)
                     } else {
-                        failures.append("\(source.lastPathComponent) : \(error.localizedDescription)")
+                        failures.append(L("\(source.lastPathComponent) : \(error.localizedDescription)"))
                     }
                 }
             }

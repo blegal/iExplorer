@@ -88,7 +88,7 @@ final class HistoryMenuProvider: NSObject, NSMenuDelegate {
                 menu.addItem(item)
             }
             if history.isEmpty {
-                menu.addItem(NSMenuItem(title: "Aucun historique", action: nil, keyEquivalent: ""))
+                menu.addItem(NSMenuItem(title: L("Aucun historique"), action: nil, keyEquivalent: ""))
             }
         case .recent:
             let recents = Array(RecentFolders.all.filter(\.isExistingDirectory).prefix(30))
@@ -96,10 +96,10 @@ final class HistoryMenuProvider: NSObject, NSMenuDelegate {
                 menu.addItem(folderMenuItem(url, action: #selector(PanelViewController.openRecentFolder(_:))))
             }
             if recents.isEmpty {
-                menu.addItem(NSMenuItem(title: "Historique vide", action: nil, keyEquivalent: ""))
+                menu.addItem(NSMenuItem(title: L("Historique vide"), action: nil, keyEquivalent: ""))
             } else {
                 menu.addItem(.separator())
-                let clear = NSMenuItem(title: "Effacer l’historique", action: #selector(AppDelegate.clearRecentFolders(_:)), keyEquivalent: "")
+                let clear = NSMenuItem(title: L("Effacer l’historique"), action: #selector(AppDelegate.clearRecentFolders(_:)), keyEquivalent: "")
                 clear.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
                 menu.addItem(clear)
             }

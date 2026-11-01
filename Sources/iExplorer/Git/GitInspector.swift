@@ -100,17 +100,17 @@ final class GitInspectorSection: NSStackView {
             return label
         }
         let fileRow = NSStackView(views: [
-            caption("Fichier"),
-            button("add", "Indexer", "plus.circle", "git add"),
-            button("unstage", "Désindexer", "minus.circle", "git restore --staged"),
-            button("discard", "Abandonner les modifications", "arrow.uturn.backward.circle", "git restore"),
+            caption(L("Fichier")),
+            button("add", L("Indexer"), "plus.circle", "git add"),
+            button("unstage", L("Désindexer"), "minus.circle", "git restore --staged"),
+            button("discard", L("Abandonner les modifications"), "arrow.uturn.backward.circle", "git restore"),
         ])
         let repoRow = NSStackView(views: [
-            caption("Dépôt"),
-            button("commit", "Valider…", "checkmark.circle", "git commit"),
-            button("fetch", "Récupérer", "arrow.triangle.2.circlepath.circle", "git fetch"),
-            button("pull", "Tirer", "arrow.down.circle", "git pull --ff-only"),
-            button("push", "Pousser", "arrow.up.circle", "git push"),
+            caption(L("Dépôt")),
+            button("commit", L("Valider…"), "checkmark.circle", "git commit"),
+            button("fetch", L("Récupérer"), "arrow.triangle.2.circlepath.circle", "git fetch"),
+            button("pull", L("Tirer"), "arrow.down.circle", "git pull --ff-only"),
+            button("push", L("Pousser"), "arrow.up.circle", "git push"),
             spinner,
         ])
         fileRow.spacing = 4
@@ -137,9 +137,9 @@ final class GitInspectorSection: NSStackView {
         historyView.font = .monospacedSystemFont(ofSize: 10.5, weight: .regular)
         historyView.textColor = .secondaryLabelColor
 
-        let diffTitle = NSTextField(labelWithString: "Modifications")
+        let diffTitle = NSTextField(labelWithString: L("Modifications"))
         diffTitle.font = .systemFont(ofSize: 11, weight: .semibold)
-        let historyTitle = NSTextField(labelWithString: "Historique")
+        let historyTitle = NSTextField(labelWithString: L("Historique"))
         historyTitle.font = .systemFont(ofSize: 11, weight: .semibold)
         for view in [header, line, summary, fileActions, message, diffTitle, diffScroll, historyTitle, historyView] {
             addArrangedSubview(view)
@@ -198,17 +198,17 @@ final class GitInspectorSection: NSStackView {
         isHidden = false
         var parts: [String] = []
         if let branch = summary?.branch { parts.append("⎇ \(branch)") }
-        if let summary, summary.ahead > 0 { parts.append("↑\(summary.ahead) à pousser") }
-        if let summary, summary.behind > 0 { parts.append("↓\(summary.behind) à tirer") }
+        if let summary, summary.ahead > 0 { parts.append(L("↑\(summary.ahead) à pousser")) }
+        if let summary, summary.behind > 0 { parts.append(L("↓\(summary.behind) à tirer")) }
         let stateText: String = switch state {
-        case .modified?: "modifié"
-        case .added?: "ajouté"
-        case .untracked?: "non suivi"
-        case .deleted?: "supprimé"
-        case .renamed?: "renommé"
-        case .conflict?: "en conflit"
-        case .ignored?: "ignoré"
-        case nil: "à jour"
+        case .modified?: L("modifié")
+        case .added?: L("ajouté")
+        case .untracked?: L("non suivi")
+        case .deleted?: L("supprimé")
+        case .renamed?: L("renommé")
+        case .conflict?: L("en conflit")
+        case .ignored?: L("ignoré")
+        case nil: L("à jour")
         }
         parts.append(stateText)
         self.summary.stringValue = parts.joined(separator: " · ")
@@ -219,12 +219,12 @@ final class GitInspectorSection: NSStackView {
         buttons["discard"]?.isEnabled = hasChanges && state != .untracked
         buttons["push"]?.isEnabled = (summary?.ahead ?? 0) > 0 || summary?.hasUpstream == false
         buttons["pull"]?.isEnabled = summary?.hasUpstream == true
-        diffView.textStorage?.setAttributedString(Self.colorize(diff.isEmpty ? "Aucune modification." : String(diff.prefix(60_000))))
+        diffView.textStorage?.setAttributedString(Self.colorize(diff.isEmpty ? L("Aucune modification.") : String(diff.prefix(60_000))))
         // La section vient peut-être de redevenir visible : recalcul de la mise en page du texte.
         if let container = diffView.textContainer { diffView.layoutManager?.ensureLayout(for: container) }
         diffView.sizeToFit()
         diffView.scroll(.zero)
-        historyView.stringValue = log.isEmpty ? "Aucun commit pour cet élément." : log
+        historyView.stringValue = log.isEmpty ? L("Aucun commit pour cet élément.") : log
     }
 
     /// Diff coloré : ajouts en vert, suppressions en rouge, en-têtes de bloc en bleu.
@@ -254,45 +254,45 @@ final class GitInspectorSection: NSStackView {
         guard let repository, let key = sender.identifier?.rawValue else { return }
         let path = relativePath
         switch key {
-        case "add": execute(["add", "--", path], label: "Indexé")
-        case "unstage": execute(["restore", "--staged", "--", path], label: "Désindexé")
+        case "add": execute(["add", "--", path], label: L("Indexé"))
+        case "unstage": execute(["restore", "--staged", "--", path], label: L("Désindexé"))
         case "discard":
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Abandonner les modifications de « \((path as NSString).lastPathComponent) » ?"
-            alert.informativeText = "Le fichier revient à sa version du dernier commit. Cette action est irréversible."
-            alert.addButton(withTitle: "Abandonner").hasDestructiveAction = true
-            alert.addButton(withTitle: "Annuler")
+            alert.messageText = L("Abandonner les modifications de « \((path as NSString).lastPathComponent) » ?")
+            alert.informativeText = L("Le fichier revient à sa version du dernier commit. Cette action est irréversible.")
+            alert.addButton(withTitle: L("Abandonner")).hasDestructiveAction = true
+            alert.addButton(withTitle: L("Annuler"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
-            execute(["restore", "--", path], label: "Modifications abandonnées")
+            execute(["restore", "--", path], label: L("Modifications abandonnées"))
         case "commit": commit(in: repository)
-        case "fetch": execute(["fetch", "--prune"], label: "Récupération terminée")
-        case "pull": execute(["pull", "--ff-only"], label: "Branche à jour")
+        case "fetch": execute(["fetch", "--prune"], label: L("Récupération terminée"))
+        case "pull": execute(["pull", "--ff-only"], label: L("Branche à jour"))
         case "push":
             let hasUpstream = GitCommand.run(["rev-parse", "--abbrev-ref", "@{u}"], in: repository).succeeded
-            execute(hasUpstream ? ["push"] : ["push", "-u", "origin", "HEAD"], label: "Poussé")
+            execute(hasUpstream ? ["push"] : ["push", "-u", "origin", "HEAD"], label: L("Poussé"))
         default: break
         }
     }
 
     private func commit(in repository: URL) {
         let alert = NSAlert()
-        alert.messageText = "Valider (commit)"
-        alert.informativeText = "Message du commit :"
+        alert.messageText = L("Valider (commit)")
+        alert.informativeText = L("Message du commit :")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        let all = NSButton(checkboxWithTitle: "Inclure tous les fichiers suivis modifiés (-a)", target: nil, action: nil)
+        let all = NSButton(checkboxWithTitle: L("Inclure tous les fichiers suivis modifiés (-a)"), target: nil, action: nil)
         let box = NSStackView(views: [field, all])
         box.orientation = .vertical
         box.alignment = .leading
         box.frame = NSRect(x: 0, y: 0, width: 320, height: 52)
         alert.accessoryView = box
-        alert.addButton(withTitle: "Valider")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Valider"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { NSSound.beep(); return }
-        execute(["commit"] + (all.state == .on ? ["-a"] : []) + ["-m", text], label: "Commit créé")
+        execute(["commit"] + (all.state == .on ? ["-a"] : []) + ["-m", text], label: L("Commit créé"))
     }
 
     /// Lance une commande git en arrière-plan puis rafraîchit la section et les panneaux.

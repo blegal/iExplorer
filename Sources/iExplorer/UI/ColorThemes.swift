@@ -51,27 +51,27 @@ enum ColorTheme: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .system: "Système (macOS)"
-        case .graphite: "Graphite neutre"
-        case .slate: "Ardoise bleutée"
-        case .sand: "Sable chaud"
-        case .ink: "Encre profonde"
-        case .workbench: "Établi"
-        case .atelier: "Atelier"
+        case .system: L("Système (macOS)")
+        case .graphite: L("Graphite neutre")
+        case .slate: L("Ardoise bleutée")
+        case .sand: L("Sable chaud")
+        case .ink: L("Encre profonde")
+        case .workbench: L("Établi")
+        case .atelier: L("Atelier")
         case .nord: "Nord"
-        case .solarized: "Solarisé"
-        case .liquidGlass: "Verre liquide"
-        case .aurora: "Aurore"
-        case .grainedPaper: "Papier grainé"
-        case .mist: "Brume"
-        case .dusk: "Crépuscule"
-        case .smoke: "Fumée"
-        case .human: "Humain"
+        case .solarized: L("Solarisé")
+        case .liquidGlass: L("Verre liquide")
+        case .aurora: L("Aurore")
+        case .grainedPaper: L("Papier grainé")
+        case .mist: L("Brume")
+        case .dusk: L("Crépuscule")
+        case .smoke: L("Fumée")
+        case .human: L("Humain")
         case .orchis: "Orchis"
         case .whiteSur: "WhiteSur"
-        case .monochrome: "Monochrome"
-        case .candy: "Bonbon"
-        case .flatRemix: "Flat Remix violet"
+        case .monochrome: L("Monochrome")
+        case .candy: L("Bonbon")
+        case .flatRemix: L("Flat Remix violet")
         }
     }
 
@@ -79,10 +79,10 @@ enum ColorTheme: Int, CaseIterable {
     var family: String? {
         switch self {
         case .system: nil
-        case .graphite, .slate, .sand, .ink: "Uni"
-        case .workbench, .atelier, .nord, .solarized: "Uni par zones"
-        case .liquidGlass, .aurora, .grainedPaper, .mist: "Non uni"
-        case .dusk, .smoke, .human, .orchis, .whiteSur, .monochrome, .candy, .flatRemix: "Bureaux libres"
+        case .graphite, .slate, .sand, .ink: L("Uni")
+        case .workbench, .atelier, .nord, .solarized: L("Uni par zones")
+        case .liquidGlass, .aurora, .grainedPaper, .mist: L("Non uni")
+        case .dusk, .smoke, .human, .orchis, .whiteSur, .monochrome, .candy, .flatRemix: L("Bureaux libres")
         }
     }
 
@@ -487,7 +487,7 @@ extension ColorTheme {
     /// Menu des thèmes, rempli à chaque ouverture : on ne le remplace jamais pendant qu'il est affiché
     /// (le changement de thème ou d'apparence arrive alors que le menu est encore ouvert).
     static func menu() -> NSMenu {
-        let menu = NSMenu(title: "Thème de couleurs")
+        let menu = NSMenu(title: L("Thème de couleurs"))
         menu.delegate = ColorThemeMenuDelegate.shared
         fill(menu)
         return menu
@@ -495,7 +495,7 @@ extension ColorTheme {
 
     fileprivate static func fill(_ menu: NSMenu) {
         menu.removeAllItems()
-        menu.addItem(.sectionHeader(title: "Apparence"))
+        menu.addItem(.sectionHeader(title: L("Apparence")))
         for appearance in AppAppearance.allCases {
             let item = NSMenuItem(title: appearance.title, action: #selector(AppDelegate.chooseAppearance(_:)), keyEquivalent: "")
             item.tag = appearance.rawValue
@@ -550,9 +550,9 @@ enum AppAppearance: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .automatic: "Automatique"
-        case .light: "Claire"
-        case .dark: "Sombre"
+        case .automatic: L("Automatique")
+        case .light: L("Claire")
+        case .dark: L("Sombre")
         }
     }
 
@@ -566,9 +566,9 @@ enum AppAppearance: Int, CaseIterable {
 
     var toolTip: String {
         switch self {
-        case .automatic: "Suit le réglage clair / sombre de macOS"
-        case .light: "Variante claire du thème, même si macOS est en mode sombre"
-        case .dark: "Variante sombre du thème, même si macOS est en mode clair"
+        case .automatic: L("Suit le réglage clair / sombre de macOS")
+        case .light: L("Variante claire du thème, même si macOS est en mode sombre")
+        case .dark: L("Variante sombre du thème, même si macOS est en mode clair")
         }
     }
 }

@@ -24,7 +24,7 @@ enum TOMLValue: Equatable {
 struct TOMLError: LocalizedError {
     let line: Int
     let message: String
-    var errorDescription: String? { "Ligne \(line) : \(message)" }
+    var errorDescription: String? { L("Ligne \(line) : \(message)") }
 }
 
 /// Document lu : les clés de premier niveau et les tables `[[nom]]` dans l'ordre du fichier.
@@ -45,15 +45,15 @@ enum TOMLParser {
         func assign(_ key: String, _ value: TOMLValue) throws {
             switch target {
             case .root:
-                guard document.root[key] == nil else { throw scanner.error("clé « \(key) » déjà définie") }
+                guard document.root[key] == nil else { throw scanner.error(L("clé « \(key) » déjà définie")) }
                 document.root[key] = value
             case .table(let name):
                 var table = document.root[name]?.table ?? [:]
-                guard table[key] == nil else { throw scanner.error("clé « \(key) » déjà définie") }
+                guard table[key] == nil else { throw scanner.error(L("clé « \(key) » déjà définie")) }
                 table[key] = value
                 document.root[name] = .table(table)
             case .entry(let index):
-                guard document.entries[index].values[key] == nil else { throw scanner.error("clé « \(key) » déjà définie") }
+                guard document.entries[index].values[key] == nil else { throw scanner.error(L("clé « \(key) » déjà définie")) }
                 document.entries[index].values[key] = value
             }
         }
@@ -68,22 +68,22 @@ enum TOMLParser {
                 var name = ""
                 while let c = scanner.peek, c != "]", c != "\n" { name.append(scanner.next()) }
                 name = name.trimmingCharacters(in: .whitespaces)
-                guard !name.isEmpty, scanner.peek == "]" else { throw scanner.error("en-tête de table mal fermé") }
+                guard !name.isEmpty, scanner.peek == "]" else { throw scanner.error(L("en-tête de table mal fermé")) }
                 _ = scanner.next()
                 if isArray {
-                    guard scanner.peek == "]" else { throw scanner.error("« ]] » attendu") }
+                    guard scanner.peek == "]" else { throw scanner.error(L("« ]] » attendu")) }
                     _ = scanner.next()
                     document.entries.append((name, [:]))
                     target = .entry(document.entries.count - 1)
                 } else {
-                    guard document.root[name] == nil else { throw scanner.error("table « \(name) » déjà définie") }
+                    guard document.root[name] == nil else { throw scanner.error(L("table « \(name) » déjà définie")) }
                     document.root[name] = .table([:])
                     target = .table(name)
                 }
             } else {
                 let key = try scanner.key()
                 scanner.skipSpaces()
-                guard scanner.peek == "=" else { throw scanner.error("« = » attendu après « \(key) »") }
+                guard scanner.peek == "=" else { throw scanner.error(L("« = » attendu après « \(key) »")) }
                 _ = scanner.next()
                 scanner.skipSpaces()
                 try assign(key, try scanner.value())
@@ -131,7 +131,7 @@ enum TOMLParser {
             skipSpaces()
             if peek == "#" { while let c = peek, c != "\n" { index += 1 } }
             if peek == "\r" { index += 1 }
-            guard peek == nil || peek == "\n" else { throw error("fin de ligne attendue") }
+            guard peek == nil || peek == "\n" else { throw error(L("fin de ligne attendue")) }
         }
 
         mutating func key() throws -> String {
@@ -139,12 +139,12 @@ enum TOMLParser {
             if peek == "'" { _ = next(); return try literalString() }
             var key = ""
             while let c = peek, c.isLetter || c.isNumber || c == "_" || c == "-" { key.append(next()) }
-            guard !key.isEmpty else { throw error("clé attendue") }
+            guard !key.isEmpty else { throw error(L("clé attendue")) }
             return key
         }
 
         mutating func value() throws -> TOMLValue {
-            guard let c = peek else { throw error("valeur attendue") }
+            guard let c = peek else { throw error(L("valeur attendue")) }
             if starts(with: "\"\"\"") { skip(3); return .string(try multilineString(basic: true)) }
             if starts(with: "'''") { skip(3); return .string(try multilineString(basic: false)) }
             switch c {
@@ -158,7 +158,7 @@ enum TOMLParser {
                     if peek == "]" { _ = next(); return .array(values) }
                     values.append(try value())
                     skipBlank()
-                    if peek == "," { _ = next() } else if peek != "]" { throw error("« , » ou « ] » attendu") }
+                    if peek == "," { _ = next() } else if peek != "]" { throw error(L("« , » ou « ] » attendu")) }
                 }
             case "{":
                 _ = next()
@@ -168,12 +168,12 @@ enum TOMLParser {
                     if peek == "}" { _ = next(); return .table(table) }
                     let key = try key()
                     skipSpaces()
-                    guard peek == "=" else { throw error("« = » attendu après « \(key) »") }
+                    guard peek == "=" else { throw error(L("« = » attendu après « \(key) »")) }
                     _ = next()
                     skipSpaces()
                     table[key] = try value()
                     skipBlank()
-                    if peek == "," { _ = next() } else if peek != "}" { throw error("« , » ou « } » attendu") }
+                    if peek == "," { _ = next() } else if peek != "}" { throw error(L("« , » ou « } » attendu")) }
                 }
             default:
                 var word = ""
@@ -181,12 +181,12 @@ enum TOMLParser {
                 if word == "true" { return .bool(true) }
                 if word == "false" { return .bool(false) }
                 if let number = Double(word.replacingOccurrences(of: "_", with: "")) { return .number(number) }
-                throw error(word.isEmpty ? "valeur attendue" : "valeur inconnue « \(word) » (une chaîne s’écrit entre guillemets)")
+                throw error(word.isEmpty ? L("valeur attendue") : L("valeur inconnue « \(word) » (une chaîne s’écrit entre guillemets)"))
             }
         }
 
         mutating func escape() throws -> String {
-            guard peek != nil else { throw error("chaîne non terminée") }
+            guard peek != nil else { throw error(L("chaîne non terminée")) }
             switch next() {
             case "n": return "\n"
             case "t": return "\t"
@@ -196,9 +196,9 @@ enum TOMLParser {
             case "u":
                 var hex = ""
                 for _ in 0..<4 { if let c = peek, c.isHexDigit { hex.append(next()) } }
-                guard let code = UInt32(hex, radix: 16), let scalar = Unicode.Scalar(code) else { throw error("\\u invalide") }
+                guard let code = UInt32(hex, radix: 16), let scalar = Unicode.Scalar(code) else { throw error(L("\\u invalide")) }
                 return String(Character(scalar))
-            case let other: throw error("échappement « \\\(other) » inconnu (doublez la barre : \\\\)")
+            case let other: throw error(L("échappement « \\\(other) » inconnu (doublez la barre : \\\\)"))
             }
         }
 
@@ -209,7 +209,7 @@ enum TOMLParser {
                 if c == "\"" { return text }
                 text += c == "\\" ? try escape() : String(c)
             }
-            throw error("chaîne non terminée")
+            throw error(L("chaîne non terminée"))
         }
 
         mutating func literalString() throws -> String {
@@ -219,7 +219,7 @@ enum TOMLParser {
                 if c == "'" { return text }
                 text.append(c)
             }
-            throw error("chaîne non terminée")
+            throw error(L("chaîne non terminée"))
         }
 
         mutating func multilineString(basic: Bool) throws -> String {
@@ -231,7 +231,7 @@ enum TOMLParser {
                 let c = next()
                 text += basic && c == "\\" ? try escape() : String(c)
             }
-            throw error("chaîne sur plusieurs lignes non terminée")
+            throw error(L("chaîne sur plusieurs lignes non terminée"))
         }
     }
 }
@@ -277,15 +277,15 @@ struct FileActionEntry {
         case "action": self.kind = .action
         case "list": self.kind = .list
         case "separator": self.kind = .separator; return
-        default: throw error("table [[\(kind)]] inconnue (action, list ou separator)")
+        default: throw error(L("table [[\(kind)]] inconnue (action, list ou separator)"))
         }
         title = values["title"]?.string ?? ""
         run = values["run"]?.string ?? ""
-        guard !title.isEmpty else { throw error("[[\(kind)]] sans « title »") }
-        guard !run.isEmpty else { throw error("« \(title) » : « run » manquant") }
+        guard !title.isEmpty else { throw error(L("[[\(kind)]] sans « title »")) }
+        guard !run.isEmpty else { throw error(L("« \(title) » : « run » manquant")) }
         icon = values["icon"]?.string
         if let raw = values["in"]?.string {
-            guard let mode = Mode(rawValue: raw) else { throw error("« in » vaut terminal, background ou open (et non « \(raw) »)") }
+            guard let mode = Mode(rawValue: raw) else { throw error(L("« in » vaut terminal, background ou open (et non « \(raw) »)")) }
             self.mode = mode
         }
         switch values["confirm"] {
@@ -297,12 +297,12 @@ struct FileActionEntry {
         requires = values["requires"]?.strings ?? []
         missing = values["missing"]?.strings ?? []
         if let raw = values["count"]?.string {
-            guard let count = FileActionCount(rawValue: raw) else { throw error("« count » vaut one, many ou any") }
+            guard let count = FileActionCount(rawValue: raw) else { throw error(L("« count » vaut one, many ou any")) }
             self.count = count
         }
         if self.kind == .list {
             from = values["from"]?.string ?? ""
-            guard !from.isEmpty else { throw error("« \(title) » : « from » manquant") }
+            guard !from.isEmpty else { throw error(L("« \(title) » : « from » manquant")) }
             pinned = values["pinned"]?.strings ?? []
         }
     }
@@ -333,11 +333,11 @@ struct FileActionRule {
         types = (match["types"]?.strings ?? []).compactMap { UTType($0) }
         folderContains = match["folderContains"]?.bool ?? false
         if let raw = match["count"]?.string {
-            guard let count = FileActionCount(rawValue: raw) else { throw TOMLError(line: 1, message: "« count » vaut one, many ou any") }
+            guard let count = FileActionCount(rawValue: raw) else { throw TOMLError(line: 1, message: L("« count » vaut one, many ou any")) }
             self.count = count
         }
         guard !names.isEmpty || !extensions.isEmpty || !types.isEmpty else {
-            throw TOMLError(line: 1, message: "« match » doit donner names, extensions ou types")
+            throw TOMLError(line: 1, message: L("« match » doit donner names, extensions ou types"))
         }
         requires = document.root["requires"]?.strings ?? []
         // Numéros de ligne approximatifs : ceux des en-têtes [[…]] dans le texte.
@@ -356,7 +356,7 @@ struct FileActionRule {
         if !names.isEmpty { parts.append(names.joined(separator: ", ")) }
         if !extensions.isEmpty { parts.append(extensions.map { "." + $0 }.joined(separator: ", ")) }
         if !types.isEmpty { parts.append(types.map { $0.localizedDescription ?? $0.identifier }.joined(separator: ", ")) }
-        return parts.joined(separator: " · ") + (folderContains ? " (et les dossiers qui en contiennent)" : "")
+        return parts.joined(separator: " · ") + (folderContains ? L(" (et les dossiers qui en contiennent)") : "")
     }
 
     func matches(file url: URL) -> Bool {
@@ -651,7 +651,7 @@ enum FileActionMenu {
         func makeItem(_ entry: FileActionEntry, item: String?) -> NSMenuItem {
             var variables = context.variables(item: item)
             variables["ITEM"] = item ?? ""
-            let menuItem = NSMenuItem(title: expandFileActionVariables(entry.title, variables) + (entry.confirm != nil ? "…" : ""),
+            let menuItem = NSMenuItem(title: expandFileActionVariables(DefaultFileActions.displayText(entry.title), variables) + (entry.confirm != nil ? "…" : ""),
                                       action: action, keyEquivalent: "")
             menuItem.target = target
             menuItem.image = image(entry.icon ?? (entry.mode == .terminal ? "terminal" : nil))
@@ -680,7 +680,7 @@ enum FileActionMenu {
                 let others = values.filter { !pinned.contains($0) }
                 items += pinned.map { makeItem(entry, item: $0) }
                 if !others.isEmpty {
-                    let more = NSMenuItem(title: pinned.isEmpty ? expandFileActionVariables(entry.title, ["ITEM": "…"]) : "Autres", action: nil, keyEquivalent: "")
+                    let more = NSMenuItem(title: pinned.isEmpty ? expandFileActionVariables(DefaultFileActions.displayText(entry.title), ["ITEM": "…"]) : L("Autres"), action: nil, keyEquivalent: "")
                     more.image = image("ellipsis.circle")
                     let submenu = NSMenu()
                     for value in others { submenu.addItem(makeItem(entry, item: value)) }
@@ -691,7 +691,7 @@ enum FileActionMenu {
         }
         while items.last?.isSeparatorItem == true { items.removeLast() }
         guard !items.isEmpty else { return [] }
-        let header = NSMenuItem.sectionHeader(title: rule.name)
+        let header = NSMenuItem.sectionHeader(title: DefaultFileActions.displayText(rule.name))
         return [header] + items
     }
 }

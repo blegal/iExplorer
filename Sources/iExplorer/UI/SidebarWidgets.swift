@@ -8,16 +8,16 @@ enum SidebarWidgetKind: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .analogClock: "Horloge analogique"
-        case .digitalClock: "Horloge numérique"
-        case .eyes: "Yeux (xeyes)"
-        case .load: "Charge processeur et mémoire (xload)"
-        case .aquarium: "Aquarium (xfish)"
-        case .matrix: "Pluie Matrix (cmatrix)"
-        case .disk: "Espace disque"
-        case .network: "Débit réseau"
-        case .timer: "Minuteur"
-        case .calendar: "Calendrier du mois"
+        case .analogClock: L("Horloge analogique")
+        case .digitalClock: L("Horloge numérique")
+        case .eyes: L("Yeux (xeyes)")
+        case .load: L("Charge processeur et mémoire (xload)")
+        case .aquarium: L("Aquarium (xfish)")
+        case .matrix: L("Pluie Matrix (cmatrix)")
+        case .disk: L("Espace disque")
+        case .network: L("Débit réseau")
+        case .timer: L("Minuteur")
+        case .calendar: L("Calendrier du mois")
         }
     }
 
@@ -84,12 +84,12 @@ class SidebarWidget: NSView {
     /// Petite croix en haut à droite, visible au survol : retire le widget.
     var onClose: (() -> Void)?
     private lazy var closeButton: NSButton = {
-        let button = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Retirer le widget")!,
+        let button = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: L("Retirer le widget"))!,
                               target: self, action: #selector(closeWidget))
         button.isBordered = false
         button.symbolConfiguration = .init(pointSize: 11, weight: .regular)
         button.contentTintColor = .secondaryLabelColor
-        button.toolTip = "Retirer ce widget"
+        button.toolTip = L("Retirer ce widget")
         button.isHidden = true
         button.translatesAutoresizingMaskIntoConstraints = false
         addSubview(button, positioned: .above, relativeTo: nil)
@@ -193,7 +193,7 @@ final class AnalogClockWidget: SidebarWidget {
 final class DigitalClockWidget: SidebarWidget {
     override var kind: SidebarWidgetKind { .digitalClock }
     private static let time: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f }()
-    private static let day: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "EEEE d MMMM"; return f }()
+    private static let day: DateFormatter = { let f = DateFormatter(); f.locale = AppLanguage.locale; f.setLocalizedDateFormatFromTemplate("EEEEdMMMM"); return f }()
 
     override func draw(_ dirtyRect: NSRect) {
         let now = Date()
@@ -212,17 +212,17 @@ enum EyeStyle: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .classic: "Classiques (xeyes)"
-        case .makeup: "Maquillés"
-        case .man: "Homme"
-        case .woman: "Femme"
-        case .child: "Enfant"
-        case .cyclops: "Cyclope"
-        case .crowd: "Groupe d’yeux"
-        case .cat: "Chat"
-        case .alien: "Extraterrestre"
-        case .robot: "Robot"
-        case .sleepy: "Endormis"
+        case .classic: L("Classiques (xeyes)")
+        case .makeup: L("Maquillés")
+        case .man: L("Homme")
+        case .woman: L("Femme")
+        case .child: L("Enfant")
+        case .cyclops: L("Cyclope")
+        case .crowd: L("Groupe d’yeux")
+        case .cat: L("Chat")
+        case .alien: L("Extraterrestre")
+        case .robot: L("Robot")
+        case .sleepy: L("Endormis")
         }
     }
 
@@ -259,7 +259,7 @@ final class EyesWidget: SidebarWidget {
     }
 
     override func extraMenuItems() -> [NSMenuItem] {
-        let style = NSMenuItem(title: "Style des yeux", action: nil, keyEquivalent: "")
+        let style = NSMenuItem(title: L("Style des yeux"), action: nil, keyEquivalent: "")
         style.image = NSImage(systemSymbolName: "eyes", accessibilityDescription: nil)
         let menu = NSMenu()
         for choice in EyeStyle.allCases {
@@ -449,8 +449,8 @@ final class LoadWidget: SidebarWidget {
         draw(memoryHistory, in: graph, color: .systemTeal, filled: true)
         draw(cpuHistory, in: graph, color: .systemOrange, filled: false)
         let cpu = Int((cpuHistory.last ?? 0) * 100), memory = Int((memoryHistory.last ?? 0) * 100)
-        text("Processeur \(cpu) %", size: 10.5, color: .systemOrange, monospaced: true).draw(at: NSPoint(x: 2, y: 1))
-        let mem = text("Mémoire \(memory) %", size: 10.5, color: .systemTeal, monospaced: true)
+        text(L("Processeur \(cpu) %"), size: 10.5, color: .systemOrange, monospaced: true).draw(at: NSPoint(x: 2, y: 1))
+        let mem = text(L("Mémoire \(memory) %"), size: 10.5, color: .systemTeal, monospaced: true)
         mem.draw(at: NSPoint(x: bounds.width - mem.size().width - 2, y: 1))
     }
 
@@ -507,10 +507,10 @@ enum AquariumStyle: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .tropical: "Lagon tropical"
-        case .abyss: "Abysses (méduses lumineuses)"
-        case .school: "Banc de poissons"
-        case .koi: "Bassin de carpes koï"
+        case .tropical: L("Lagon tropical")
+        case .abyss: L("Abysses (méduses lumineuses)")
+        case .school: L("Banc de poissons")
+        case .koi: L("Bassin de carpes koï")
         }
     }
 
@@ -534,7 +534,7 @@ final class AquariumWidget: SidebarWidget {
     private var populated: AquariumStyle?
 
     override func extraMenuItems() -> [NSMenuItem] {
-        let style = NSMenuItem(title: "Style de l’aquarium", action: nil, keyEquivalent: "")
+        let style = NSMenuItem(title: L("Style de l’aquarium"), action: nil, keyEquivalent: "")
         style.image = NSImage(systemSymbolName: "fish", accessibilityDescription: nil)
         let menu = NSMenu()
         for choice in AquariumStyle.allCases {
@@ -704,12 +704,12 @@ enum MatrixStyle: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .green: "Vert classique"
-        case .amber: "Ambre (vieux terminal)"
-        case .blue: "Bleu néon"
-        case .rainbow: "Arc-en-ciel"
-        case .binary: "Binaire (0 et 1)"
-        case .red: "Rouge alerte"
+        case .green: L("Vert classique")
+        case .amber: L("Ambre (vieux terminal)")
+        case .blue: L("Bleu néon")
+        case .rainbow: L("Arc-en-ciel")
+        case .binary: L("Binaire (0 et 1)")
+        case .red: L("Rouge alerte")
         }
     }
 
@@ -742,7 +742,7 @@ final class MatrixWidget: SidebarWidget {
     private let cell: CGFloat = 11
 
     override func extraMenuItems() -> [NSMenuItem] {
-        let style = NSMenuItem(title: "Style de la pluie", action: nil, keyEquivalent: "")
+        let style = NSMenuItem(title: L("Style de la pluie"), action: nil, keyEquivalent: "")
         style.image = NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil)
         let menu = NSMenu()
         for choice in MatrixStyle.allCases {
@@ -808,8 +808,8 @@ final class DiskWidget: SidebarWidget {
         let total = Double(values?.volumeTotalCapacity ?? 0)
         let free = Double(values?.volumeAvailableCapacityForImportantUsage ?? 0)
         let used = total > 0 ? 1 - free / total : 0
-        text(values?.volumeLocalizedName ?? "Disque", size: 11, weight: .semibold).draw(at: NSPoint(x: 2, y: 2))
-        let free​Text = text("\(Format.size(Int64(free))) libres", size: 10.5, color: faint, monospaced: true)
+        text(values?.volumeLocalizedName ?? L("Disque"), size: 11, weight: .semibold).draw(at: NSPoint(x: 2, y: 2))
+        let free​Text = text(L("\(Format.size(Int64(free))) libres"), size: 10.5, color: faint, monospaced: true)
         free​Text.draw(at: NSPoint(x: bounds.width - free​Text.size().width - 2, y: 3))
         let bar = NSRect(x: 2, y: 24, width: bounds.width - 4, height: 10)
         faint.withAlphaComponent(0.2).setFill()
@@ -919,10 +919,10 @@ final class TimerWidget: SidebarWidget {
     }
     private var duration: TimeInterval { TimeInterval(minutes * 60) }
 
-    private lazy var playButton = FlatRoundButton(symbol: "play.fill", fill: .systemGreen, tip: "Démarrer", target: self, action: #selector(toggle))
-    private lazy var stopButton = FlatRoundButton(symbol: "stop.fill", fill: .systemRed, tip: "Arrêter et remettre à zéro", target: self, action: #selector(reset))
-    private lazy var configureButton = FlatRoundButton(symbol: "gearshape.fill", fill: .systemGray, tip: "Durée", target: self, action: #selector(configure(_:)))
-    private lazy var extendButton = FlatRoundButton(symbol: "plus", fill: .systemBlue, tip: "Ajouter 5 minutes", target: self, action: #selector(extend))
+    private lazy var playButton = FlatRoundButton(symbol: "play.fill", fill: .systemGreen, tip: L("Démarrer"), target: self, action: #selector(toggle))
+    private lazy var stopButton = FlatRoundButton(symbol: "stop.fill", fill: .systemRed, tip: L("Arrêter et remettre à zéro"), target: self, action: #selector(reset))
+    private lazy var configureButton = FlatRoundButton(symbol: "gearshape.fill", fill: .systemGray, tip: L("Durée"), target: self, action: #selector(configure(_:)))
+    private lazy var extendButton = FlatRoundButton(symbol: "plus", fill: .systemBlue, tip: L("Ajouter 5 minutes"), target: self, action: #selector(extend))
     /// Les quatre boutons en matrice 2 × 2, à droite de l'anneau.
     private lazy var buttons: NSGridView = {
         let grid = NSGridView(views: [[playButton, stopButton], [extendButton, configureButton]])
@@ -954,9 +954,9 @@ final class TimerWidget: SidebarWidget {
 
     private func updatePlayButton() {
         let running = endDate != nil
-        playButton.image = NSImage(systemSymbolName: running ? "pause.fill" : "play.fill", accessibilityDescription: running ? "Pause" : "Démarrer")
+        playButton.image = NSImage(systemSymbolName: running ? "pause.fill" : "play.fill", accessibilityDescription: running ? L("Pause") : L("Démarrer"))
         playButton.fill = running ? .systemOrange : .systemGreen
-        playButton.toolTip = running ? "Pause" : (remainingWhenPaused != nil ? "Reprendre" : "Démarrer")
+        playButton.toolTip = running ? L("Pause") : (remainingWhenPaused != nil ? L("Reprendre") : L("Démarrer"))
     }
 
     @objc private func toggle() {
@@ -990,9 +990,9 @@ final class TimerWidget: SidebarWidget {
 
     @objc private func configure(_ sender: NSButton) {
         let menu = NSMenu()
-        menu.addItem(.sectionHeader(title: "Durée"))
+        menu.addItem(.sectionHeader(title: L("Durée")))
         for value in Self.durations {
-            let item = NSMenuItem(title: "\(value) minutes", action: #selector(setDuration(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: L("\(value) minutes"), action: #selector(setDuration(_:)), keyEquivalent: "")
             item.target = self
             item.tag = value
             item.state = value == minutes ? .on : .off
@@ -1007,7 +1007,7 @@ final class TimerWidget: SidebarWidget {
     }
 
     override func extraMenuItems() -> [NSMenuItem] {
-        let reset = NSMenuItem(title: "Remettre à zéro", action: #selector(reset), keyEquivalent: "")
+        let reset = NSMenuItem(title: L("Remettre à zéro"), action: #selector(reset), keyEquivalent: "")
         reset.target = self
         reset.image = NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: nil)
         return [reset]
@@ -1040,8 +1040,8 @@ final class CalendarWidget: SidebarWidget {
 
     override func draw(_ dirtyRect: NSRect) {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = Locale(identifier: "fr_FR")
-        calendar.firstWeekday = 2
+        calendar.locale = AppLanguage.locale
+        if AppLanguage.current == "fr" { calendar.firstWeekday = 2 }
         let today = Date()
         let month = DateFormatter()
         month.locale = calendar.locale
@@ -1049,13 +1049,17 @@ final class CalendarWidget: SidebarWidget {
         let title = text(month.string(from: today).capitalized, size: 11.5, weight: .semibold)
         title.draw(at: NSPoint(x: (bounds.width - title.size().width) / 2, y: 0))
         let cellWidth = bounds.width / 7
-        for (index, letter) in ["L", "M", "M", "J", "V", "S", "D"].enumerated() {
+        // Initiales des jours, à partir du premier jour de la semaine de la langue (lundi en français).
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let first = calendar.firstWeekday - 1
+        let letters = (0..<7).map { symbols[(first + $0) % 7] }
+        for (index, letter) in letters.enumerated() {
             let label = text(letter, size: 9.5, weight: .medium, color: faint)
             label.draw(at: NSPoint(x: CGFloat(index) * cellWidth + (cellWidth - label.size().width) / 2, y: 18))
         }
         guard let start = calendar.date(from: calendar.dateComponents([.year, .month], from: today)),
               let days = calendar.range(of: .day, in: .month, for: start) else { return }
-        let offset = (calendar.component(.weekday, from: start) + 5) % 7
+        let offset = (calendar.component(.weekday, from: start) - calendar.firstWeekday + 7) % 7
         let current = calendar.component(.day, from: today)
         for day in days {
             let slot = offset + day - 1
@@ -1065,7 +1069,7 @@ final class CalendarWidget: SidebarWidget {
                 NSBezierPath(ovalIn: NSRect(x: x + cellWidth / 2 - 8, y: y - 1, width: 16, height: 16)).fill()
             }
             let label = text("\(day)", size: 10, weight: day == current ? .bold : .regular,
-                             color: day == current ? .white : (slot % 7 >= 5 ? faint : ink), monospaced: true)
+                             color: day == current ? .white : ([0, 6].contains((first + slot) % 7) ? faint : ink), monospaced: true)
             label.draw(at: NSPoint(x: x + (cellWidth - label.size().width) / 2, y: y))
         }
     }
@@ -1080,14 +1084,14 @@ final class SidebarWidgetsView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        let title = NSTextField(labelWithString: "Widgets")
+        let title = NSTextField(labelWithString: L("Widgets"))
         title.font = .systemFont(ofSize: 11, weight: .semibold)
         title.textColor = Theme.secondaryText
-        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Ajouter un widget")!, target: self, action: #selector(showMenu(_:)))
+        let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: L("Ajouter un widget"))!, target: self, action: #selector(showMenu(_:)))
         add.isBordered = false
         add.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
         add.contentTintColor = Theme.secondaryText
-        add.toolTip = "Ajouter, retirer ou réordonner les widgets"
+        add.toolTip = L("Ajouter, retirer ou réordonner les widgets")
         header.setViews([title, NSView(), add], in: .leading)
         header.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 12)
         stack.orientation = .vertical
@@ -1160,8 +1164,8 @@ final class SidebarWidgetsView: NSView {
             extra.forEach(menu.addItem)
             menu.addItem(.separator())
         }
-        for (title, action, symbol) in [("Monter", #selector(moveWidgetUp(_:)), "arrow.up"), ("Descendre", #selector(moveWidgetDown(_:)), "arrow.down"),
-                                        ("Retirer", #selector(remove(_:)), "minus.circle")] {
+        for (title, action, symbol) in [(L("Monter"), #selector(moveWidgetUp(_:)), "arrow.up"), (L("Descendre"), #selector(moveWidgetDown(_:)), "arrow.down"),
+                                        (L("Retirer"), #selector(remove(_:)), "minus.circle")] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
             item.representedObject = kind.rawValue

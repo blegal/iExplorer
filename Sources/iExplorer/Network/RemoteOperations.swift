@@ -7,7 +7,7 @@ extension FileOperationCenter {
         let fm = FileManager.default
         job.countsItems = true
         job.setTotal(Int64(sources.count))
-        job.setStatus("Connexion…")
+        job.setStatus(L("Connexion…"))
 
         var sessions: [String: SFTPSession] = [:]
         func session(_ url: URL) throws -> SFTPSession {
@@ -29,7 +29,7 @@ extension FileOperationCenter {
                 ? Set(try session(destination).list(destination.path).entries.map(\.name))
                 : Set(try fm.contentsOfDirectory(atPath: destination.path))
         } catch {
-            DispatchQueue.main.sync { showError("Impossible de lire « \(destination.lastPathComponent) » : \(error.localizedDescription)") }
+            DispatchQueue.main.sync { showError(L("Impossible de lire « \(destination.lastPathComponent) » : \(error.localizedDescription)")) }
             return []
         }
 
@@ -42,7 +42,7 @@ extension FileOperationCenter {
             defer { job.setDone(Int64(index + 1)) }
             var name = source.lastPathComponent
             if source.deletingLastPathComponent().isSameLocation(as: destination) {
-                name = uniqueName(name, in: existing, suffix: " copie")
+                name = uniqueName(name, in: existing, suffix: L(" copie"))
             } else if existing.contains(name) {
                 let choice: ConflictChoice
                 if let applyToAll { choice = applyToAll } else {
@@ -129,11 +129,11 @@ extension FileOperationCenter {
             var failures: [String] = []
             for url in urls {
                 do { try SFTPManager.shared.session(for: url).removeRecursively(url.path) } catch {
-                    failures.append("\(url.lastPathComponent) : \(error.localizedDescription)")
+                    failures.append(L("\(url.lastPathComponent) : \(error.localizedDescription)"))
                 }
             }
             DispatchQueue.main.async {
-                if !failures.isEmpty { self.showError("Certains éléments n’ont pas pu être supprimés.\n" + failures.joined(separator: "\n")) }
+                if !failures.isEmpty { self.showError(L("Certains éléments n’ont pas pu être supprimés.") + "\n" + failures.joined(separator: "\n")) }
                 completion()
             }
         }
@@ -143,7 +143,7 @@ extension FileOperationCenter {
         let target = url.deletingLastPathComponent().appendingPathComponent(newName)
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result { () -> URL in
-                guard !newName.contains("/") else { throw SFTPError.command("Le nom ne peut pas contenir « / ».") }
+                guard !newName.contains("/") else { throw SFTPError.command(L("Le nom ne peut pas contenir « / ».")) }
                 try SFTPManager.shared.session(for: url).rename(url.path, to: target.path)
                 return target
             }
@@ -156,7 +156,7 @@ extension FileOperationCenter {
             let result = Result { () -> URL in
                 let session = try SFTPManager.shared.session(for: directory)
                 let names = Set(try session.list(directory.path).entries.map(\.name))
-                let url = directory.appendingPathComponent(self.uniqueName("nouveau dossier", in: names, suffix: ""))
+                let url = directory.appendingPathComponent(self.uniqueName(L("nouveau dossier"), in: names, suffix: ""))
                 try session.makeDirectory(url.path)
                 return url
             }

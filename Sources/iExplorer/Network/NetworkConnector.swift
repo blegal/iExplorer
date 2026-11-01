@@ -34,10 +34,10 @@ enum NetworkConnector {
     }
 
     private static func error(for status: Int32, url: URL) -> NSError {
-        let reason = status > 0 ? String(cString: strerror(status)) : "code \(status)"
+        let reason = status > 0 ? String(cString: strerror(status)) : L("code \(status)")
         return NSError(domain: NSPOSIXErrorDomain, code: Int(status), userInfo: [
-            NSLocalizedDescriptionKey: "Impossible de se connecter à « \(url.host ?? url.absoluteString) ».",
-            NSLocalizedRecoverySuggestionErrorKey: "Vérifiez l’adresse, le nom du partage et vos identifiants (\(reason)).",
+            NSLocalizedDescriptionKey: L("Impossible de se connecter à « \(url.host ?? url.absoluteString) »."),
+            NSLocalizedRecoverySuggestionErrorKey: L("Vérifiez l’adresse, le nom du partage et vos identifiants (\(reason))."),
         ])
     }
 }

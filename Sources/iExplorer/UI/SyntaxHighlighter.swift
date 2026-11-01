@@ -26,14 +26,14 @@ enum SyntaxHighlighter {
             case .tex: "LaTeX"
             case .bibtex: "BibTeX"
             case .markdown: "Markdown"
-            case .plain: "Texte"
+            case .plain: L("Texte")
             case .make: "Makefile"
             case .cmake: "CMake"
             case .vhdl: "VHDL"
             case .verilog: "Verilog / SystemVerilog"
             case .tcl: "Tcl"
             case .yaml: "YAML"
-            case .ini: "Configuration"
+            case .ini: L("Configuration")
             case .xml: "XML / HTML"
             case .css: "CSS"
             case .sql: "SQL"
@@ -44,15 +44,15 @@ enum SyntaxHighlighter {
             case .r: "R"
             case .julia: "Julia"
             case .dockerfile: "Dockerfile"
-            case .assembly: "Assembleur"
+            case .assembly: L("Assembleur")
             case .fortran: "Fortran"
             case .haskell: "Haskell"
             case .diff: "Diff"
             case .typst: "Typst"
             case .matlab: "Matlab / Octave"
             case .spice: "SPICE"
-            case .linker: "Script d’édition de liens"
-            case .fpga: "Contraintes FPGA"
+            case .linker: L("Script d’édition de liens")
+            case .fpga: L("Contraintes FPGA")
             case .gnuplot: "Gnuplot"
             case .scala: "Scala / Chisel"
             case .kotlin: "Kotlin"
@@ -60,9 +60,9 @@ enum SyntaxHighlighter {
             case .rst: "reStructuredText"
             case .asciidoc: "AsciiDoc"
             case .org: "Org"
-            case .subtitles: "Sous-titres"
+            case .subtitles: L("Sous-titres")
             case .powershell: "PowerShell"
-            case .batch: "Batch Windows"
+            case .batch: L("Batch Windows")
             case .awk: "Awk"
             case .sed: "Sed"
             case .m4: "M4 / Autoconf"
@@ -74,7 +74,7 @@ enum SyntaxHighlighter {
             case .just: "Justfile"
             case .protobuf: "Protocol Buffers"
             case .graphql: "GraphQL"
-            case .template: "Gabarit (Jinja, Handlebars…)"
+            case .template: L("Gabarit (Jinja, Handlebars…)")
             case .elixir: "Elixir"
             case .erlang: "Erlang"
             case .ocaml: "OCaml"

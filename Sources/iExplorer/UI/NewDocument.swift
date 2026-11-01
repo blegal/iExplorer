@@ -3,7 +3,7 @@ import AppKit
 /// « Nouveau document › » : crée un fichier à partir d'un modèle puis passe en renommage.
 extension PanelViewController {
     func newDocumentMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "Nouveau document", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L("Nouveau document"), action: nil, keyEquivalent: "")
         item.image = NSImage(systemSymbolName: "doc.badge.plus", accessibilityDescription: nil)
         item.submenu = NSMenu()
         Self.fillNewDocumentMenu(item.submenu!, target: self)
@@ -13,14 +13,14 @@ extension PanelViewController {
     static func fillNewDocumentMenu(_ menu: NSMenu, target: AnyObject?) {
         let templates = DocumentTemplates.menuItems(target: target, action: #selector(newDocument(_:)))
         if templates.isEmpty {
-            let empty = NSMenuItem(title: "Aucun modèle", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: L("Aucun modèle"), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
         } else {
             templates.forEach(menu.addItem)
         }
         menu.addItem(.separator())
-        let open = NSMenuItem(title: "Ouvrir le dossier des modèles", action: #selector(openTemplatesFolder(_:)), keyEquivalent: "")
+        let open = NSMenuItem(title: L("Ouvrir le dossier des modèles"), action: #selector(openTemplatesFolder(_:)), keyEquivalent: "")
         open.target = target
         open.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         menu.addItem(open)

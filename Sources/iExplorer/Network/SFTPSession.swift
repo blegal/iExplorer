@@ -44,7 +44,7 @@ enum SFTPError: LocalizedError {
         switch self {
         case .connection(let message): return message
         case .command(let message): return message
-        case .timeout: return "Le serveur SFTP ne répond pas."
+        case .timeout: return L("Le serveur SFTP ne répond pas.")
         }
     }
 }
@@ -174,7 +174,7 @@ final class SFTPSession {
         condition.unlock()
 
         do { try process.run() } catch {
-            throw SFTPError.connection("Impossible de lancer sftp : \(error.localizedDescription)")
+            throw SFTPError.connection(L("Impossible de lancer sftp : \(error.localizedDescription)"))
         }
         self.process = process
         input = stdin.fileHandleForWriting
@@ -234,7 +234,7 @@ final class SFTPSession {
         do {
             try input?.write(contentsOf: Data(text.utf8))
         } catch {
-            throw SFTPError.connection("La connexion SFTP a été interrompue.")
+            throw SFTPError.connection(L("La connexion SFTP a été interrompue."))
         }
 
         let deadline = Date().addingTimeInterval(timeout)
@@ -261,12 +261,12 @@ final class SFTPSession {
 
     private static func describe(_ lines: [String], connection: Bool = false) -> String {
         let text = lines.joined(separator: "\n")
-        if text.contains("Permission denied") && connection { return "Authentification refusée par le serveur." }
-        if text.contains("Host key verification failed") { return "La clé du serveur n’a pas été acceptée." }
-        if text.contains("Could not resolve hostname") { return "Serveur introuvable." }
-        if text.contains("Connection refused") { return "Connexion refusée (le service SSH est-il actif ?)." }
-        if text.contains("timed out") { return "Le délai de connexion a expiré." }
-        if text.isEmpty { return connection ? "La connexion SFTP a été fermée." : "Erreur SFTP." }
+        if text.contains("Permission denied") && connection { return L("Authentification refusée par le serveur.") }
+        if text.contains("Host key verification failed") { return L("La clé du serveur n’a pas été acceptée.") }
+        if text.contains("Could not resolve hostname") { return L("Serveur introuvable.") }
+        if text.contains("Connection refused") { return L("Connexion refusée (le service SSH est-il actif ?).") }
+        if text.contains("timed out") { return L("Le délai de connexion a expiré.") }
+        if text.isEmpty { return connection ? L("La connexion SFTP a été fermée.") : L("Erreur SFTP.") }
         return text
     }
 
@@ -315,7 +315,7 @@ final class SFTPSession {
             // Un dossier se décrit par son entrée « . » ; un fichier par son unique ligne.
             return entries.first { $0.path.hasSuffix("/.") || $0.path == "." } ?? (entries.count == 1 ? entries[0] : nil)
         }
-        guard let numeric = try entry("-lan") else { throw SFTPError.command("Impossible de lire les permissions de « \(path) ».") }
+        guard let numeric = try entry("-lan") else { throw SFTPError.command(L("Impossible de lire les permissions de « \(path) ».")) }
         let named = try? entry("-la")
         return (numeric, named?.owner ?? numeric.owner, named?.group ?? numeric.group)
     }
@@ -416,7 +416,7 @@ final class SFTPManager {
     }
 
     func session(for url: URL) throws -> SFTPSession {
-        guard let endpoint = endpoint(for: url) else { throw SFTPError.connection("Adresse SFTP invalide.") }
+        guard let endpoint = endpoint(for: url) else { throw SFTPError.connection(L("Adresse SFTP invalide.")) }
         return lock.withLock {
             if let existing = sessions[endpoint.key] { return existing }
             let session = SFTPSession(endpoint: endpoint)
@@ -427,7 +427,7 @@ final class SFTPManager {
 
     /// Une session séparée pour un transfert (réutilise l'authentification de la connexion maîtresse).
     func dedicatedSession(for url: URL) throws -> SFTPSession {
-        guard let endpoint = endpoint(for: url) else { throw SFTPError.connection("Adresse SFTP invalide.") }
+        guard let endpoint = endpoint(for: url) else { throw SFTPError.connection(L("Adresse SFTP invalide.")) }
         return SFTPSession(endpoint: endpoint)
     }
 
@@ -461,7 +461,7 @@ extension FileItem {
         guard url.isRemote else { return try contents(of: url, showHidden: showHidden) }
         let session = try SFTPManager.shared.session(for: url)
         let listing = try session.list(url.path.isEmpty ? "/" : url.path)
-        guard listing.isDirectory else { throw SFTPError.command("« \(url.lastPathComponent) » n’est pas un dossier.") }
+        guard listing.isDirectory else { throw SFTPError.command(L("« \(url.lastPathComponent) » n’est pas un dossier.")) }
         return listing.entries
             .filter { showHidden || !$0.name.hasPrefix(".") }
             .map { FileItem(remote: url.appendingPathComponent($0.name), entry: $0) }

@@ -10,13 +10,13 @@ enum MetadataColumn: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .created: "Créé le"
-        case .shotDate: "Prise de vue"
-        case .dimensions: "Dimensions"
-        case .camera: "Appareil"
-        case .duration: "Durée"
-        case .authors: "Auteurs"
-        case .pages: "Pages"
+        case .created: L("Créé le")
+        case .shotDate: L("Prise de vue")
+        case .dimensions: L("Dimensions")
+        case .camera: L("Appareil")
+        case .duration: L("Durée")
+        case .authors: L("Auteurs")
+        case .pages: L("Pages")
         }
     }
 
@@ -208,7 +208,7 @@ private final class MetadataColumnMenu: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        menu.addItem(.sectionHeader(title: "Colonnes"))
+        menu.addItem(.sectionHeader(title: L("Colonnes")))
         let visible = MetadataColumn.visible
         for column in MetadataColumn.allCases {
             let item = NSMenuItem(title: column.title, action: #selector(toggle(_:)), keyEquivalent: "")

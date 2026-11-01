@@ -51,11 +51,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var displayedURL: URL?
 
     private let tabs = NSStackView()
-    private let saveButton = NSButton(title: "Enregistrer", target: nil, action: nil)
-    private let commitButton = NSButton(title: "Enregistrer, commit et push", target: nil, action: nil)
-    private let findButton = NSButton(title: "Rechercher", target: nil, action: nil)
-    private let previewButton = NSButton(title: "Aperçu", target: nil, action: nil)
-    private let wrapButton = NSButton(title: "Retour à la ligne", target: nil, action: nil)
+    private let saveButton = NSButton(title: L("Enregistrer"), target: nil, action: nil)
+    private let commitButton = NSButton(title: L("Enregistrer, commit et push"), target: nil, action: nil)
+    private let findButton = NSButton(title: L("Rechercher"), target: nil, action: nil)
+    private let previewButton = NSButton(title: L("Aperçu"), target: nil, action: nil)
+    private let wrapButton = NSButton(title: L("Retour à la ligne"), target: nil, action: nil)
     private let split = NSSplitView()
     private let preview = EditorPreviewView()
     private let textScroll = NSScrollView()
@@ -68,7 +68,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var pdfViewer: PDFView?
     /// Fichier affiché (texte ou Coup d'œil), rechargé quand il change sur le disque.
     private let fileWatcher = FileChangeWatcher()
-    private let placeholder = NSTextField(labelWithString: "Sélectionnez un fichier texte dans le panneau pour le modifier ici.")
+    private let placeholder = NSTextField(labelWithString: L("Sélectionnez un fichier texte dans le panneau pour le modifier ici."))
     private let statusLeft = NSTextField(labelWithString: "")
     private let statusRight = NSTextField(labelWithString: "")
     private var highlightWork: DispatchWorkItem?
@@ -107,27 +107,27 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         }
         previewButton.action = #selector(togglePreview(_:))
         previewButton.setButtonType(.pushOnPushOff)
-        previewButton.toolTip = "Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON).\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)"
+        previewButton.toolTip = L("Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON).\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)")
         wrapButton.image = Self.wrapIcon()
         wrapButton.action = #selector(toggleWrap(_:))
         wrapButton.setButtonType(.pushOnPushOff)
-        wrapButton.toolTip = "Retour à la ligne : couper les lignes longues à la largeur de l’éditeur"
+        wrapButton.toolTip = L("Retour à la ligne : couper les lignes longues à la largeur de l’éditeur")
         findButton.action = #selector(showSearch(_:))
-        findButton.toolTip = "Rechercher et remplacer dans le fichier (⌘F)"
+        findButton.toolTip = L("Rechercher et remplacer dans le fichier (⌘F)")
         saveButton.action = #selector(saveDocument(_:))
         saveButton.keyEquivalent = "s"
         saveButton.keyEquivalentModifierMask = .command
-        saveButton.toolTip = "Enregistrer (⌘S)"
+        saveButton.toolTip = L("Enregistrer (⌘S)")
         commitButton.action = #selector(saveCommitAndPush(_:))
         commitButton.keyEquivalent = "s"
         commitButton.keyEquivalentModifierMask = [.command, .option]
-        commitButton.toolTip = "Enregistrer, puis git add, commit et push de ce fichier (⌥⌘S)"
+        commitButton.toolTip = L("Enregistrer, puis git add, commit et push de ce fichier (⌥⌘S)")
         commitButton.isHidden = true
-        let close = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Fermer l’onglet")!,
+        let close = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: L("Fermer l’onglet"))!,
                              target: self, action: #selector(closeCurrent))
         close.isBordered = false
         close.contentTintColor = .secondaryLabelColor
-        close.toolTip = "Fermer l’onglet"
+        close.toolTip = L("Fermer l’onglet")
         let header = NSStackView(views: [tabScroll, previewButton, wrapButton, findButton, saveButton, commitButton, close])
         header.spacing = 8
         header.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 10)
@@ -352,7 +352,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         saveButton.isHidden = true
         commitButton.isHidden = true
         findButton.isHidden = true
-        statusLeft.stringValue = "Aperçu · \(url.lastPathComponent)"
+        statusLeft.stringValue = L("Aperçu · \(url.lastPathComponent)")
         statusRight.stringValue = ""
         rebuildTabs()
     }
@@ -394,7 +394,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private func reloadFromDisk(_ document: Document) {
         guard let fresh = Self.load(document.url), fresh.text != document.text else { return }
         if document.isModified {
-            statusRight.stringValue = "Modifié sur le disque · vos modifications sont conservées"
+            statusRight.stringValue = L("Modifié sur le disque · vos modifications sont conservées")
             return
         }
         let selection = textView.selectedRange()
@@ -439,7 +439,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             button.image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: nil)
             button.imagePosition = .imageLeading
             button.contentTintColor = .secondaryLabelColor
-            button.toolTip = "Ouvrir \(url.lastPathComponent)"
+            button.toolTip = L("Ouvrir \(url.lastPathComponent)")
             button.identifier = NSUserInterfaceItemIdentifier(url.path)
             tabs.addArrangedSubview(button)
         }
@@ -483,7 +483,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Retour à la ligne"
+        image.accessibilityDescription = L("Retour à la ligne")
         return image
     }
 
@@ -524,10 +524,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         }
         if document.isModified {
             let alert = NSAlert()
-            alert.messageText = "Enregistrer les modifications de « \(document.url.lastPathComponent) » ?"
-            alert.addButton(withTitle: "Enregistrer")
-            alert.addButton(withTitle: "Annuler")
-            alert.addButton(withTitle: "Ne pas enregistrer")
+            alert.messageText = L("Enregistrer les modifications de « \(document.url.lastPathComponent) » ?")
+            alert.addButton(withTitle: L("Enregistrer"))
+            alert.addButton(withTitle: L("Annuler"))
+            alert.addButton(withTitle: L("Ne pas enregistrer"))
             switch alert.runModal() {
             case .alertFirstButtonReturn: guard save(document) else { return }
             case .alertSecondButtonReturn: return
@@ -599,12 +599,12 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let line = before.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }
         let lastNewline = (before as NSString).range(of: "\n", options: .backwards).location
         let column = lastNewline == NSNotFound ? location + 1 : location - lastNewline
-        let language = SyntaxHighlighter.language(for: document.url)?.title ?? "Texte"
+        let language = SyntaxHighlighter.language(for: document.url)?.title ?? L("Texte")
         let endings = document.text.contains("\r\n") ? "CRLF" : "LF"
         let encoding = document.encoding == .utf8 ? "UTF-8" : "ISO Latin-1"
-        statusLeft.stringValue = "\(language) · \(encoding) · \(endings) · Ligne \(line), colonne \(column)"
+        statusLeft.stringValue = L("\(language) · \(encoding) · \(endings) · Ligne \(line), colonne \(column)")
         let root = document.gitRoot ?? nil
-        statusRight.stringValue = root.map { "Git : \($0.lastPathComponent)" + (document.isModified ? " · non enregistré" : "") } ?? (document.isModified ? "Non enregistré" : "")
+        statusRight.stringValue = root.map { document.isModified ? L("Git : \($0.lastPathComponent) · non enregistré") : L("Git : \($0.lastPathComponent)") } ?? (document.isModified ? L("Non enregistré") : "")
     }
 
     // MARK: Enregistrer
@@ -619,7 +619,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         if document === current { document.text = textView.string }
         do {
             guard let data = document.text.data(using: document.encoding) else {
-                throw NSError(domain: "iExplorer", code: 3, userInfo: [NSLocalizedDescriptionKey: "Le texte contient des caractères impossibles à écrire dans l’encodage du fichier."])
+                throw NSError(domain: "iExplorer", code: 3, userInfo: [NSLocalizedDescriptionKey: L("Le texte contient des caractères impossibles à écrire dans l’encodage du fichier.")])
             }
             try data.write(to: document.url, options: .atomic)
             document.isModified = false
@@ -657,20 +657,20 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         guard let document = current, let root = document.gitRoot ?? nil else { return }
         if document.isModified { guard save(document) else { return } }
         let alert = NSAlert()
-        alert.messageText = "Commit et push de « \(document.url.lastPathComponent) »"
-        alert.informativeText = "Seul ce fichier est ajouté au commit, puis poussé vers la branche distante."
-        let field = NSTextField(string: "Mise à jour de \(document.url.lastPathComponent)")
+        alert.messageText = L("Commit et push de « \(document.url.lastPathComponent) »")
+        alert.informativeText = L("Seul ce fichier est ajouté au commit, puis poussé vers la branche distante.")
+        let field = NSTextField(string: L("Mise à jour de \(document.url.lastPathComponent)"))
         field.frame = NSRect(x: 0, y: 0, width: 360, height: 24)
         alert.accessoryView = field
-        alert.addButton(withTitle: "Commit et push")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: L("Commit et push"))
+        alert.addButton(withTitle: L("Annuler"))
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let message = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { NSSound.beep(); return }
         let path = document.url.resolvingSymlinksInPath().path
         commitButton.isEnabled = false
-        statusRight.stringValue = "Commit et push en cours…"
+        statusRight.stringValue = L("Commit et push en cours…")
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var failure: String?
             let add = GitCommand.run(["add", "--", path], in: root)
@@ -683,7 +683,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             if failure == nil {
                 let push = GitCommand.run(["push"], in: root)
                 pushed = push.succeeded
-                if !push.succeeded { failure = "Le commit est fait, mais le push a échoué :\n" + push.error }
+                if !push.succeeded { failure = L("Le commit est fait, mais le push a échoué :\n") + push.error }
             }
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -696,7 +696,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                     alert.informativeText = failure.trimmingCharacters(in: .whitespacesAndNewlines)
                     alert.runModal()
                 } else if pushed {
-                    self.statusRight.stringValue = "Commit et push effectués"
+                    self.statusRight.stringValue = L("Commit et push effectués")
                 }
                 self.loadCommittedLines(document)
             }
@@ -744,7 +744,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 let sourceDate = (try? root.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
                 if compileIfMissing, sourceDate > pdfDate { compile(document) }
             } else {
-                preview.showMessage("Enregistrez (⌘S) pour compiler et voir le PDF ici.")
+                preview.showMessage(L("Enregistrez (⌘S) pour compiler et voir le PDF ici."))
                 if compileIfMissing, (kind == .latex ? ExternalTool.latex : .typst).isInstalled { compile(document) }
             }
         }
@@ -757,7 +757,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let root = DocumentCompiler.root(for: document.url, text: document.text)
         compiling = true
         let start = Date()
-        statusRight.stringValue = "Compilation de \(root.lastPathComponent)…"
+        statusRight.stringValue = L("Compilation de \(root.lastPathComponent)…")
         DocumentCompiler.compile(root, kind: kind) { [weak self] result in
             guard let self else { return }
             self.compiling = false
@@ -767,7 +767,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             case .success(let pdf):
                 self.preview.showPDF(pdf)
                 let seconds = Date().timeIntervalSince(start).formatted(.number.precision(.fractionLength(1)))
-                self.preview.showBanner("Compilé en \(seconds) s", error: false)
+                self.preview.showBanner(L("Compilé en \(seconds) s"), error: false)
             case .failure(let failure):
                 self.preview.showBanner(failure.summary, error: true, log: failure.log.isEmpty ? nil : failure.log, line: failure.line)
             }
@@ -804,11 +804,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             let root = DocumentCompiler.root(for: document.url, text: textView.string)
             let pdf = DocumentCompiler.pdf(for: root)
             guard SyncTeX.isAvailable(for: pdf) else {
-                preview.showBanner("Pas de données SyncTeX : enregistrez (⌘S) pour recompiler", error: true)
+                preview.showBanner(L("Pas de données SyncTeX : enregistrez (⌘S) pour recompiler"), error: true)
                 return true
             }
             SyncTeX.forward(line: line, source: document.url, pdf: pdf) { [weak self] boxes in
-                if boxes.isEmpty { self?.preview.showBanner("Ligne \(line) introuvable dans le PDF", error: true) } else { self?.preview.showSyncTeX(boxes) }
+                if boxes.isEmpty { self?.preview.showBanner(L("Ligne \(line) introuvable dans le PDF"), error: true) } else { self?.preview.showSyncTeX(boxes) }
             }
             return true
         default:
@@ -853,7 +853,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     func textView(_ view: NSTextView, menu: NSMenu, for event: NSEvent, at index: Int) -> NSMenu? {
         guard let kind = current?.previewKind, kind == .markdown || kind == .latex, Self.previewVisible else { return menu }
-        let item = NSMenuItem(title: kind == .latex ? "Afficher dans le PDF" : "Afficher dans l’aperçu", action: #selector(showInPreview(_:)), keyEquivalent: "")
+        let item = NSMenuItem(title: kind == .latex ? L("Afficher dans le PDF") : L("Afficher dans l’aperçu"), action: #selector(showInPreview(_:)), keyEquivalent: "")
         item.target = self
         item.representedObject = index
         menu.insertItem(item, at: 0)
@@ -1119,9 +1119,9 @@ private final class LineNumberRuler: NSRulerView {
     private func showPopover(for change: GitLineChange, at point: NSPoint) {
         let title: String
         switch change.kind {
-        case .added: title = change.count > 1 ? "\(change.count) lignes ajoutées depuis le dernier commit" : "Ligne ajoutée depuis le dernier commit"
-        case .modified: title = "Version du dernier commit"
-        case .deleted: title = change.oldLines.count > 1 ? "\(change.oldLines.count) lignes supprimées" : "Ligne supprimée"
+        case .added: title = change.count > 1 ? L("\(change.count) lignes ajoutées depuis le dernier commit") : L("Ligne ajoutée depuis le dernier commit")
+        case .modified: title = L("Version du dernier commit")
+        case .deleted: title = change.oldLines.count > 1 ? L("\(change.oldLines.count) lignes supprimées") : L("Ligne supprimée")
         }
         let label = NSTextField(labelWithString: title)
         label.font = .systemFont(ofSize: 11.5, weight: .semibold)
@@ -1142,7 +1142,7 @@ private final class LineNumberRuler: NSRulerView {
             scroll.heightAnchor.constraint(equalToConstant: height).isActive = true
             views.append(scroll)
         }
-        let button = NSButton(title: change.kind == .added ? "Supprimer ces lignes" : "Rétablir la version du commit", target: self, action: #selector(revertFromPopover(_:)))
+        let button = NSButton(title: change.kind == .added ? L("Supprimer ces lignes") : L("Rétablir la version du commit"), target: self, action: #selector(revertFromPopover(_:)))
         button.controlSize = .small
         views.append(button)
         let stack = NSStackView(views: views)

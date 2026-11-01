@@ -15,20 +15,26 @@ final class SettingsWindowController: NSWindowController {
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
         // Le titre de chaque onglet devient celui de la fenêtre.
+        let generalController = GeneralSettingsViewController()
+        generalController.title = L("Général")
+        let general = NSTabViewItem(viewController: generalController)
+        general.label = L("Général")
+        general.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        tabs.addTabViewItem(general)
         let toolsController = ExternalToolsViewController()
-        toolsController.title = "Outils externes"
+        toolsController.title = L("Outils externes")
         let tools = NSTabViewItem(viewController: toolsController)
-        tools.label = "Outils externes"
+        tools.label = L("Outils externes")
         tools.image = NSImage(systemSymbolName: "shippingbox", accessibilityDescription: nil)
         tabs.addTabViewItem(tools)
         let animationsController = AnimationSettingsViewController()
-        animationsController.title = "Animations"
+        animationsController.title = L("Animations")
         let animations = NSTabViewItem(viewController: animationsController)
-        animations.label = "Animations"
+        animations.label = L("Animations")
         animations.image = NSImage(systemSymbolName: "wand.and.sparkles", accessibilityDescription: nil)
         tabs.addTabViewItem(animations)
         let window = NSWindow(contentViewController: tabs)
-        window.title = "Réglages"
+        window.title = L("Réglages")
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -49,8 +55,7 @@ final class ExternalToolsViewController: NSViewController {
         rows.orientation = .vertical
         rows.alignment = .leading
         rows.spacing = 10
-        let intro = NSTextField(wrappingLabelWithString: "Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. "
-            + "« Installer » lance Homebrew en arrière-plan ; le journal s’affiche ci-dessous.")
+        let intro = NSTextField(wrappingLabelWithString: L("Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. « Installer » lance Homebrew en arrière-plan ; le journal s’affiche ci-dessous."))
         intro.textColor = .secondaryLabelColor
         intro.font = .systemFont(ofSize: 12)
 
@@ -108,18 +113,18 @@ final class ExternalToolsViewController: NSViewController {
         rows.arrangedSubviews.forEach { $0.removeFromSuperview() }
         // Homebrew d'abord : sans lui, pas d'installation automatique.
         if let brew = ExternalTool.homebrew {
-            rows.addArrangedSubview(row(installed: true, title: "Homebrew", purpose: "Installe les outils ci-dessous", detail: brew.path, button: nil))
+            rows.addArrangedSubview(row(installed: true, title: "Homebrew", purpose: L("Installe les outils ci-dessous"), detail: brew.path, button: nil))
         } else {
-            let button = NSButton(title: "Installer Homebrew…", target: self, action: #selector(openHomebrewSite))
-            rows.addArrangedSubview(row(installed: false, title: "Homebrew", purpose: "Nécessaire pour installer les outils ci-dessous", detail: "brew.sh", button: button))
+            let button = NSButton(title: L("Installer Homebrew…"), target: self, action: #selector(openHomebrewSite))
+            rows.addArrangedSubview(row(installed: false, title: "Homebrew", purpose: L("Nécessaire pour installer les outils ci-dessous"), detail: "brew.sh", button: button))
         }
         for category in ExternalTool.Category.allCases {
             rows.addArrangedSubview(separator())
-            rows.addArrangedSubview(sectionTitle(category.rawValue))
+            rows.addArrangedSubview(sectionTitle(category.title))
             for tool in ExternalTool.allCases where tool.category == category { addRow(for: tool) }
         }
         rows.addArrangedSubview(separator())
-        rows.addArrangedSubview(sectionTitle("Déjà intégrés"))
+        rows.addArrangedSubview(sectionTitle(L("Déjà intégrés")))
         for library in ExternalTool.builtIn {
             rows.addArrangedSubview(row(installed: true, title: library.title, purpose: library.purpose, detail: nil, button: nil))
         }
@@ -136,7 +141,7 @@ final class ExternalToolsViewController: NSViewController {
             let path = tool.path
             var button: NSButton?
             if path == nil {
-                let title = installing == tool ? "Installation…" : (tool == .developerTools ? "Installer…" : "Installer")
+                let title = installing == tool ? L("Installation…") : (tool == .developerTools ? L("Installer…") : L("Installer"))
                 let install = NSButton(title: title, target: self, action: #selector(install(_:)))
                 install.tag = ExternalTool.allCases.firstIndex(of: tool) ?? 0
                 install.isEnabled = installing == nil && (tool == .developerTools || ExternalTool.homebrew != nil)
@@ -144,7 +149,7 @@ final class ExternalToolsViewController: NSViewController {
             }
             let package = tool.brewPackage.map { "brew install \($0.cask ? "--cask " : "")\($0.name)" } ?? "xcode-select --install"
             // Outil utile mais pas encore exploité par l'app : on le dit.
-            let purpose = tool.isUsed ? tool.purpose : tool.purpose + " — intégration à venir"
+            let purpose = tool.isUsed ? tool.purpose : tool.purpose + L(" — intégration à venir")
             rows.addArrangedSubview(row(installed: path != nil, title: tool.title, purpose: purpose,
                                         detail: path?.path ?? package, button: button))
     }
@@ -157,7 +162,7 @@ final class ExternalToolsViewController: NSViewController {
     }
 
     private func row(installed: Bool, title: String, purpose: String, detail: String?, button: NSButton?) -> NSView {
-        let icon = NSImageView(image: NSImage(systemSymbolName: installed ? "checkmark.circle.fill" : "circle.dashed", accessibilityDescription: installed ? "Installé" : "Absent")!)
+        let icon = NSImageView(image: NSImage(systemSymbolName: installed ? "checkmark.circle.fill" : "circle.dashed", accessibilityDescription: installed ? L("Installé") : L("Absent"))!)
         icon.contentTintColor = installed ? .systemGreen : .tertiaryLabelColor
         icon.symbolConfiguration = .init(pointSize: 15, weight: .regular)
         let name = NSTextField(labelWithString: title)
@@ -187,7 +192,7 @@ final class ExternalToolsViewController: NSViewController {
     }
 
     @objc private func openHomebrewSite() {
-        if let url = URL(string: "https://brew.sh/fr/") { NSWorkspace.shared.open(url) }
+        if let url = URL(string: AppLanguage.current == "fr" ? "https://brew.sh/fr/" : "https://brew.sh/") { NSWorkspace.shared.open(url) }
     }
 
     @objc private func install(_ sender: NSButton) {
@@ -198,7 +203,7 @@ final class ExternalToolsViewController: NSViewController {
             process.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
             process.arguments = ["--install"]
             try? process.run()
-            append("xcode-select --install : suivez la fenêtre d’Apple, puis rouvrez ces réglages.\n")
+            append(L("xcode-select --install : suivez la fenêtre d’Apple, puis rouvrez ces réglages.\n"))
             return
         }
         guard let brew = ExternalTool.homebrew, let package = tool.brewPackage else { return }
@@ -227,7 +232,7 @@ final class ExternalToolsViewController: NSViewController {
             output.fileHandleForReading.readabilityHandler = nil
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.append(process.terminationStatus == 0 ? "✓ \(tool.title) installé.\n" : "✗ L’installation a échoué (code \(process.terminationStatus)).\n")
+                self.append(process.terminationStatus == 0 ? L("✓ \(tool.title) installé.\n") : L("✗ L’installation a échoué (code \(process.terminationStatus)).\n"))
                 self.installing = nil
                 self.rebuild()
                 NotificationCenter.default.post(name: Self.toolsChanged, object: nil)
@@ -247,6 +252,47 @@ final class ExternalToolsViewController: NSViewController {
 }
 
 /// Onglet Animations : le niveau choisi, puis chaque effet à cocher, rangé par niveau.
+/// Onglet Général : langue de l'interface.
+final class GeneralSettingsViewController: NSViewController {
+    private let language = NSPopUpButton()
+
+    override func loadView() {
+        for choice in AppLanguage.allCases { language.addItem(withTitle: choice.title) }
+        language.selectItem(at: AppLanguage.allCases.firstIndex(of: AppLanguage.chosen) ?? 0)
+        language.target = self
+        language.action = #selector(changeLanguage)
+        let line = NSStackView(views: [NSTextField(labelWithString: L("Langue :")), language])
+        let intro = NSTextField(wrappingLabelWithString: L("Par défaut, iExplorer suit la langue de macOS. Le changement s’applique au prochain lancement."))
+        intro.textColor = .secondaryLabelColor
+        intro.font = .systemFont(ofSize: 12)
+        let stack = NSStackView(views: [line, intro])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 22, bottom: 18, right: 22)
+        stack.widthAnchor.constraint(equalToConstant: 520).isActive = true
+        view = stack
+    }
+
+    @objc private func changeLanguage() {
+        let choice = AppLanguage.allCases[max(0, language.indexOfSelectedItem)]
+        guard choice != AppLanguage.chosen else { return }
+        AppLanguage.chosen = choice
+        let alert = NSAlert()
+        alert.messageText = L("Relancer iExplorer maintenant ?")
+        alert.informativeText = L("La nouvelle langue s’appliquera au redémarrage.")
+        alert.addButton(withTitle: L("Relancer"))
+        alert.addButton(withTitle: L("Plus tard"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        AppLanguage.applyAtLaunch()
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
+    }
+}
+
 final class AnimationSettingsViewController: NSViewController {
     private let mode = NSPopUpButton()
     private var boxes: [AnimationEffect: NSButton] = [:]
@@ -257,14 +303,13 @@ final class AnimationSettingsViewController: NSViewController {
         mode.selectItem(at: AnimationMode.chosen.rawValue)
         mode.target = self
         mode.action = #selector(changeAnimationLevel)
-        let modeLine = NSStackView(views: [NSTextField(labelWithString: "Niveau :"), mode])
-        let intro = NSTextField(wrappingLabelWithString: "Le niveau active tous les effets jusqu’à lui ; décochez ceux que vous ne voulez pas. "
-            + "Le bouton Animations de la barre d’outils change aussi le niveau.")
+        let modeLine = NSStackView(views: [NSTextField(labelWithString: L("Niveau :")), mode])
+        let intro = NSTextField(wrappingLabelWithString: L("Le niveau active tous les effets jusqu’à lui ; décochez ceux que vous ne voulez pas. Le bouton Animations de la barre d’outils change aussi le niveau."))
         intro.textColor = .secondaryLabelColor
         intro.font = .systemFont(ofSize: 12)
         var views: [NSView] = [modeLine, intro]
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            let warning = NSTextField(wrappingLabelWithString: "« Réduire les animations » est activé dans les réglages d’accessibilité de macOS : aucune animation n’est jouée.")
+            let warning = NSTextField(wrappingLabelWithString: L("« Réduire les animations » est activé dans les réglages d’accessibilité de macOS : aucune animation n’est jouée."))
             warning.textColor = .systemOrange
             warning.font = .systemFont(ofSize: 12)
             views.append(warning)
@@ -313,7 +358,7 @@ final class AnimationSettingsViewController: NSViewController {
         let chosen = AnimationMode.chosen
         for (effect, box) in boxes { box.alphaValue = effect.level.rawValue <= chosen.rawValue ? 1 : 0.45 }
         for (level, header) in headers {
-            header.stringValue = level.title + (level.rawValue <= chosen.rawValue ? "" : " — actifs à partir de ce niveau")
+            header.stringValue = level.title + (level.rawValue <= chosen.rawValue ? "" : L(" — actifs à partir de ce niveau"))
             header.textColor = level.rawValue <= chosen.rawValue ? .labelColor : .tertiaryLabelColor
         }
     }

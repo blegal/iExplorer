@@ -1,0 +1,5 @@
+NSDesktopFolderUsageDescription = "Show and manage the files on your Desktop.";
+NSDocumentsFolderUsageDescription = "Show and manage the files in your Documents folder.";
+NSDownloadsFolderUsageDescription = "Show and manage the files in your Downloads folder.";
+NSRemovableVolumesUsageDescription = "Show and manage the files on removable disks.";
+NSNetworkVolumesUsageDescription = "Show and manage the files on network volumes.";

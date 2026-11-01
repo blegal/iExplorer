@@ -34,6 +34,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$PRODUCT"
 cp "$INFO" "$APP/Contents/Info.plist"
 cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
+# Traductions de l'interface (fr.lproj, en.lproj…).
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
 PLIST="$APP/Contents/Info.plist"
 [[ -n "${VERSION:-}" ]] && /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
 [[ -n "${BUILD_NUMBER:-}" ]] && /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"

@@ -560,7 +560,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     /// Menu des modes de présentation (barre d'outils) ; les entrées vont au panneau actif.
     static func viewModeMenu() -> NSMenu {
-        let menu = NSMenu(title: "Présentation")
+        let menu = NSMenu(title: L("Présentation"))
         for mode in PanelViewMode.allCases {
             let item = NSMenuItem(title: mode.title, action: mode.action, keyEquivalent: "\(mode.rawValue + 1)")
             item.image = mode.icon
@@ -571,7 +571,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     /// Menu des dispositions (barre d'outils et menu Présentation).
     static func layoutMenu() -> NSMenu {
-        let menu = NSMenu(title: "Disposition")
+        let menu = NSMenu(title: L("Disposition"))
         for (index, layout) in PanelLayout.ordered.enumerated() {
             let item = NSMenuItem(title: layout.title, action: #selector(setLayout(_:)), keyEquivalent: index < 9 ? "\(index + 1)" : "")
             item.keyEquivalentModifierMask = [.command, .option]
@@ -592,9 +592,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     /// Bouton Thèmes : un sous-menu pour les couleurs, un pour les icônes.
     static func appearanceMenu() -> NSMenu {
-        let menu = NSMenu(title: "Thèmes")
-        for (title, symbol, submenu) in [("Couleurs et apparence", "swatchpalette", ColorTheme.menu()),
-                                         ("Icônes de fichiers", "folder", iconThemeMenu())] {
+        let menu = NSMenu(title: L("Thèmes"))
+        for (title, symbol, submenu) in [(L("Couleurs et apparence"), "swatchpalette", ColorTheme.menu()),
+                                         (L("Icônes de fichiers"), "folder", iconThemeMenu())] {
             let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
             item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
             item.submenu = submenu
@@ -605,7 +605,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     /// Menu des thèmes d'icônes, chacun illustré par son icône de dossier.
     static func iconThemeMenu() -> NSMenu {
-        let menu = NSMenu(title: "Thème d’icônes")
+        let menu = NSMenu(title: L("Thème d’icônes"))
         for theme in IconTheme.allCases {
             let item = NSMenuItem(title: theme.title, action: #selector(AppDelegate.setIconTheme(_:)), keyEquivalent: "")
             item.tag = theme.rawValue
@@ -646,7 +646,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             case .failure(let error):
                 guard let window = self?.window else { return }
                 let alert = NSAlert(error: error)
-                alert.messageText = "Impossible de se connecter à « \(connection.displayName) »."
+                alert.messageText = L("Impossible de se connecter à « \(connection.displayName) ».")
                 alert.informativeText = error.localizedDescription
                 alert.beginSheetModal(for: window)
             }
@@ -668,10 +668,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             return panelsController.layout.panelCount > 1
         }
         if menuItem.action == #selector(toggleTerminal(_:)) {
-            menuItem.title = terminalItem.isCollapsed ? "Afficher le terminal" : "Masquer le terminal"
+            menuItem.title = terminalItem.isCollapsed ? L("Afficher le terminal") : L("Masquer le terminal")
         }
         if menuItem.action == #selector(toggleInspectorPane(_:)) {
-            menuItem.title = inspectorItem.isCollapsed ? "Afficher l’inspecteur" : "Masquer l’inspecteur"
+            menuItem.title = inspectorItem.isCollapsed ? L("Afficher l’inspecteur") : L("Masquer l’inspecteur")
         }
         if menuItem.action == #selector(focusNextPanel(_:)) || menuItem.action == #selector(equalizePanels(_:)) {
             return panelsController.layout.panelCount > 1
@@ -710,8 +710,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             // Clic : précédent / suivant ; appui long : tout l'historique de l'onglet.
             let isBack = identifier == .back
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
-            item.label = isBack ? "Précédent" : "Suivant"
-            item.toolTip = (isBack ? "Précédent (⌘[)" : "Suivant (⌘])") + " — maintenir le clic pour tout l’historique de l’onglet"
+            item.label = isBack ? L("Précédent") : L("Suivant")
+            item.toolTip = (isBack ? L("Précédent (⌘[)") : L("Suivant (⌘])")) + L(" — maintenir le clic pour tout l’historique de l’onglet")
             item.image = NSImage(systemSymbolName: isBack ? "chevron.left" : "chevron.right", accessibilityDescription: item.label)
             item.action = isBack ? #selector(PanelViewController.goBack(_:)) : #selector(PanelViewController.goForward(_:))
             item.showsIndicator = false
@@ -720,78 +720,78 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             menu.delegate = isBack ? backMenu : forwardMenu
             item.menu = menu
             return item
-        case .newFolder: return button("Nouveau dossier", "folder.badge.plus", #selector(PanelViewController.newFolder(_:)), tip: "Nouveau dossier (⇧⌘N)")
-        case .quickLook: return button("Coup d’œil", "eye", #selector(PanelViewController.quickLook(_:)), tip: "Coup d’œil sur la sélection (Espace ou ⌘Y)")
-        case .trash: return button("Corbeille", "trash", #selector(PanelViewController.moveToTrash(_:)), tip: "Placer la sélection dans la corbeille (⌘⌫)")
+        case .newFolder: return button(L("Nouveau dossier"), "folder.badge.plus", #selector(PanelViewController.newFolder(_:)), tip: L("Nouveau dossier (⇧⌘N)"))
+        case .quickLook: return button(L("Coup d’œil"), "eye", #selector(PanelViewController.quickLook(_:)), tip: L("Coup d’œil sur la sélection (Espace ou ⌘Y)"))
+        case .trash: return button(L("Corbeille"), "trash", #selector(PanelViewController.moveToTrash(_:)), tip: L("Placer la sélection dans la corbeille (⌘⌫)"))
         case .hidden, .inspector:
             // Boutons à bascule : coloré quand actif (fichiers cachés affichés, inspecteur ouvert).
             let isHidden = identifier == .hidden
             let toggle = ToolbarToggle(image: NSImage(systemSymbolName: isHidden ? "doc.badge.ellipsis" : "info.circle",
-                                                      accessibilityDescription: isHidden ? "Fichiers cachés" : "Inspecteur")!,
+                                                      accessibilityDescription: isHidden ? L("Fichiers cachés") : L("Inspecteur"))!,
                                        target: isHidden ? nil : self,
                                        action: isHidden ? #selector(AppDelegate.toggleHiddenFiles(_:)) : #selector(toggleInspectorPane(_:)))
             toggle.setButtonType(.pushOnPushOff)
             toggle.bezelStyle = .toolbar
             toggle.state = (isHidden ? Preferences.showHiddenFiles : !inspectorItem.isCollapsed) ? .on : .off
-            toggle.toolTip = isHidden ? "Afficher ou masquer les fichiers cachés (⇧⌘.)" : "Afficher ou masquer l’inspecteur (⌥⌘I)"
+            toggle.toolTip = isHidden ? L("Afficher ou masquer les fichiers cachés (⇧⌘.)") : L("Afficher ou masquer l’inspecteur (⌥⌘I)")
             if isHidden { hiddenButton = toggle } else { inspectorButton = toggle }
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = toggle
-            item.label = isHidden ? "Fichiers cachés" : "Inspecteur"
+            item.label = isHidden ? L("Fichiers cachés") : L("Inspecteur")
             return item
-        case .connect: return button("Se connecter au serveur", "network", #selector(connectToServer(_:)), tip: "Se connecter à un serveur SFTP, SMB, WebDAV… (⌘K)")
+        case .connect: return button(L("Se connecter au serveur"), "network", #selector(connectToServer(_:)), tip: L("Se connecter à un serveur SFTP, SMB, WebDAV… (⌘K)"))
         case .updates:
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = UpdateStatusButton()
-            item.label = "Mises à jour"
+            item.label = L("Mises à jour")
             return item
         case .git, .terminal:
             // Boutons à bascule : leur état (activé / désactivé) est visible dans la barre.
             let isGit = identifier == .git
             let toggle = ToolbarToggle(image: NSImage(systemSymbolName: isGit ? "arrow.triangle.branch" : "apple.terminal",
-                                                 accessibilityDescription: isGit ? "État Git" : "Terminal")!,
+                                                 accessibilityDescription: isGit ? L("État Git") : "Terminal")!,
                                   target: isGit ? nil : self,
                                   action: isGit ? #selector(AppDelegate.toggleGit(_:)) : #selector(toggleTerminal(_:)))
             toggle.setButtonType(.pushOnPushOff)
             toggle.bezelStyle = .toolbar
             toggle.state = (isGit ? GitService.isEnabled : !terminalItem.isCollapsed) ? .on : .off
-            toggle.toolTip = isGit ? "Afficher l’état Git (couleurs, push / pull en attente) — consomme du temps processeur" : "Afficher ou masquer le terminal (⌃`)"
+            toggle.toolTip = isGit ? L("Afficher l’état Git (couleurs, push / pull en attente) — consomme du temps processeur") : L("Afficher ou masquer le terminal (⌃`)")
             if isGit { gitButton = toggle } else { terminalButton = toggle }
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = toggle
             item.label = isGit ? "Git" : "Terminal"
             return item
         case .syncNavigation:
-            let toggle = ToolbarToggle(image: NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: "Navigation synchronisée")!,
+            let toggle = ToolbarToggle(image: NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: L("Navigation synchronisée"))!,
                                   target: self, action: #selector(toggleSyncNavigation(_:)))
             toggle.setButtonType(.pushOnPushOff)
             toggle.bezelStyle = .toolbar
             toggle.state = Preferences.syncNavigation ? .on : .off
-            toggle.toolTip = "Navigation synchronisée (⌃⌘Y) : les autres panneaux descendent et remontent avec le panneau actif"
+            toggle.toolTip = L("Navigation synchronisée (⌃⌘Y) : les autres panneaux descendent et remontent avec le panneau actif")
             syncButton = toggle
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = toggle
-            item.label = "Synchro"
+            item.label = L("Synchro")
             return item
         case .diskUsage:
-            let toggle = ToolbarToggle(image: NSImage(systemSymbolName: "chart.pie", accessibilityDescription: "Occupation du disque")!,
+            let toggle = ToolbarToggle(image: NSImage(systemSymbolName: "chart.pie", accessibilityDescription: L("Occupation du disque"))!,
                                   target: self, action: #selector(toggleDiskUsageFromToolbar(_:)))
             toggle.setButtonType(.pushOnPushOff)
             toggle.bezelStyle = .toolbar
             toggle.state = activePanel.isShowingDiskUsage ? .on : .off
-            toggle.toolTip = "Occupation du disque (⌘5) — cliquer de nouveau pour revenir aux fichiers"
+            toggle.toolTip = L("Occupation du disque (⌘5) — cliquer de nouveau pour revenir aux fichiers")
             diskUsageButton = toggle
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = toggle
-            item.label = "Occupation"
+            item.label = L("Occupation")
             return item
         case .viewMode:
             // Comme la disposition : un bouton qui montre le mode courant et déroule les autres.
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
             item.menu = Self.viewModeMenu()
             item.image = activePanel.viewMode.icon
-            item.label = "Présentation"
-            item.toolTip = "Présentation du panneau : icônes, liste, liste détaillée ou colonnes (⌘1 à ⌘4)"
+            item.label = L("Présentation")
+            item.toolTip = L("Présentation du panneau : icônes, liste, liste détaillée ou colonnes (⌘1 à ⌘4)")
             item.showsIndicator = true
             viewModeItem = item
             return item
@@ -800,24 +800,24 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
             item.menu = Self.layoutMenu()
             item.image = panelsController.layout.icon()
-            item.label = "Disposition"
-            item.toolTip = "Disposition des panneaux : 1 à 4 panneaux (⌥⌘1…)"
+            item.label = L("Disposition")
+            item.toolTip = L("Disposition des panneaux : 1 à 4 panneaux (⌥⌘1…)")
             item.showsIndicator = true
             layoutItem = item
             return item
         case .colorTheme:
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
             item.menu = ColorTheme.menu()
-            item.image = NSImage(systemSymbolName: "swatchpalette", accessibilityDescription: "Thème de couleurs")
-                ?? NSImage(systemSymbolName: "circle.lefthalf.filled", accessibilityDescription: "Thème de couleurs")
-            item.label = "Thème de couleurs"
-            item.toolTip = "Thème de couleurs et apparence claire / sombre"
+            item.image = NSImage(systemSymbolName: "swatchpalette", accessibilityDescription: L("Thème de couleurs"))
+                ?? NSImage(systemSymbolName: "circle.lefthalf.filled", accessibilityDescription: L("Thème de couleurs"))
+            item.label = L("Thème de couleurs")
+            item.toolTip = L("Thème de couleurs et apparence claire / sombre")
             item.showsIndicator = true
             return item
         case .animations:
             // Sans animation, légères ou complètes : l'icône montre le mode choisi.
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
-            let menu = NSMenu(title: "Animations")
+            let menu = NSMenu(title: L("Animations"))
             for mode in AnimationMode.allCases {
                 let entry = NSMenuItem(title: mode.title, action: #selector(setAnimationMode(_:)), keyEquivalent: "")
                 entry.target = self
@@ -827,8 +827,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             }
             item.menu = menu
             item.image = AnimationMode.current.icon
-            item.label = "Animations"
-            item.toolTip = "Animations : aucune, légères ou complètes"
+            item.label = L("Animations")
+            item.toolTip = L("Animations : aucune, légères ou complètes")
             item.showsIndicator = true
             animationsItem = item
             return item
@@ -836,17 +836,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             // Couleurs et icônes réunies derrière un seul bouton.
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
             item.menu = Self.appearanceMenu()
-            item.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: "Thèmes")
-            item.label = "Thèmes"
-            item.toolTip = "Thèmes : couleurs (et clair / sombre) et icônes de fichiers"
+            item.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: L("Thèmes"))
+            item.label = L("Thèmes")
+            item.toolTip = L("Thèmes : couleurs (et clair / sombre) et icônes de fichiers")
             item.showsIndicator = true
             return item
         case .iconTheme:
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
             item.menu = Self.iconThemeMenu()
-            item.image = NSImage(systemSymbolName: "folder.badge.gearshape", accessibilityDescription: "Thème d’icônes")
-            item.label = "Thème d’icônes"
-            item.toolTip = "Thème des icônes de fichiers et de dossiers"
+            item.image = NSImage(systemSymbolName: "folder.badge.gearshape", accessibilityDescription: L("Thème d’icônes"))
+            item.label = L("Thème d’icônes")
+            item.toolTip = L("Thème des icônes de fichiers et de dossiers")
             item.showsIndicator = true
             return item
         default:
@@ -863,8 +863,8 @@ final class JobsView: NSView {
     private var collapsed: NSLayoutConstraint!
     /// En-tête : résumé, « à la suite », tout mettre en pause, opérations terminées.
     private let summary = NSTextField(labelWithString: "")
-    private let sequential = NSButton(checkboxWithTitle: "À la suite (une à la fois)", target: nil, action: nil)
-    private let pauseAll = NSButton(title: "Tout mettre en pause", target: nil, action: nil)
+    private let sequential = NSButton(checkboxWithTitle: L("À la suite (une à la fois)"), target: nil, action: nil)
+    private let pauseAll = NSButton(title: L("Tout mettre en pause"), target: nil, action: nil)
     private let history = NSPopUpButton(frame: .zero, pullsDown: true)
 
     override init(frame: NSRect) {
@@ -880,7 +880,7 @@ final class JobsView: NSView {
         sequential.font = .systemFont(ofSize: 11)
         sequential.target = self
         sequential.action = #selector(toggleSequential)
-        sequential.toolTip = "Les nouvelles opérations attendent la fin des précédentes"
+        sequential.toolTip = L("Les nouvelles opérations attendent la fin des précédentes")
         pauseAll.controlSize = .small
         pauseAll.bezelStyle = .accessoryBarAction
         pauseAll.target = self
@@ -924,24 +924,25 @@ final class JobsView: NSView {
             let snapshot = job.snapshot
             return job.countsItems ? total : total + max(0, snapshot.total - snapshot.done)
         }
-        var parts = ["\(jobs.count) opération\(jobs.count > 1 ? "s" : "")"]
-        if waiting > 0 { parts.append("\(waiting) en attente") }
-        if remaining > 0 { parts.append("\(Format.size(remaining)) restants") }
+        var parts = [jobs.count > 1 ? L("\(jobs.count) opérations") : L("\(jobs.count) opération")]
+        if waiting > 0 { parts.append(L("\(waiting) en attente")) }
+        if remaining > 0 { parts.append(L("\(Format.size(remaining)) restants")) }
         summary.stringValue = parts.joined(separator: " · ")
         sequential.state = FileOperationCenter.sequential ? .on : .off
         let allPaused = !jobs.isEmpty && jobs.allSatisfy(\.isPaused)
-        pauseAll.title = allPaused ? "Tout reprendre" : "Tout mettre en pause"
+        pauseAll.title = allPaused ? L("Tout reprendre") : L("Tout mettre en pause")
         history.removeAllItems()
-        history.addItem(withTitle: "Terminées : \(center.finished.count)")
+        history.addItem(withTitle: L("Terminées : \(center.finished.count)"))
         history.isHidden = center.finished.isEmpty
         let formatter = DateFormatter()
+        formatter.locale = AppLanguage.locale
         formatter.timeStyle = .short
         for entry in center.finished {
-            history.addItem(withTitle: "\(formatter.string(from: entry.date))  \(entry.title)\(entry.cancelled ? " — annulée" : "")")
+            history.addItem(withTitle: "\(formatter.string(from: entry.date))  \(entry.title)" + (entry.cancelled ? L(" — annulée") : ""))
             history.lastItem?.isEnabled = false
         }
         history.menu?.addItem(.separator())
-        let clear = NSMenuItem(title: "Effacer la liste", action: #selector(clearHistory), keyEquivalent: "")
+        let clear = NSMenuItem(title: L("Effacer la liste"), action: #selector(clearHistory), keyEquivalent: "")
         clear.target = self
         history.menu?.addItem(clear)
     }
@@ -1020,19 +1021,19 @@ private final class JobRowView: NSView {
         progress.controlSize = .small
         progress.minValue = 0
         progress.maxValue = 1
-        let cancel = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Annuler")!,
+        let cancel = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: L("Annuler"))!,
                               target: self, action: #selector(cancelJob))
         cancel.isBordered = false
         cancel.contentTintColor = .secondaryLabelColor
-        cancel.toolTip = "Annuler"
+        cancel.toolTip = L("Annuler")
         pauseButton.isBordered = false
         pauseButton.contentTintColor = .secondaryLabelColor
         pauseButton.target = self
         pauseButton.action = #selector(togglePause)
-        upButton.image = NSImage(systemSymbolName: "arrow.up.circle.fill", accessibilityDescription: "Monter dans la file")
+        upButton.image = NSImage(systemSymbolName: "arrow.up.circle.fill", accessibilityDescription: L("Monter dans la file"))
         upButton.isBordered = false
         upButton.contentTintColor = .secondaryLabelColor
-        upButton.toolTip = "Monter dans la file"
+        upButton.toolTip = L("Monter dans la file")
         upButton.target = self
         upButton.action = #selector(moveJobUp)
         upButton.isHidden = true
@@ -1069,7 +1070,7 @@ private final class JobRowView: NSView {
             progress.doubleValue = 0
             progress.isIndeterminate = false
             progress.stopAnimation(nil)
-            detail.stringValue = "En attente · \(queuePosition == 1 ? "prochaine" : "\(queuePosition)e dans la file")"
+            detail.stringValue = queuePosition == 1 ? L("En attente · prochaine") : L("En attente · \(queuePosition)e dans la file")
             return
         }
         let snapshot = job.snapshot
@@ -1077,8 +1078,8 @@ private final class JobRowView: NSView {
             if progress.isIndeterminate { progress.stopAnimation(nil); progress.isIndeterminate = false }
             progress.doubleValue = min(1, Double(snapshot.done) / Double(snapshot.total))
             let amount = job.countsItems
-                ? "\(snapshot.done) sur \(Format.items(Int(snapshot.total)))"
-                : "\(Format.size(snapshot.done)) sur \(Format.size(snapshot.total))"
+                ? L("\(snapshot.done) sur \(Format.itemCount(Int(snapshot.total)))")
+                : L("\(Format.size(snapshot.done)) sur \(Format.size(snapshot.total))")
             detail.stringValue = [amount, timing(done: snapshot.done, total: snapshot.total), snapshot.status]
                 .compactMap { $0 }.joined(separator: " — ")
         } else {
@@ -1090,7 +1091,7 @@ private final class JobRowView: NSView {
 
     /// Débit et temps restant (moyenne glissante, mise à jour à chaque rafraîchissement).
     private func timing(done: Int64, total: Int64) -> String? {
-        if job.isPaused { lastSample = nil; return "en pause" }
+        if job.isPaused { lastSample = nil; return L("en pause") }
         let now = Date()
         if let last = lastSample, now.timeIntervalSince(last.time) > 0.1 {
             let instant = Double(done - last.done) / now.timeIntervalSince(last.time)
@@ -1098,8 +1099,9 @@ private final class JobRowView: NSView {
         }
         lastSample = (now, done)
         guard rate > 0, total > done else { return nil }
-        let speed = job.countsItems ? String(format: "%.1f éléments/s", rate) : "\(Format.size(Int64(rate)))/s"
-        return "\(speed), \(Self.duration(Double(total - done) / rate)) restantes"
+        let itemRate = String(format: "%.1f", rate)
+        let speed = job.countsItems ? L("\(itemRate) éléments/s") : "\(Format.size(Int64(rate)))/s"
+        return L("\(speed), \(Self.duration(Double(total - done) / rate)) restantes")
     }
 
     private static let durationFormatter: DateComponentsFormatter = {
@@ -1107,6 +1109,9 @@ private final class JobRowView: NSView {
         f.unitsStyle = .abbreviated
         f.allowedUnits = [.hour, .minute, .second]
         f.maximumUnitCount = 2
+        var calendar = Calendar.current
+        calendar.locale = AppLanguage.locale
+        f.calendar = calendar
         return f
     }()
 
@@ -1129,14 +1134,14 @@ private final class JobRowView: NSView {
     private func updatePauseButton() {
         upButton.isHidden = (queuePosition ?? 1) <= 1
         if queuePosition != nil {
-            pauseButton.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "Démarrer maintenant")
-            pauseButton.toolTip = "Démarrer maintenant, sans attendre son tour"
+            pauseButton.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: L("Démarrer maintenant"))
+            pauseButton.toolTip = L("Démarrer maintenant, sans attendre son tour")
             return
         }
         let paused = job.isPaused
         pauseButton.image = NSImage(systemSymbolName: paused ? "play.circle.fill" : "pause.circle.fill",
-                                    accessibilityDescription: paused ? "Reprendre" : "Mettre en pause")
-        pauseButton.toolTip = paused ? "Reprendre" : "Mettre en pause"
+                                    accessibilityDescription: paused ? L("Reprendre") : L("Mettre en pause"))
+        pauseButton.toolTip = paused ? L("Reprendre") : L("Mettre en pause")
     }
 
     @objc private func cancelJob() { job.cancel() }
