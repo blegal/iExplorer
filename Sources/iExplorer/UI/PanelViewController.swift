@@ -1860,6 +1860,15 @@ extension PanelViewController: NSMenuItemValidation {
 extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int { isGrouped ? groupRows.count : items.count }
 
+    /// Colonne Taille ou Date redimensionnée : les textes visibles sont recalculés pour la nouvelle largeur.
+    func tableViewColumnDidResize(_ notification: Notification) {
+        guard let column = notification.userInfo?["NSTableColumn"] as? NSTableColumn,
+              column.identifier == .size || column.identifier == .date,
+              let index = tableView.tableColumns.firstIndex(of: column) else { return }
+        let rows = tableView.rows(in: tableView.visibleRect)
+        tableView.reloadData(forRowIndexes: IndexSet(integersIn: rows.location..<rows.location + rows.length), columnIndexes: [index])
+    }
+
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { isGroupHeader(row) ? nil : ThemedRowView() }
 
     func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { isGroupHeader(row) }
@@ -1919,12 +1928,16 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
             cell.alphaValue = dimmed ? 0.5 : 1
             return cell
         }
+        // Taille et date se raccourcissent quand la colonne est étroite.
+        let available = (tableColumn?.width ?? 200) - 8
         switch identifier {
         case .size:
-            field.stringValue = item.isNavigableDirectory ? folderSizeText(for: item) : (item.size.map(Format.size) ?? "—")
+            let bytes = item.isNavigableDirectory ? item.folderSize : item.size
+            let full = item.isNavigableDirectory ? folderSizeText(for: item) : (item.size.map(Format.size) ?? "—")
+            field.stringValue = bytes.map { Format.fitting([full, Format.compactSize($0)], width: available, font: field.font!) } ?? full
             field.alignment = .right
         case .date:
-            field.stringValue = item.modificationDate.map { Format.dateFormatter.string(from: $0) } ?? ""
+            field.stringValue = item.modificationDate.map { Format.fitting(Format.dateVariants($0), width: available, font: field.font!) } ?? ""
             field.alignment = .left
         default:
             // Dans les résultats de recherche, la colonne indique le dossier de chaque élément.

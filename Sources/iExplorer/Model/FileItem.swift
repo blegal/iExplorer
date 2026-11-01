@@ -95,6 +95,44 @@ extension Format {
         return f
     }()
 
+    static let dateOnlyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .short
+        f.timeStyle = .none
+        f.doesRelativeDateFormatting = true
+        return f
+    }()
+
+    static let compactDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("ddMMyy")
+        return f
+    }()
+
+    /// Date de plus en plus courte : date et heure, date seule, puis jj/mm/aa.
+    static func dateVariants(_ date: Date) -> [String] {
+        [dateFormatter.string(from: date), dateOnlyFormatter.string(from: date), compactDateFormatter.string(from: date)]
+    }
+
+    /// Taille arrondie à l'unité du dessus, sans décimale : 737 octets → 1 ko, 6,2 ko → 7 ko.
+    static func compactSize(_ bytes: Int64) -> String {
+        guard bytes > 0 else { return "0 ko" }
+        var value = Double(bytes) / 1000
+        var unit = 0
+        let units = ["ko", "Mo", "Go", "To", "Po"]
+        while value.rounded(.up) >= 1000, unit < units.count - 1 {
+            value /= 1000
+            unit += 1
+        }
+        return "\(Int(value.rounded(.up))) \(units[unit])"
+    }
+
+    /// Le premier texte qui tient dans `width` avec `font`, sinon le plus court.
+    static func fitting(_ variants: [String], width: CGFloat, font: NSFont) -> String {
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        return variants.first { ($0 as NSString).size(withAttributes: attributes).width <= width } ?? variants.last ?? ""
+    }
+
     static func freeSpace(at url: URL) -> String? {
         availableCapacity(at: url).map { "\(size($0)) disponibles" }
     }
