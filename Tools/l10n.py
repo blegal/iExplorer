@@ -16,6 +16,10 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "Sources" / "iExplorer"
 TRANSLATIONS = ROOT / "Tools" / "l10n"
+# Bibliothèques d'iBaobab (DiskUsageKit, UpdateKit) : leurs textes passent par le Localizable.strings d'iExplorer,
+# avec les traductions tenues dans le dépôt iBaobab (Tools/l10n/<langue>.json).
+BAOBAB = ROOT / ".build" / "checkouts" / "iBaobab"
+BAOBAB_SOURCES = [BAOBAB / "Sources" / "DiskUsageKit", BAOBAB / "Sources" / "UpdateKit"]
 ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "0": "\0", '"': '"', "'": "'", "\\": "\\"}
 
 
@@ -83,8 +87,10 @@ def keys_in(path):
     return keys
 
 
-def all_keys(files=None):
+def all_keys(files=None, libraries=False):
     paths = [pathlib.Path(f) for f in files] if files else sorted(SOURCES.rglob("*.swift"))
+    if libraries:
+        paths += [p for folder in BAOBAB_SOURCES if folder.exists() for p in sorted(folder.rglob("*.swift"))]
     seen = {}
     for path in paths:
         for key in keys_in(path):
@@ -113,10 +119,12 @@ def main():
             print(json.dumps(key, ensure_ascii=False))
         print(f"{len(missing)} clé(s) sans traduction", file=sys.stderr)
     elif command == "build":
-        keys = all_keys()
+        keys = all_keys(libraries=True)
         for path in sorted(TRANSLATIONS.glob("*.json")):
             language = path.stem
-            translations = load(language)
+            library = BAOBAB / "Tools" / "l10n" / f"{language}.json"
+            translations = json.loads(library.read_text(encoding="utf-8")) if library.exists() else {}
+            translations.update(load(language))
             lines = ["/* Généré par Tools/l10n.py depuis Tools/l10n/%s.json : ne pas modifier à la main. */" % language]
             missing = 0
             for key in sorted(keys):
