@@ -99,7 +99,6 @@
 "Abandonner" = "Discard";
 "Abandonner les modifications" = "Discard changes";
 "Abandonner les modifications de « %@ » ?" = "Discard changes to “%@”?";
-"Absent" = "Not installed";
 "Abysses (méduses lumineuses)" = "Abyss (glowing jellyfish)";
 "Accès refusé" = "Access denied";
 "Acier doux" = "Soft steel";
@@ -240,7 +239,7 @@
 "Ce fichier vient du projet %@ et peut exécuter n’importe quelle commande. Vérifiez son contenu ; il faudra l’approuver de nouveau s’il change." = "This file comes from the project %@ and can run any command. Check its contents; you’ll need to approve it again if it changes.";
 "Certains éléments n’ont pas pu être supprimés." = "Some items could not be deleted.";
 "Certains éléments n’ont pas été renommés." = "Some items weren’t renamed.";
-"Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. « Installer » lance Homebrew en arrière-plan ; le journal s’affiche ci-dessous." = "These tools are optional: without them, the related features stay dimmed. “Install” runs Homebrew in the background; the log appears below.";
+"Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. « Installer » lance Homebrew en arrière-plan ; le journal s’affiche en bas." = "These tools are optional: without them, the related features stay dimmed. “Install” runs Homebrew in the background; the log appears at the bottom.";
 "Charge processeur et mémoire (xload)" = "CPU and memory load (xload)";
 "Chat" = "Cat";
 "Chemin" = "Path";
@@ -392,7 +391,6 @@
 "Déchiffrer %@ fichiers" = "Decrypt %@ files";
 "Déchiffrer « %@ »" = "Decrypt “%@”";
 "Déchiffrer…" = "Decrypt…";
-"Décochez un groupe pour le retirer du clic droit, ou seulement certains de ses éléments. Ils restent dans la barre de menus et gardent leurs raccourcis." = "Uncheck a group to remove it from the right-click menu, or only some of its items. They stay in the menu bar and keep their shortcuts.";
 "Décompresser" = "Extract";
 "Décompresser ici" = "Extract Here";
 "Décompresser vers l’autre panneau" = "Extract to Other Panel";
@@ -513,7 +511,7 @@
 "Horloge analogique" = "Analog clock";
 "Horloge numérique" = "Digital clock";
 "Humain" = "Human";
-"Icône du Dock :" = "Dock icon:";
+"Icône du Dock" = "Dock Icon";
 "Icône d’origine" = "Original icon";
 "Icônes" = "Icons";
 "Icônes de fichiers" = "File Icons";
@@ -539,8 +537,8 @@
 "Indexer" = "Stage";
 "Indexé" = "Staged";
 "Inspecteur" = "Inspector";
+"Installation" = "Installation";
 "Installation…" = "Installing…";
-"Installe les outils ci-dessous" = "Installs the tools below";
 "Installer" = "Install";
 "Installer Homebrew…" = "Install Homebrew…";
 "Installer pandoc (Homebrew)" = "Install pandoc (Homebrew)";
@@ -552,6 +550,7 @@
 "JSON invalide : %@" = "Invalid JSON: %@";
 "JSON invalide." = "Invalid JSON.";
 "Jaune" = "Yellow";
+"Journal d’installation" = "Installation log";
 "LZ4 1.10.0 (intégré)" = "LZ4 1.10.0 (built in)";
 "LZ4 : %@" = "LZ4: %@";
 "LZ4 HC niveau %@" = "LZ4 HC level %@";
@@ -567,7 +566,8 @@
 "La somme SHA-256 ne correspond pas : un morceau est abîmé ou manquant." = "The SHA-256 checksum does not match: a part is damaged or missing.";
 "La somme SHA-256 sera vérifiée." = "The SHA-256 checksum will be verified.";
 "Lagon tropical" = "Tropical lagoon";
-"Langue :" = "Language:";
+"Langue" = "Language";
+"Langue de l’interface" = "Interface language";
 "Langue du système" = "System language";
 "Le 7z chiffré demande 7-Zip (brew install sevenzip)." = "Encrypted 7z requires 7-Zip (brew install sevenzip).";
 "Le PDF « %@ » est illisible." = "The PDF “%@” cannot be read.";
@@ -585,7 +585,7 @@
 "Le liseré du panneau actif se déploie avec un rebond" = "Active panel border springs open";
 "Le mot de passe enregistré dans le trousseau sera aussi supprimé." = "The password saved in the keychain will also be deleted.";
 "Le mot de passe est vide." = "The password is empty.";
-"Le niveau active tous les effets jusqu’à lui ; décochez ceux que vous ne voulez pas. Le bouton Animations de la barre d’outils change aussi le niveau." = "The level turns on every effect up to it; uncheck the ones you don’t want. The Animations button in the toolbar also changes the level.";
+"Le niveau active tous les effets jusqu’à lui ; désactivez ceux que vous ne voulez pas. Le bouton Animations de la barre d’outils change aussi le niveau." = "The level turns on every effect up to it; turn off the ones you don’t want. The Animations button in the toolbar also changes the level.";
 "Le nom ne peut pas contenir « / »." = "The name can’t contain “/”.";
 "Le raccourci sera retiré de cette commande." = "The shortcut will be removed from that command.";
 "Le réassemblage a échoué.\n%@" = "Joining failed.\n%@";
@@ -675,7 +675,6 @@
 "Ne pas enregistrer" = "Don’t Save";
 "Nettoyer les fichiers auxiliaires" = "Clean auxiliary files";
 "Niveau" = "Level";
-"Niveau :" = "Level:";
 "Nom" = "Name";
 "Nom actuel" = "Current name";
 "Nom de la règle et extensions concernées (séparées par des virgules) :" = "Rule name and file extensions (separated by commas):";
@@ -728,6 +727,7 @@
 "Ouvrir les Réglages" = "Open Settings";
 "Page HTML" = "HTML page";
 "Pages" = "Pages";
+"Pages des réglages" = "Settings pages";
 "Panneau %@ — %@" = "Panel %@ — %@";
 "Panneau inactif légèrement estompé" = "Inactive panel slightly dimmed";
 "Panneau suivant" = "Next Panel";
@@ -959,6 +959,7 @@
 "Trier par" = "Sort By";
 "Type" = "Kind";
 "Téléchargements" = "Downloads";
+"Un groupe désactivé disparaît du clic droit ; sinon, choisissez ses éléments un à un. Tout reste dans la barre de menus, avec les raccourcis." = "A group that is turned off disappears from the right-click menu; otherwise, choose its items one by one. Everything stays in the menu bar, with its shortcuts.";
 "Un élément nommé « %@ » existe déjà." = "An item named “%@” already exists.";
 "Une erreur est survenue avec « %@ »." = "An error occurred with “%@”.";
 "Uni" = "Solid";
@@ -1036,6 +1037,7 @@
 "libarchive (bsdtar de macOS)" = "libarchive (macOS bsdtar)";
 "macOS refuse la lecture de la liste des favoris du Finder. Accordez l’« Accès complet au disque » à iExplorer dans Réglages Système › Confidentialité et sécurité, puis relancez l’app." = "macOS won’t let iExplorer read the Finder favorites list. Give iExplorer “Full Disk Access” in System Settings › Privacy & Security, then relaunch the app.";
 "maintenir le clic pour tout l’historique de l’onglet" = "click and hold for the tab’s full history";
+"masqué" = "hidden";
 "minuscules" = "lowercase";
 "modifié" = "modified";
 "modifié le %@" = "modified %@";

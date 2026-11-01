@@ -1,67 +1,167 @@
 import AppKit
 
-/// Fenêtre Réglages (⌘,). Premier onglet : les outils externes, leur état et leur installation par Homebrew.
+/// Fenêtre Réglages (⌘,), façon Réglages d'iPadOS : barre latérale à pastilles colorées, pages en cartes.
 final class SettingsWindowController: NSWindowController {
     private static var shared: SettingsWindowController?
 
-    enum Tab: Int { case general, contextMenu, fileActions, customActions, tools, animations }
+    enum Tab: Int, CaseIterable { case general, contextMenu, fileActions, customActions, tools, animations }
 
-    /// Ouvre la fenêtre, sur un onglet donné si besoin ; renvoie le contrôleur de l'onglet affiché.
+    /// Ouvre la fenêtre, sur une page donnée si besoin ; renvoie le contrôleur de la page affichée.
     @discardableResult
     static func show(tab: Tab? = nil) -> NSViewController? {
         let controller = shared ?? SettingsWindowController()
         shared = controller
-        if let tab { controller.tabs.selectedTabViewItemIndex = tab.rawValue }
+        if let tab { controller.select(tab) }
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
-        return controller.tabs.tabViewItems[controller.tabs.selectedTabViewItemIndex].viewController
+        let page = controller.tabs.tabViewItems[controller.tabs.selectedTabViewItemIndex].viewController
+        return (page as? BelowTitlebar)?.content ?? page
     }
 
-    private let tabs: NSTabViewController
+    private let tabs: SettingsTabsController
+    private let sidebar: SettingsSidebarController
 
     private init() {
         let tabs = SettingsTabsController()
-        tabs.tabStyle = .toolbar
-        // Le titre de chaque onglet devient celui de la fenêtre ; l'ordre suit `Tab`.
-        func add(_ controller: NSViewController, _ title: String, _ symbol: String) {
+        tabs.tabStyle = .unspecified
+        let pages: [(NSViewController, String, String, NSColor)] = [
+            (GeneralSettingsViewController(), L("Général"), "gearshape.fill", .systemGray),
+            (ContextMenuSettingsViewController(), L("Menu contextuel"), "contextualmenu.and.cursorarrow", .systemBlue),
+            (BelowTitlebar(FileActionsEditorController(), size: NSSize(width: 980, height: 640)),
+             L("Actions par type"), "doc.badge.gearshape.fill", .systemOrange),
+            (BelowTitlebar({ let editor = CustomActionsController(); editor.showsDoneButton = false; return editor }(), size: NSSize(width: 760, height: 440)),
+             L("Actions personnalisées"), "bolt.fill", .systemPurple),
+            (ExternalToolsViewController(), L("Outils externes"), "shippingbox.fill", .systemBrown),
+            (AnimationSettingsViewController(), L("Animations"), "wand.and.sparkles", .systemPink),
+        ]
+        for (controller, title, _, _) in pages {
             controller.title = title
-            let item = NSTabViewItem(viewController: controller)
-            item.label = title
-            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-            tabs.addTabViewItem(item)
+            tabs.addTabViewItem(NSTabViewItem(viewController: controller))
         }
-        add(GeneralSettingsViewController(), L("Général"), "gearshape")
-        add(ContextMenuSettingsViewController(), L("Menu contextuel"), "contextualmenu.and.cursorarrow")
-        let fileActions = FileActionsEditorController()
-        fileActions.preferredContentSize = NSSize(width: 980, height: 640)
-        add(fileActions, L("Actions par type"), "doc.badge.gearshape")
-        let customActions = CustomActionsController()
-        customActions.showsDoneButton = false
-        customActions.preferredContentSize = NSSize(width: 760, height: 420)
-        add(customActions, L("Actions personnalisées"), "bolt")
-        add(ExternalToolsViewController(), L("Outils externes"), "shippingbox")
-        add(AnimationSettingsViewController(), L("Animations"), "wand.and.sparkles")
-        let window = NSWindow(contentViewController: tabs)
+        let sidebar = SettingsSidebarController(entries: pages.map { ($0.1, $0.2, $0.3) })
+        let split = NSSplitViewController()
+        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
+        sidebarItem.canCollapse = false
+        sidebarItem.minimumThickness = SettingsSidebarController.width
+        sidebarItem.maximumThickness = SettingsSidebarController.width
+        split.addSplitViewItem(sidebarItem)
+        split.addSplitViewItem(NSSplitViewItem(viewController: tabs))
+        let window = NSWindow(contentViewController: split)
         window.title = L("Réglages")
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: SettingsSidebarController.width + 660, height: 640))
+        window.contentMinSize = NSSize(width: SettingsSidebarController.width + 560, height: 440)
         self.tabs = tabs
+        self.sidebar = sidebar
         super.init(window: window)
+        sidebar.onSelect = { [weak self] index in self?.select(Tab(rawValue: index) ?? .general) }
         window.center()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    private func select(_ tab: Tab) {
+        tabs.selectedTabViewItemIndex = tab.rawValue
+        sidebar.select(tab.rawValue)
+    }
 }
 
-/// Onglets des Réglages : la fenêtre prend la taille de chaque onglet (les éditeurs d'actions sont bien plus grands).
+/// Éditeur d'actions placé sous la barre de titre transparente (les pages en cartes, elles, défilent dessous).
+private final class BelowTitlebar: NSViewController {
+    let content: NSViewController
+
+    init(_ content: NSViewController, size: NSSize) {
+        self.content = content
+        super.init(nibName: nil, bundle: nil)
+        preferredContentSize = NSSize(width: size.width, height: size.height + 28)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func loadView() {
+        let root = NSView()
+        addChild(content)
+        content.view.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(content.view)
+        NSLayoutConstraint.activate([
+            content.view.topAnchor.constraint(equalTo: root.safeAreaLayoutGuide.topAnchor),
+            content.view.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            content.view.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            content.view.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+        ])
+        view = root
+    }
+}
+
+/// Barre latérale des Réglages : une pastille colorée et un nom par page.
+private final class SettingsSidebarController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
+    static let width: CGFloat = 220
+    private let entries: [(title: String, symbol: String, color: NSColor)]
+    private let table = NSTableView()
+    var onSelect: ((Int) -> Void)?
+
+    init(entries: [(String, String, NSColor)]) {
+        self.entries = entries.map { (title: $0.0, symbol: $0.1, color: $0.2) }
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func loadView() {
+        table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("page")))
+        table.headerView = nil
+        table.style = .sourceList
+        table.rowHeight = 32
+        table.dataSource = self
+        table.delegate = self
+        table.setAccessibilityLabel(L("Pages des réglages"))
+        let scroll = NSScrollView()
+        scroll.documentView = table
+        scroll.drawsBackground = false
+        scroll.automaticallyAdjustsContentInsets = true
+        view = scroll
+        table.reloadData()
+        table.selectRowIndexes([0], byExtendingSelection: false)
+    }
+
+    func select(_ index: Int) {
+        guard table.selectedRow != index else { return }
+        table.selectRowIndexes([index], byExtendingSelection: false)
+    }
+
+    func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        let entry = entries[row]
+        let label = NSTextField(labelWithString: entry.title)
+        label.font = .systemFont(ofSize: 13)
+        let stack = NSStackView(views: [SettingsUI.tile(entry.symbol, entry.color, size: 22), label])
+        stack.spacing = 9
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
+        return stack
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        guard table.selectedRow >= 0 else { return }
+        onSelect?(table.selectedRow)
+    }
+}
+
+/// Pages des Réglages : la fenêtre s'agrandit pour les éditeurs d'actions, qui demandent plus de place.
 private final class SettingsTabsController: NSTabViewController {
     override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
         super.tabView(tabView, didSelect: tabViewItem)
         guard let controller = tabViewItem?.viewController, let window = view.window else { return }
-        let size = controller.preferredContentSize == .zero ? controller.view.fittingSize : controller.preferredContentSize
-        guard size.width > 0, size.height > 0 else { return }
-        // Le haut de la fenêtre reste en place.
-        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+        let content = controller.preferredContentSize == .zero ? NSSize(width: 660, height: 640) : controller.preferredContentSize
+        let size = NSSize(width: max(content.width, 560) + SettingsSidebarController.width, height: max(content.height, 440))
+        // Le haut de la fenêtre reste en place ; elle ne rapetisse pas si l'utilisateur l'a agrandie.
+        let current = window.contentRect(forFrameRect: window.frame).size
+        let target = NSSize(width: max(size.width, current.width), height: max(size.height, current.height))
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: target))
         frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
         window.setFrame(frame, display: true, animate: window.isVisible)
     }
@@ -70,148 +170,103 @@ private final class SettingsTabsController: NSTabViewController {
 final class ExternalToolsViewController: NSViewController {
     static let toolsChanged = Notification.Name("ExternalToolsChanged")
 
-    private let rows = NSStackView()
+    private let container = NSView()
     private let log = NSTextView()
-    private var installing: ExternalTool?
-
-    override func loadView() {
-        rows.orientation = .vertical
-        rows.alignment = .leading
-        rows.spacing = 10
-        let intro = NSTextField(wrappingLabelWithString: L("Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. « Installer » lance Homebrew en arrière-plan ; le journal s’affiche ci-dessous."))
-        intro.textColor = .secondaryLabelColor
-        intro.font = .systemFont(ofSize: 12)
-
+    private lazy var logScroll: NSScrollView = {
         log.isEditable = false
         log.font = .monospacedSystemFont(ofSize: 10.5, weight: .regular)
         log.textColor = .secondaryLabelColor
         log.drawsBackground = false
-        let logScroll = NSScrollView()
-        logScroll.documentView = log
-        logScroll.hasVerticalScroller = true
-        logScroll.borderType = .bezelBorder
-        logScroll.heightAnchor.constraint(equalToConstant: 110).isActive = true
+        log.textContainerInset = NSSize(width: 8, height: 8)
         log.autoresizingMask = [.width]
+        let scroll = NSScrollView()
+        scroll.documentView = log
+        scroll.hasVerticalScroller = true
+        scroll.drawsBackground = false
+        scroll.heightAnchor.constraint(equalToConstant: 110).isActive = true
+        return scroll
+    }()
+    private var installing: ExternalTool?
 
-        // Liste longue : elle défile, le journal reste visible dessous.
-        let rowsScroll = NSScrollView()
-        let flipped = FlippedClipContent()
-        flipped.addSubview(rows)
-        rows.translatesAutoresizingMaskIntoConstraints = false
-        rowsScroll.documentView = flipped
-        flipped.translatesAutoresizingMaskIntoConstraints = false
-        rowsScroll.hasVerticalScroller = true
-        rowsScroll.drawsBackground = false
-        rowsScroll.heightAnchor.constraint(equalToConstant: 470).isActive = true
-        NSLayoutConstraint.activate([
-            rows.topAnchor.constraint(equalTo: flipped.topAnchor),
-            rows.leadingAnchor.constraint(equalTo: flipped.leadingAnchor),
-            rows.trailingAnchor.constraint(equalTo: flipped.trailingAnchor),
-            rows.bottomAnchor.constraint(equalTo: flipped.bottomAnchor),
-            flipped.widthAnchor.constraint(equalTo: rowsScroll.contentView.widthAnchor),
-        ])
-        let stack = NSStackView(views: [intro, rowsScroll, logScroll])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 14
-        stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 18, right: 20)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        let root = NSView()
-        root.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: root.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-            root.widthAnchor.constraint(equalToConstant: 660),
-            intro.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
-            rowsScroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
-            logScroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40),
-        ])
-        view = root
+    override func loadView() {
+        view = container
         rebuild()
     }
 
     private func rebuild() {
-        rows.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        var sections: [NSView] = []
         // Homebrew d'abord : sans lui, pas d'installation automatique.
+        let homebrew: NSView
         if let brew = ExternalTool.homebrew {
-            rows.addArrangedSubview(row(installed: true, title: "Homebrew", purpose: L("Installe les outils ci-dessous"), detail: brew.path, button: nil))
+            homebrew = SettingsUI.row("Homebrew", subtitle: brew.path, tile: SettingsUI.tile("mug.fill", .systemBrown), accessory: installedBadge())
         } else {
             let button = NSButton(title: L("Installer Homebrew…"), target: self, action: #selector(openHomebrewSite))
-            rows.addArrangedSubview(row(installed: false, title: "Homebrew", purpose: L("Nécessaire pour installer les outils ci-dessous"), detail: "brew.sh", button: button))
+            homebrew = SettingsUI.row("Homebrew", subtitle: L("Nécessaire pour installer les outils ci-dessous"), tile: SettingsUI.tile("mug.fill", .systemBrown), accessory: button)
         }
+        sections += [SettingsUI.caption(L("Installation")), SettingsCard(rows: [homebrew])]
         for category in ExternalTool.Category.allCases {
-            rows.addArrangedSubview(separator())
-            rows.addArrangedSubview(sectionTitle(category.title))
-            for tool in ExternalTool.allCases where tool.category == category { addRow(for: tool) }
+            let rows = ExternalTool.allCases.filter { $0.category == category }.map(row(for:))
+            sections += [SettingsUI.caption(category.title), SettingsCard(rows: rows)]
         }
-        rows.addArrangedSubview(separator())
-        rows.addArrangedSubview(sectionTitle(L("Déjà intégrés")))
-        for library in ExternalTool.builtIn {
-            rows.addArrangedSubview(row(installed: true, title: library.title, purpose: library.purpose, detail: nil, button: nil))
+        let builtIn = ExternalTool.builtIn.map { library in
+            SettingsUI.row(library.title, subtitle: library.purpose, tile: SettingsUI.tile("checkmark.seal.fill", .systemGreen), accessory: installedBadge())
         }
+        sections += [SettingsUI.caption(L("Déjà intégrés")), SettingsCard(rows: builtIn)]
+        logScroll.removeFromSuperview()
+        sections += [SettingsUI.caption(L("Journal d’installation")), SettingsCard(rows: [logScroll])]
+
+        container.subviews.forEach { $0.removeFromSuperview() }
+        let page = SettingsUI.page(title: L("Outils externes"),
+                                   intro: L("Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. « Installer » lance Homebrew en arrière-plan ; le journal s’affiche en bas."),
+                                   sections: sections)
+        page.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(page)
+        NSLayoutConstraint.activate([
+            page.topAnchor.constraint(equalTo: container.topAnchor),
+            page.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            page.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            page.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
     }
 
-    private func sectionTitle(_ title: String) -> NSView {
-        let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = .secondaryLabelColor
-        return label
+    /// « ✓ Installé », en vert.
+    private func installedBadge() -> NSView {
+        let icon = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)!)
+        icon.contentTintColor = .systemGreen
+        let label = NSTextField(labelWithString: L("Installé"))
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = .systemGreen
+        let stack = NSStackView(views: [icon, label])
+        stack.spacing = 4
+        return stack
     }
 
-    private func addRow(for tool: ExternalTool) {
-            let path = tool.path
-            var button: NSButton?
-            if path == nil {
-                let title = installing == tool ? L("Installation…") : (tool == .developerTools ? L("Installer…") : L("Installer"))
-                let install = NSButton(title: title, target: self, action: #selector(install(_:)))
-                install.tag = ExternalTool.allCases.firstIndex(of: tool) ?? 0
-                install.isEnabled = installing == nil && (tool == .developerTools || ExternalTool.homebrew != nil)
-                button = install
-            }
-            let package = tool.brewPackage.map { "brew install \($0.cask ? "--cask " : "")\($0.name)" } ?? "xcode-select --install"
-            // Outil utile mais pas encore exploité par l'app : on le dit.
-            let purpose = tool.isUsed ? tool.purpose : tool.purpose + L(" — intégration à venir")
-            rows.addArrangedSubview(row(installed: path != nil, title: tool.title, purpose: purpose,
-                                        detail: path?.path ?? package, button: button))
-    }
-
-    private func separator() -> NSView {
-        let box = NSBox()
-        box.boxType = .separator
-        box.widthAnchor.constraint(equalToConstant: 600).isActive = true
-        return box
-    }
-
-    private func row(installed: Bool, title: String, purpose: String, detail: String?, button: NSButton?) -> NSView {
-        let icon = NSImageView(image: NSImage(systemSymbolName: installed ? "checkmark.circle.fill" : "circle.dashed", accessibilityDescription: installed ? L("Installé") : L("Absent"))!)
-        icon.contentTintColor = installed ? .systemGreen : .tertiaryLabelColor
-        icon.symbolConfiguration = .init(pointSize: 15, weight: .regular)
-        let name = NSTextField(labelWithString: title)
-        name.font = .systemFont(ofSize: 13, weight: .semibold)
-        let text = NSTextField(wrappingLabelWithString: purpose)
-        text.font = .systemFont(ofSize: 11.5)
-        text.textColor = .secondaryLabelColor
-        var lines: [NSView] = [name, text]
-        if let detail {
-            let path = NSTextField(labelWithString: detail)
-            path.font = .monospacedSystemFont(ofSize: 10.5, weight: .regular)
-            path.textColor = .tertiaryLabelColor
-            path.isSelectable = true
-            lines.append(path)
+    private func row(for tool: ExternalTool) -> NSView {
+        let path = tool.path
+        let accessory: NSView
+        if path != nil {
+            accessory = installedBadge()
+        } else if installing == tool {
+            let spinner = NSProgressIndicator()
+            spinner.style = .spinning
+            spinner.controlSize = .small
+            spinner.startAnimation(nil)
+            let label = NSTextField(labelWithString: L("Installation…"))
+            label.textColor = .secondaryLabelColor
+            let stack = NSStackView(views: [spinner, label])
+            stack.spacing = 6
+            accessory = stack
+        } else {
+            let install = NSButton(title: tool == .developerTools ? L("Installer…") : L("Installer"), target: self, action: #selector(install(_:)))
+            install.bezelStyle = .push
+            install.tag = ExternalTool.allCases.firstIndex(of: tool) ?? 0
+            install.isEnabled = installing == nil && (tool == .developerTools || ExternalTool.homebrew != nil)
+            accessory = install
         }
-        let texts = NSStackView(views: lines)
-        texts.orientation = .vertical
-        texts.alignment = .leading
-        texts.spacing = 2
-        texts.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let line = NSStackView(views: [icon, texts] + (button.map { [NSView(), $0] } ?? []))
-        line.alignment = .top
-        line.spacing = 10
-        line.widthAnchor.constraint(equalToConstant: 600).isActive = true
-        text.preferredMaxLayoutWidth = 480
-        return line
+        let package = tool.brewPackage.map { "brew install \($0.cask ? "--cask " : "")\($0.name)" } ?? "xcode-select --install"
+        // Outil utile mais pas encore exploité par l'app : on le dit.
+        let purpose = (tool.isUsed ? tool.purpose : tool.purpose + L(" — intégration à venir")) + "\n" + (path?.path ?? package)
+        return SettingsUI.row(tool.title, subtitle: purpose, tile: SettingsUI.tile(tool.category.symbol, tool.category.color), accessory: accessory)
     }
 
     @objc private func openHomebrewSite() {
@@ -274,46 +329,65 @@ final class ExternalToolsViewController: NSViewController {
     }
 }
 
-/// Onglet Animations : le niveau choisi, puis chaque effet à cocher, rangé par niveau.
-/// Onglet Général : langue de l'interface.
+/// Page Général : langue de l'interface et icône du Dock.
 final class GeneralSettingsViewController: NSViewController {
     private let language = NSPopUpButton()
-    private let icon = NSPopUpButton()
+    private var iconButtons: [NSButton] = []
 
     override func loadView() {
         for choice in AppLanguage.allCases { language.addItem(withTitle: choice.title) }
         language.selectItem(at: AppLanguage.allCases.firstIndex(of: AppLanguage.chosen) ?? 0)
         language.target = self
         language.action = #selector(changeLanguage)
-        let line = NSStackView(views: [NSTextField(labelWithString: L("Langue :")), language])
-        let intro = NSTextField(wrappingLabelWithString: L("Par défaut, iExplorer suit la langue de macOS. Le changement s’applique au prochain lancement."))
-        intro.textColor = .secondaryLabelColor
-        intro.font = .systemFont(ofSize: 12)
-        for choice in AppIconChoice.allCases {
-            icon.addItem(withTitle: choice.title)
-            let image = choice.image?.copy() as? NSImage
-            image?.size = NSSize(width: 18, height: 18)
-            icon.lastItem?.image = image
+        language.setAccessibilityLabel(L("Langue de l’interface"))
+        let languageCard = SettingsCard(rows: [
+            SettingsUI.row(L("Langue de l’interface"), tile: SettingsUI.tile("globe", .systemBlue), accessory: language),
+        ])
+
+        // Les icônes en vignettes, la choisie entourée.
+        let grid = NSStackView()
+        grid.spacing = 2
+        grid.alignment = .top
+        for (index, choice) in AppIconChoice.allCases.enumerated() {
+            let button = NSButton(title: choice.title, image: choice.image ?? NSImage(), target: self, action: #selector(changeIcon(_:)))
+            button.imagePosition = .imageAbove
+            button.isBordered = false
+            button.font = .systemFont(ofSize: 10)
+            button.tag = index
+            button.imageScaling = .scaleProportionallyUpOrDown
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 12
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.widthAnchor.constraint(equalToConstant: 84).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 92).isActive = true
+            button.setAccessibilityLabel(choice.title)
+            iconButtons.append(button)
+            grid.addArrangedSubview(button)
         }
-        icon.selectItem(at: AppIconChoice.allCases.firstIndex(of: AppIconChoice.chosen) ?? 0)
-        icon.target = self
-        icon.action = #selector(changeIcon)
-        let iconLine = NSStackView(views: [NSTextField(labelWithString: L("Icône du Dock :")), icon])
-        let iconNote = NSTextField(wrappingLabelWithString: L("L’icône choisie s’affiche dans le Dock quand iExplorer est ouvert ; le Finder garde l’icône d’origine."))
-        iconNote.textColor = .secondaryLabelColor
-        iconNote.font = .systemFont(ofSize: 12)
-        let stack = NSStackView(views: [line, intro, iconLine, iconNote])
-        stack.setCustomSpacing(18, after: intro)
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 18, left: 22, bottom: 18, right: 22)
-        stack.widthAnchor.constraint(equalToConstant: 520).isActive = true
-        view = stack
+        let gridRow = NSStackView(views: [grid])
+        gridRow.edgeInsets = NSEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
+        let iconCard = SettingsCard(rows: [gridRow])
+        updateIconSelection()
+
+        view = SettingsUI.page(title: L("Général"), intro: nil, sections: [
+            SettingsUI.caption(L("Langue")), languageCard,
+            SettingsUI.footnote(L("Par défaut, iExplorer suit la langue de macOS. Le changement s’applique au prochain lancement.")),
+            SettingsUI.caption(L("Icône du Dock")), iconCard,
+            SettingsUI.footnote(L("L’icône choisie s’affiche dans le Dock quand iExplorer est ouvert ; le Finder garde l’icône d’origine.")),
+        ])
     }
 
-    @objc private func changeIcon() {
-        AppIconChoice.chosen = AppIconChoice.allCases[max(0, icon.indexOfSelectedItem)]
+    private func updateIconSelection() {
+        let chosen = AppIconChoice.allCases.firstIndex(of: AppIconChoice.chosen) ?? 0
+        for button in iconButtons {
+            button.layer?.backgroundColor = button.tag == chosen ? NSColor.controlAccentColor.withAlphaComponent(0.22).cgColor : NSColor.clear.cgColor
+            button.state = button.tag == chosen ? .on : .off
+        }
+    }
+
+    @objc private func changeIcon(_ sender: NSButton) {
+        AppIconChoice.chosen = AppIconChoice.allCases[sender.tag]
+        updateIconSelection()
     }
 
     @objc private func changeLanguage() {
@@ -335,59 +409,44 @@ final class GeneralSettingsViewController: NSViewController {
     }
 }
 
+/// Page Animations : le niveau choisi, puis un interrupteur par effet, rangés par niveau.
 final class AnimationSettingsViewController: NSViewController {
     private let mode = NSPopUpButton()
-    private var boxes: [AnimationEffect: NSButton] = [:]
-    private var headers: [AnimationMode: NSTextField] = [:]
+    private var switches: [AnimationEffect: NSSwitch] = [:]
+    private var rows: [AnimationEffect: NSView] = [:]
+    private var captions: [AnimationMode: NSTextField] = [:]
 
     override func loadView() {
         for choice in AnimationMode.allCases { mode.addItem(withTitle: choice.title) }
         mode.selectItem(at: AnimationMode.chosen.rawValue)
         mode.target = self
         mode.action = #selector(changeAnimationLevel)
-        let modeLine = NSStackView(views: [NSTextField(labelWithString: L("Niveau :")), mode])
-        let intro = NSTextField(wrappingLabelWithString: L("Le niveau active tous les effets jusqu’à lui ; décochez ceux que vous ne voulez pas. Le bouton Animations de la barre d’outils change aussi le niveau."))
-        intro.textColor = .secondaryLabelColor
-        intro.font = .systemFont(ofSize: 12)
-        var views: [NSView] = [modeLine, intro]
+        mode.setAccessibilityLabel(L("Niveau"))
+        var sections: [NSView] = [SettingsCard(rows: [SettingsUI.row(L("Niveau"), tile: SettingsUI.tile("wand.and.sparkles", .systemPink), accessory: mode)])]
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            let warning = NSTextField(wrappingLabelWithString: L("« Réduire les animations » est activé dans les réglages d’accessibilité de macOS : aucune animation n’est jouée."))
-            warning.textColor = .systemOrange
-            warning.font = .systemFont(ofSize: 12)
-            views.append(warning)
+            sections.append(SettingsUI.footnote(L("« Réduire les animations » est activé dans les réglages d’accessibilité de macOS : aucune animation n’est jouée.")))
         }
         let disabled = AnimationEffect.disabled
         for level in [AnimationMode.light, .full, .wow] {
-            let header = NSTextField(labelWithString: level.title)
-            header.font = .systemFont(ofSize: 12, weight: .semibold)
-            headers[level] = header
-            views.append(header)
+            let caption = NSTextField(labelWithString: "")
+            caption.font = .systemFont(ofSize: 11, weight: .medium)
+            caption.textColor = .secondaryLabelColor
+            captions[level] = caption
+            let captionRow = NSStackView(views: [caption])
+            captionRow.edgeInsets = NSEdgeInsets(top: 14, left: 14, bottom: 2, right: 14)
+            var cardRows: [NSView] = []
             for effect in AnimationEffect.allCases where effect.level == level {
-                let box = NSButton(checkboxWithTitle: effect.title, target: self, action: #selector(toggle(_:)))
-                box.state = disabled.contains(effect) ? .off : .on
-                box.identifier = NSUserInterfaceItemIdentifier(effect.rawValue)
-                boxes[effect] = box
-                views.append(box)
+                let toggle = SettingsUI.toggle(!disabled.contains(effect), target: self, action: #selector(toggle(_:)), identifier: effect.rawValue, label: effect.title)
+                switches[effect] = toggle
+                let row = SettingsUI.row(effect.title, accessory: toggle)
+                rows[effect] = row
+                cardRows.append(row)
             }
+            sections += [captionRow, SettingsCard(rows: cardRows, separatorInset: 12)]
         }
-        let stack = NSStackView(views: views)
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 6
-        stack.edgeInsets = NSEdgeInsets(top: 18, left: 22, bottom: 18, right: 22)
-        for header in headers.values { stack.setCustomSpacing(4, after: header) }
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        let root = NSView()
-        root.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: root.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-            root.widthAnchor.constraint(equalToConstant: 660),
-            intro.widthAnchor.constraint(equalToConstant: 610),
-        ])
-        view = root
+        view = SettingsUI.page(title: L("Animations"),
+                               intro: L("Le niveau active tous les effets jusqu’à lui ; désactivez ceux que vous ne voulez pas. Le bouton Animations de la barre d’outils change aussi le niveau."),
+                               sections: sections)
         NotificationCenter.default.addObserver(forName: AnimationMode.changed, object: nil, queue: .main) { [weak self] _ in
             self?.mode.selectItem(at: AnimationMode.chosen.rawValue)
             self?.updateAvailability()
@@ -395,13 +454,12 @@ final class AnimationSettingsViewController: NSViewController {
         updateAvailability()
     }
 
-    /// Les effets d'un niveau supérieur au niveau choisi restent cochables, mais apparaissent grisés.
+    /// Les effets d'un niveau supérieur au niveau choisi restent réglables, mais apparaissent estompés.
     private func updateAvailability() {
         let chosen = AnimationMode.chosen
-        for (effect, box) in boxes { box.alphaValue = effect.level.rawValue <= chosen.rawValue ? 1 : 0.45 }
-        for (level, header) in headers {
-            header.stringValue = level.title + (level.rawValue <= chosen.rawValue ? "" : L(" — actifs à partir de ce niveau"))
-            header.textColor = level.rawValue <= chosen.rawValue ? .labelColor : .tertiaryLabelColor
+        for (effect, row) in rows { row.alphaValue = effect.level.rawValue <= chosen.rawValue ? 1 : 0.45 }
+        for (level, caption) in captions {
+            caption.stringValue = (level.title + (level.rawValue <= chosen.rawValue ? "" : L(" — actifs à partir de ce niveau"))).uppercased()
         }
     }
 
@@ -409,11 +467,37 @@ final class AnimationSettingsViewController: NSViewController {
         AnimationMode.current = AnimationMode(rawValue: mode.indexOfSelectedItem) ?? .light
     }
 
-    @objc private func toggle(_ sender: NSButton) {
+    @objc private func toggle(_ sender: NSSwitch) {
         guard let raw = sender.identifier?.rawValue, let effect = AnimationEffect(rawValue: raw) else { return }
         var disabled = AnimationEffect.disabled
         if sender.state == .on { disabled.remove(effect) } else { disabled.insert(effect) }
         AnimationEffect.disabled = disabled
+    }
+}
+
+extension ExternalTool.Category {
+    var symbol: String {
+        switch self {
+        case .archives: "archivebox.fill"
+        case .previews: "photo.fill"
+        case .search: "magnifyingglass"
+        case .crypto: "lock.fill"
+        case .sync: "arrow.triangle.2.circlepath"
+        case .writing: "pencil"
+        case .development: "hammer.fill"
+        }
+    }
+
+    var color: NSColor {
+        switch self {
+        case .archives: .systemOrange
+        case .previews: .systemCyan
+        case .search: .systemIndigo
+        case .crypto: .systemGray
+        case .sync: .systemBlue
+        case .writing: .systemGreen
+        case .development: .systemBrown
+        }
     }
 }
 

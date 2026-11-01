@@ -19,6 +19,12 @@ final class FileActionsEditorController: NSViewController, NSTableViewDataSource
     private var rows: [Row] = []
     private var projectDirectory: URL?
     private var currentFile: URL?
+
+    /// Page des Réglages : la liste est relue à chaque affichage (règles ajoutées ou approuvées entre-temps).
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        reloadRules(selecting: currentFile)
+    }
     private var isModified = false { didSet { saveButton.isEnabled = isModified } }
 
     private let table = NSTableView()

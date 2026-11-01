@@ -108,82 +108,76 @@ enum ContextMenuEntry: String, CaseIterable {
     }
 }
 
-/// Onglet « Menu contextuel » des Réglages : une case par groupe, puis, en retrait, une case par élément.
+/// Page « Menu contextuel » des Réglages : une carte par groupe, son interrupteur en tête,
+/// puis un interrupteur par élément (cachés quand le groupe est masqué).
 final class ContextMenuSettingsViewController: NSViewController {
-    private var groupBoxes: [ContextMenuGroup: NSButton] = [:]
-    private var entryBoxes: [ContextMenuEntry: NSButton] = [:]
+    private var groupSwitches: [ContextMenuGroup: NSSwitch] = [:]
+    private var entrySwitches: [ContextMenuEntry: NSSwitch] = [:]
+    private var entryRows: [ContextMenuEntry: NSView] = [:]
+    private var cards: [ContextMenuGroup: SettingsCard] = [:]
+    private var groupStatus: [ContextMenuGroup: NSTextField] = [:]
 
     override func loadView() {
-        let intro = NSTextField(wrappingLabelWithString: L("Décochez un groupe pour le retirer du clic droit, ou seulement certains de ses éléments. Ils restent dans la barre de menus et gardent leurs raccourcis."))
-        intro.textColor = .secondaryLabelColor
-        intro.font = .systemFont(ofSize: 12)
-        var views: [NSView] = [intro]
-        // Vues après lesquelles un groupe commence : un peu d'air entre les groupes.
-        var groupEnds: [NSView] = []
+        var sections: [NSView] = []
         for group in ContextMenuGroup.allCases {
-            if views.count > 1, let last = views.last { groupEnds.append(last) }
-            let box = NSButton(checkboxWithTitle: group.title, target: self, action: #selector(toggleGroup(_:)))
-            box.font = .systemFont(ofSize: 13, weight: .semibold)
-            box.identifier = NSUserInterfaceItemIdentifier(group.rawValue)
-            groupBoxes[group] = box
-            views.append(box)
-            // Un groupe d'un seul élément n'a que sa propre case.
-            guard group.entries.count > 1 else { continue }
-            for entry in group.entries {
-                let entryBox = NSButton(checkboxWithTitle: entry.title, target: self, action: #selector(toggleEntry(_:)))
-                entryBox.identifier = NSUserInterfaceItemIdentifier(entry.rawValue)
-                entryBoxes[entry] = entryBox
-                let row = NSStackView(views: [entryBox])
-                row.edgeInsets = NSEdgeInsets(top: 0, left: 22, bottom: 0, right: 0)
-                views.append(row)
+            let groupSwitch = SettingsUI.toggle(group.isShown, target: self, action: #selector(toggleGroup(_:)), identifier: group.rawValue, label: group.title)
+            groupSwitches[group] = groupSwitch
+            let status = NSTextField(labelWithString: "")
+            status.textColor = .secondaryLabelColor
+            groupStatus[group] = status
+            let accessory = NSStackView(views: [status, groupSwitch])
+            accessory.spacing = 10
+            var rows = [SettingsUI.row(group.title, tile: SettingsUI.tile(group.symbol, group.color), accessory: accessory, bold: true)]
+            // Un groupe d'un seul élément n'a que son interrupteur.
+            if group.entries.count > 1 {
+                for entry in group.entries {
+                    let entrySwitch = SettingsUI.toggle(entry.isChecked, target: self, action: #selector(toggleEntry(_:)), identifier: entry.rawValue, label: entry.title)
+                    entrySwitch.controlSize = .small
+                    entrySwitches[entry] = entrySwitch
+                    let row = SettingsUI.row(entry.title, accessory: entrySwitch, indent: true)
+                    entryRows[entry] = row
+                    rows.append(row)
+                }
             }
+            let card = SettingsCard(rows: rows)
+            cards[group] = card
+            sections += [SettingsUI.caption(""), card]
         }
         let reset = NSButton(title: L("Tout réafficher"), target: self, action: #selector(resetAll))
-        views.append(reset)
-
-        let stack = NSStackView(views: views)
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 4
-        stack.setCustomSpacing(12, after: intro)
-        stack.setCustomSpacing(14, after: views[views.count - 2])
-        groupEnds.forEach { stack.setCustomSpacing(10, after: $0) }
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        let document = FlippedClipContent()
-        document.translatesAutoresizingMaskIntoConstraints = false
-        document.addSubview(stack)
-        let scroll = NSScrollView()
-        scroll.documentView = document
-        scroll.hasVerticalScroller = true
-        scroll.drawsBackground = false
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: document.topAnchor, constant: 18),
-            stack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 22),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: document.trailingAnchor, constant: -22),
-            stack.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -18),
-            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            intro.widthAnchor.constraint(equalToConstant: 500),
-        ])
-        view = scroll
-        preferredContentSize = NSSize(width: 560, height: 620)
+        let resetRow = NSStackView(views: [NSView(), reset])
+        resetRow.edgeInsets = NSEdgeInsets(top: 14, left: 0, bottom: 0, right: 0)
+        sections.append(resetRow)
+        view = SettingsUI.page(title: L("Menu contextuel"),
+                               intro: L("Un groupe désactivé disparaît du clic droit ; sinon, choisissez ses éléments un à un. Tout reste dans la barre de menus, avec les raccourcis."),
+                               sections: sections)
         refresh()
     }
 
     private func refresh() {
-        for (group, box) in groupBoxes { box.state = group.isShown ? .on : .off }
-        for (entry, box) in entryBoxes {
-            box.state = entry.isChecked ? .on : .off
-            box.isEnabled = entry.group.isShown
+        for group in ContextMenuGroup.allCases {
+            groupSwitches[group]?.state = group.isShown ? .on : .off
+            let checked = group.entries.filter(\.isChecked).count
+            groupStatus[group]?.stringValue = !group.isShown ? L("masqué")
+                : (group.entries.count > 1 && checked < group.entries.count ? L("\(checked) sur \(group.entries.count)") : "")
+            for entry in group.entries {
+                entrySwitches[entry]?.state = entry.isChecked ? .on : .off
+                if let row = entryRows[entry] { cards[group]?.setRow(row, hidden: !group.isShown) }
+            }
         }
     }
 
-    @objc private func toggleGroup(_ sender: NSButton) {
+    @objc private func toggleGroup(_ sender: NSSwitch) {
         guard let group = sender.identifier.flatMap({ ContextMenuGroup(rawValue: $0.rawValue) }) else { return }
         group.isShown = sender.state == .on
-        refresh()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.allowsImplicitAnimation = true
+            refresh()
+            view.layoutSubtreeIfNeeded()
+        }
     }
 
-    @objc private func toggleEntry(_ sender: NSButton) {
+    @objc private func toggleEntry(_ sender: NSSwitch) {
         guard let entry = sender.identifier.flatMap({ ContextMenuEntry(rawValue: $0.rawValue) }) else { return }
         entry.isChecked = sender.state == .on
         refresh()
@@ -192,5 +186,35 @@ final class ContextMenuSettingsViewController: NSViewController {
     @objc private func resetAll() {
         ContextMenuEntry.resetAll()
         refresh()
+    }
+}
+
+extension ContextMenuGroup {
+    var symbol: String {
+        switch self {
+        case .palette: "sparkles"
+        case .open: "arrow.up.forward.app.fill"
+        case .organize: "folder.fill"
+        case .fileActions: "bolt.fill"
+        case .transform: "archivebox.fill"
+        case .share: "square.and.arrow.up.fill"
+        case .create: "plus.square.fill"
+        case .trash: "trash.fill"
+        case .view: "list.bullet"
+        }
+    }
+
+    var color: NSColor {
+        switch self {
+        case .palette: .systemIndigo
+        case .open: .systemBlue
+        case .organize: .systemCyan
+        case .fileActions: .systemPurple
+        case .transform: .systemOrange
+        case .share: .systemGreen
+        case .create: .systemTeal
+        case .trash: .systemRed
+        case .view: .systemGray
+        }
     }
 }
