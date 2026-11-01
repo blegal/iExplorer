@@ -179,6 +179,8 @@ final class CustomActionsController: NSViewController, NSTableViewDataSource, NS
     ]
     private let confirmBox = NSButton(checkboxWithTitle: L("Demander confirmation avant d’exécuter"), target: nil, action: nil)
     private var editor: NSView!
+    /// Faux dans l'onglet des Réglages : la fenêtre se ferme normalement, sans bouton « Terminé ».
+    var showsDoneButton = true
 
     override func loadView() {
         let title = NSTextField(labelWithString: L("Actions personnalisées"))
@@ -258,7 +260,7 @@ final class CustomActionsController: NSViewController, NSTableViewDataSource, NS
         let body = NSStackView(views: [list, grid])
         body.alignment = .top
         body.spacing = 16
-        let root = NSStackView(views: [title, body, close])
+        let root = NSStackView(views: showsDoneButton ? [title, body, close] : [title, body])
         root.orientation = .vertical
         root.alignment = .leading
         root.spacing = 14

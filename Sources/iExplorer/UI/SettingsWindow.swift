@@ -4,44 +4,66 @@ import AppKit
 final class SettingsWindowController: NSWindowController {
     private static var shared: SettingsWindowController?
 
-    static func show() {
+    enum Tab: Int { case general, fileActions, customActions, tools, animations }
+
+    /// Ouvre la fenêtre, sur un onglet donné si besoin ; renvoie le contrôleur de l'onglet affiché.
+    @discardableResult
+    static func show(tab: Tab? = nil) -> NSViewController? {
         let controller = shared ?? SettingsWindowController()
         shared = controller
+        if let tab { controller.tabs.selectedTabViewItemIndex = tab.rawValue }
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
+        return controller.tabs.tabViewItems[controller.tabs.selectedTabViewItemIndex].viewController
     }
 
+    private let tabs: NSTabViewController
+
     private init() {
-        let tabs = NSTabViewController()
+        let tabs = SettingsTabsController()
         tabs.tabStyle = .toolbar
-        // Le titre de chaque onglet devient celui de la fenêtre.
-        let generalController = GeneralSettingsViewController()
-        generalController.title = L("Général")
-        let general = NSTabViewItem(viewController: generalController)
-        general.label = L("Général")
-        general.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
-        tabs.addTabViewItem(general)
-        let toolsController = ExternalToolsViewController()
-        toolsController.title = L("Outils externes")
-        let tools = NSTabViewItem(viewController: toolsController)
-        tools.label = L("Outils externes")
-        tools.image = NSImage(systemSymbolName: "shippingbox", accessibilityDescription: nil)
-        tabs.addTabViewItem(tools)
-        let animationsController = AnimationSettingsViewController()
-        animationsController.title = L("Animations")
-        let animations = NSTabViewItem(viewController: animationsController)
-        animations.label = L("Animations")
-        animations.image = NSImage(systemSymbolName: "wand.and.sparkles", accessibilityDescription: nil)
-        tabs.addTabViewItem(animations)
+        // Le titre de chaque onglet devient celui de la fenêtre ; l'ordre suit `Tab`.
+        func add(_ controller: NSViewController, _ title: String, _ symbol: String) {
+            controller.title = title
+            let item = NSTabViewItem(viewController: controller)
+            item.label = title
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            tabs.addTabViewItem(item)
+        }
+        add(GeneralSettingsViewController(), L("Général"), "gearshape")
+        let fileActions = FileActionsEditorController()
+        fileActions.preferredContentSize = NSSize(width: 980, height: 640)
+        add(fileActions, L("Actions par type"), "doc.badge.gearshape")
+        let customActions = CustomActionsController()
+        customActions.showsDoneButton = false
+        customActions.preferredContentSize = NSSize(width: 760, height: 420)
+        add(customActions, L("Actions personnalisées"), "bolt")
+        add(ExternalToolsViewController(), L("Outils externes"), "shippingbox")
+        add(AnimationSettingsViewController(), L("Animations"), "wand.and.sparkles")
         let window = NSWindow(contentViewController: tabs)
         window.title = L("Réglages")
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
+        self.tabs = tabs
         super.init(window: window)
         window.center()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+/// Onglets des Réglages : la fenêtre prend la taille de chaque onglet (les éditeurs d'actions sont bien plus grands).
+private final class SettingsTabsController: NSTabViewController {
+    override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
+        super.tabView(tabView, didSelect: tabViewItem)
+        guard let controller = tabViewItem?.viewController, let window = view.window else { return }
+        let size = controller.preferredContentSize == .zero ? controller.view.fittingSize : controller.preferredContentSize
+        guard size.width > 0, size.height > 0 else { return }
+        // Le haut de la fenêtre reste en place.
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+        frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+        window.setFrame(frame, display: true, animate: window.isVisible)
+    }
 }
 
 final class ExternalToolsViewController: NSViewController {

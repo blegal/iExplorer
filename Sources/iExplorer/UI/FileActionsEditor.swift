@@ -4,26 +4,11 @@ import UniformTypeIdentifiers
 /// Fenêtre « Actions par type de fichier » : liste des règles (les miennes, celles du projet courant),
 /// édition du fichier .toml avec vérification immédiate et aperçu du menu sur un fichier réel.
 final class FileActionsEditorController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSTextViewDelegate {
-    private static var window: NSWindow?
-
-    /// Ouvre (ou ramène) la fenêtre, éventuellement sur une règle et pour le dossier d'un projet.
+    /// Ouvre les Réglages sur l'onglet Actions, éventuellement sur une règle et pour le dossier d'un projet.
     static func show(selecting file: URL? = nil, projectDirectory: URL? = nil) {
-        if window == nil {
-            let controller = FileActionsEditorController()
-            let window = NSWindow(contentViewController: controller)
-            window.title = L("Actions par type de fichier")
-            window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-            window.setContentSize(NSSize(width: 980, height: 640))
-            window.contentMinSize = NSSize(width: 820, height: 520)
-            window.setFrameAutosaveName("FileActionsEditor")
-            window.isReleasedWhenClosed = false
-            window.center()
-            self.window = window
-        }
-        guard let window, let controller = window.contentViewController as? FileActionsEditorController else { return }
+        guard let controller = SettingsWindowController.show(tab: .fileActions) as? FileActionsEditorController else { return }
         controller.projectDirectory = projectDirectory ?? controller.projectDirectory
         controller.reloadRules(selecting: file)
-        window.makeKeyAndOrderFront(nil)
     }
 
     private enum Row {

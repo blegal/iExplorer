@@ -89,8 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func clearRecentFolders(_ sender: Any?) { RecentFolders.clear() }
 
     @objc func manageCustomActions(_ sender: Any?) {
-        guard let window = NSApp.keyWindow ?? NSApp.mainWindow ?? windowControllers.first?.window else { return }
-        window.beginSheet(NSWindow(contentViewController: CustomActionsController()))
+        SettingsWindowController.show(tab: .customActions)
     }
 
     /// Actions par type de fichier ; depuis le menu contextuel, l'élément porte la règle à afficher.
