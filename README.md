@@ -85,7 +85,7 @@ is always honored.
 
 ## Installation
 
-Requires **macOS 26** or later.
+Requires **macOS 15** or later (the Liquid Glass look needs macOS 26).
 
 1. Download `iExplorer-x.y.z.dmg` from the [Releases](https://github.com/blegal/iExplorer/releases/latest) page.
 2. Open the disk image and drag **iExplorer** to **Applications**.

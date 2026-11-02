@@ -85,7 +85,7 @@ animations » de macOS est toujours respecté.
 
 ## Installation
 
-Nécessite **macOS 26** ou plus récent.
+Nécessite **macOS 15** ou plus récent (l’apparence Liquid Glass demande macOS 26).
 
 1. Téléchargez `iExplorer-x.y.z.dmg` depuis la page [Releases](https://github.com/blegal/iExplorer/releases/latest).
 2. Ouvrez l’image disque et glissez **iExplorer** dans **Applications**.

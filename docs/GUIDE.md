@@ -13,7 +13,7 @@ Le mode d'occupation du disque (⌘5) et la mise à jour automatique viennent de
 open build/iExplorer.app
 ```
 
-Nécessite macOS 26+ et Xcode (Swift 6). Seule dépendance : [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (MIT) pour le terminal intégré.
+Nécessite macOS 15+ et Xcode (Swift 6). Seule dépendance : [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (MIT) pour le terminal intégré.
 
 Chaque commit poussé incrémente la version (`Tools/bump-version.sh` : 1.0.0 → 1.0.1 et numéro de build + 1 ;
 `Tools/bump-version.sh minor` → 1.1.0, `major` → 2.0.0).

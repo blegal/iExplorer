@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "iExplorer",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("15.0")],
     products: [
         .executable(name: "iExplorer", targets: ["iExplorer"]),
     ],
