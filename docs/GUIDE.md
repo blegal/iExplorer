@@ -98,6 +98,7 @@ Le script affiche la clé privée, à enregistrer dans le secret `UPDATE_SIGNING
 | Rechercher (ce dossier, sous-dossiers, contenu) | ⌘F, Échap pour fermer |
 | Même dossier dans l’autre panneau | ⌘= |
 | Comparer et synchroniser les panneaux | ⌃⌘C |
+| Éditeur : aperçu seul / texte et aperçu / texte seul | ⌃⌘1 / ⌃⌘2 / ⌃⌘3 |
 | Se connecter au serveur (SFTP, SMB, AFP, NFS, WebDAV) | ⌘K |
 | Terminal intégré | ⌃` |
 | État Git dans les panneaux | ⌃⌘G |
@@ -235,9 +236,11 @@ intégré pour les autres documents. Un fichier modifié sur le disque est recha
 ## Éditeur
 
 En disposition à un panneau, le fichier texte sélectionné s’ouvre dans un éditeur à côté. Barre d’icônes :
-aperçu, retour à la ligne, rechercher (⌘F), enregistrer (⌘S), enregistrer, commit et push (⌥⌘S).
+affichage (aperçu seul, texte et aperçu, texte seul), retour à la ligne, rechercher (⌘F), enregistrer (⌘S), enregistrer, commit et push (⌥⌘S).
 
 - Aperçu Markdown, CSV et JSON mis à jour à la frappe ; LaTeX et Typst compilés à l’enregistrement, PDF à côté.
+- Un fichier Markdown s’ouvre en aperçu seul ; double-clic dans l’aperçu pour modifier le texte à cet endroit.
+  ⌃⌘1 / ⌃⌘2 / ⌃⌘3 : aperçu seul, texte et aperçu, texte seul (aussi dans Présentation).
 - Synchronisation texte ↔ aperçu par ⌘-clic, ou clic droit › Afficher dans le PDF / l’aperçu :
   LaTeX par SyncTeX (y compris les fichiers inclus par `\input`), Markdown par blocs.
   L’aperçu Markdown suit aussi le défilement du texte.

@@ -530,6 +530,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         layoutItem?.image = layout.icon()
     }
 
+    /// Présentation › Éditeur : aperçu seul, texte et aperçu, texte seul (tag = `EditorMode`).
+    @objc func setEditorMode(_ sender: NSMenuItem) {
+        guard let mode = EditorMode(rawValue: sender.tag) else { return }
+        panelsController.editor.setMode(mode)
+    }
+
     /// Active ou désactive la navigation synchronisée des panneaux.
     @objc func toggleSyncNavigation(_ sender: Any?) {
         Preferences.syncNavigation.toggle()
@@ -662,6 +668,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         }
         if menuItem.action == #selector(toggleEditor(_:)) {
             menuItem.state = EditorViewController.isEnabled ? .on : .off
+        }
+        if menuItem.action == #selector(setEditorMode(_:)) {
+            let editor = panelsController.editor
+            menuItem.state = editor.canChooseMode && menuItem.tag == editor.currentMode.rawValue ? .on : .off
+            return panelsController.showsEditor && editor.canChooseMode
         }
         if menuItem.action == #selector(toggleSyncNavigation(_:)) {
             menuItem.state = Preferences.syncNavigation ? .on : .off

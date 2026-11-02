@@ -27,7 +27,7 @@ Icônes, détails, liste et colonnes dans la même fenêtre, avec les tags du Fi
 
 ### Éditeur avec aperçu en direct
 
-En disposition simple, l’éditeur s’ouvre à côté du panneau : aperçu Markdown, CSV et JSON en direct, compilation
+En disposition simple, l’éditeur s’ouvre à côté du panneau. Un fichier Markdown s’affiche en aperçu seul (double-clic pour modifier à cet endroit), puis texte et aperçu côte à côte ou texte seul (⌃⌘1 … ⌃⌘3) : aperçu Markdown, CSV et JSON en direct, compilation
 LaTeX ou Typst avec le PDF à côté, coloration syntaxique de plus de soixante-dix langages.
 
 ![Éditeur Markdown avec son aperçu en direct, à côté du panneau de fichiers](docs/images/fr/editor.png)

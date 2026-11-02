@@ -124,6 +124,7 @@
 "Actualiser" = "Refresh";
 "Adresse SFTP invalide." = "Invalid SFTP address.";
 "Adresse du serveur incomplète." = "Incomplete server address.";
+"Affichage" = "Display";
 "Afficher dans la liste" = "Show in List";
 "Afficher dans le Finder" = "Show in Finder";
 "Afficher dans le PDF" = "Show in PDF";
@@ -136,7 +137,6 @@
 "Afficher le terminal" = "Show Terminal";
 "Afficher les favoris du Finder…" = "Show Finder favorites…";
 "Afficher les fichiers cachés" = "Show Hidden Files";
-"Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON).\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)" = "Show the preview next to the text (Markdown, LaTeX, Typst, CSV, JSON).\n⌘-click in the text or the preview: jump to the same place on the other side (Markdown, LaTeX)";
 "Afficher l’inspecteur" = "Show Inspector";
 "Afficher l’état Git (couleurs, push / pull en attente) — consomme du temps processeur" = "Show Git status (colors, pending push / pull) — uses CPU time";
 "Afficher ou masquer le terminal (⌃`)" = "Show or hide the terminal (⌃`)";
@@ -175,11 +175,13 @@
 "Animations légères" = "Light animations";
 "Anneau et liste" = "Ring and list";
 "Annuler" = "Cancel";
-"Aperçu" = "Preview";
 "Aperçu : « %@ »" = "Preview: “%@”";
 "Aperçu dans le navigateur" = "Preview in browser";
 "Aperçu des documents docx, odt, epub, LaTeX convertis en HTML" = "Previews of docx, odt, epub and LaTeX documents converted to HTML";
+"Aperçu seul" = "Preview only";
+"Aperçu seul (⌃⌘1)\nDouble-clic dans l’aperçu Markdown : modifier à cet endroit" = "Preview only (⌃⌘1)\nDouble-click in the Markdown preview: edit at that spot";
 "Aperçu · %@" = "Preview · %@";
+"Aperçu · %@ · double-clic pour modifier à cet endroit" = "Preview · %@ · double-click to edit at that spot";
 "Aperçus et métadonnées" = "Previews and metadata";
 "Appareil" = "Camera";
 "Appareils" = "Devices";
@@ -1002,6 +1004,10 @@
 "Terminées : %@" = "Finished: %@";
 "Texte" = "Text";
 "Texte des PDF (pdftotext) pour la recherche dans le contenu" = "PDF text (pdftotext) for content search";
+"Texte et aperçu" = "Text and preview";
+"Texte et aperçu côte à côte (⌃⌘2)\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)" = "Text and preview side by side (⌃⌘2)\n⌘-click in the text or the preview: go to the same spot on the other side (Markdown, LaTeX)";
+"Texte seul" = "Text only";
+"Texte seul (⌃⌘3)" = "Text only (⌃⌘3)";
 "Texte à rechercher" = "Text to find";
 "Thème de couleurs" = "Color Theme";
 "Thème de couleurs et apparence claire / sombre" = "Color theme and light / dark appearance";
@@ -1175,6 +1181,9 @@
 "Échap" = "Esc";
 "Écrire un fichier à côté" = "Write a File Alongside";
 "Écrire une somme SHA-256 pour vérifier le réassemblage" = "Write a SHA-256 checksum to verify the join";
+"Éditeur : aperçu seul" = "Editor: Preview Only";
+"Éditeur : texte et aperçu" = "Editor: Text and Preview";
+"Éditeur : texte seul" = "Editor: Text Only";
 "Éditeur à côté du panneau unique" = "Editor Beside Single Panel";
 "Édition" = "Edit";
 "Éjecter" = "Eject";

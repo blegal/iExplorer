@@ -30,6 +30,8 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
     var onJumpToLine: ((Int) -> Void)?
     /// ⌘-clic dans l'aperçu Markdown : ligne (1 = première) du bloc cliqué.
     var onMarkdownClick: ((Int) -> Void)?
+    /// Double-clic sur un bloc de l'aperçu Markdown : sa ligne dans le source, pour la modifier.
+    var onMarkdownDoubleClick: ((Int) -> Void)?
     /// ⌘-clic dans le PDF : page (0 = première) et point, origine en haut à gauche.
     var onPDFClick: ((Int, CGPoint) -> Void)?
 
@@ -155,7 +157,7 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
             configuration.setURLSchemeHandler(LocalFileSchemeHandler(), forURLScheme: LocalFileSchemeHandler.scheme)
             // Le contenu du fichier ne peut pas exécuter de scripts ; seule l'app met la page à jour.
             configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-            // Script de l'app, dans un monde à part : ⌘-clic sur un bloc → sa ligne dans le source.
+            // Script de l'app, dans un monde à part : ⌘-clic ou double-clic sur un bloc → sa ligne dans le source.
             let click = """
             document.addEventListener('click', function (event) {
                 if (!event.metaKey) return;
@@ -165,9 +167,16 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
                 event.stopPropagation();
                 window.webkit.messageHandlers.sync.postMessage(Number(block.dataset.line));
             }, true);
+            document.addEventListener('dblclick', function (event) {
+                var block = event.target.closest && event.target.closest('[data-line]');
+                if (!block) return;
+                window.getSelection().removeAllRanges();
+                window.webkit.messageHandlers.edit.postMessage(Number(block.dataset.line));
+            }, true);
             """
             configuration.userContentController.addUserScript(WKUserScript(source: click, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient))
             configuration.userContentController.add(WeakScriptHandler(self), contentWorld: .defaultClient, name: "sync")
+            configuration.userContentController.add(WeakScriptHandler(self), contentWorld: .defaultClient, name: "edit")
             let web = WKWebView(frame: bounds, configuration: configuration)
             web.navigationDelegate = self
             web.setValue(false, forKey: "drawsBackground")
@@ -187,7 +196,8 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        if let line = (message.body as? NSNumber)?.intValue { onMarkdownClick?(line) }
+        guard let line = (message.body as? NSNumber)?.intValue else { return }
+        if message.name == "edit" { onMarkdownDoubleClick?(line) } else { onMarkdownClick?(line) }
     }
 
     /// Fait défiler l'aperçu Markdown pour que la ligne `line` du source soit en haut (interpolée entre les blocs).

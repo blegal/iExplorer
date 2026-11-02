@@ -5,10 +5,16 @@ import UniformTypeIdentifiers
 
 /// Éditeur à côté du panneau quand un seul panneau est affiché : le fichier texte sélectionné s'ouvre
 /// dans un onglet, se modifie et s'enregistre (⌘S) ; s'il est suivi par Git, « Enregistrer, commit et push ».
-/// Markdown, CSV et JSON ont un aperçu à côté, mis à jour à la frappe ; LaTeX et Typst sont compilés
+/// Markdown, CSV et JSON ont un aperçu, mis à jour à la frappe (le Markdown s'ouvre en aperçu seul ;
+/// sélecteur Aperçu / Mixte / Source, double-clic dans l'aperçu pour modifier à cet endroit) ; LaTeX et Typst sont compilés
 /// à l'enregistrement, PDF à côté. La marge signale les lignes modifiées depuis le dernier commit.
 /// ⌘-clic synchronise le texte et l'aperçu dans les deux sens (SyncTeX pour LaTeX) ; l'aperçu Markdown suit le défilement.
 /// Les autres fichiers (images, PDF, vidéos…) s'affichent en Coup d'œil.
+enum EditorMode: Int {
+    /// Rendu seul, texte seul, ou les deux côte à côte.
+    case preview, mixed, source
+}
+
 final class EditorViewController: NSViewController, NSTextViewDelegate {
     static let enabledChanged = Notification.Name("EditorEnabledChanged")
 
@@ -34,6 +40,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         /// Lignes du fichier au dernier commit, pour les marques de la marge.
         var committedLines: [String]?
         var selection = NSRange(location: 0, length: 0)
+        /// Mode choisi pour ce document ; `nil` : celui de son type (voir `mode(for:)`).
+        var mode: EditorMode?
         var previewKind: EditorPreviewKind? { EditorPreviewKind(url: url) }
 
         init(url: URL, text: String, encoding: String.Encoding) {
@@ -54,7 +62,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let saveButton = NSButton(title: L("Enregistrer"), target: nil, action: nil)
     private let commitButton = NSButton(title: L("Enregistrer, commit et push"), target: nil, action: nil)
     private let findButton = NSButton(title: L("Rechercher"), target: nil, action: nil)
-    private let previewButton = NSButton(title: L("Aperçu"), target: nil, action: nil)
+    private let modeControl = NSSegmentedControl()
     private let wrapButton = NSButton(title: L("Retour à la ligne"), target: nil, action: nil)
     private let split = NSSplitView()
     private let preview = EditorPreviewView()
@@ -88,7 +96,6 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
         // Barre d'icônes : le nom de chaque bouton reste dans son infobulle et pour l'accessibilité.
         let symbols: [(NSButton, String, NSColor?)] = [
-            (previewButton, "rectangle.righthalf.inset.filled", nil),
             (wrapButton, "arrow.turn.down.left", nil),
             (findButton, "magnifyingglass", nil),
             (saveButton, "square.and.arrow.down", .controlAccentColor),
@@ -105,9 +112,21 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             button.contentTintColor = tint
             button.widthAnchor.constraint(equalToConstant: 30).isActive = true
         }
-        previewButton.action = #selector(togglePreview(_:))
-        previewButton.setButtonType(.pushOnPushOff)
-        previewButton.toolTip = L("Afficher l’aperçu à côté du texte (Markdown, LaTeX, Typst, CSV, JSON).\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)")
+        let modes = [("eye", L("Aperçu seul"), L("Aperçu seul (⌃⌘1)\nDouble-clic dans l’aperçu Markdown : modifier à cet endroit")),
+                     ("rectangle.split.2x1", L("Texte et aperçu"), L("Texte et aperçu côte à côte (⌃⌘2)\n⌘-clic dans le texte ou l’aperçu : aller au même endroit de l’autre côté (Markdown, LaTeX)")),
+                     ("chevron.left.forwardslash.chevron.right", L("Texte seul"), L("Texte seul (⌃⌘3)"))]
+        modeControl.segmentCount = modes.count
+        for (index, (symbol, label, tip)) in modes.enumerated() {
+            modeControl.setImage(NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
+                .withSymbolConfiguration(.init(pointSize: 12, weight: .medium)), forSegment: index)
+            modeControl.setToolTip(tip, forSegment: index)
+            modeControl.setWidth(28, forSegment: index)
+        }
+        modeControl.trackingMode = .selectOne
+        modeControl.controlSize = .small
+        modeControl.target = self
+        modeControl.action = #selector(chooseMode(_:))
+        modeControl.setAccessibilityLabel(L("Affichage"))
         wrapButton.image = Self.wrapIcon()
         wrapButton.action = #selector(toggleWrap(_:))
         wrapButton.setButtonType(.pushOnPushOff)
@@ -128,7 +147,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         close.isBordered = false
         close.contentTintColor = .secondaryLabelColor
         close.toolTip = L("Fermer l’onglet")
-        let header = NSStackView(views: [tabScroll, previewButton, wrapButton, findButton, saveButton, commitButton, close])
+        let header = NSStackView(views: [tabScroll, modeControl, wrapButton, findButton, saveButton, commitButton, close])
         header.spacing = 8
         header.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 10)
         tabScroll.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -144,6 +163,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         preview.onOpenFile = { [weak self] url in self?.open(url) }
         preview.onJumpToLine = { [weak self] line in self?.goToLine(line) }
         preview.onMarkdownClick = { [weak self] line in self?.jumpFromPreview(to: line) }
+        preview.onMarkdownDoubleClick = { [weak self] line in self?.jumpFromPreview(to: line) }
         preview.onPDFClick = { [weak self] page, point in self?.inverseSync(page: page, point: point) }
         placeholder.textColor = .secondaryLabelColor
         placeholder.alignment = .center
@@ -348,7 +368,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         fileWatcher.watch(url)
         split.isHidden = true
         placeholder.isHidden = true
-        previewButton.isHidden = true
+        modeControl.isHidden = true
         saveButton.isHidden = true
         commitButton.isHidden = true
         findButton.isHidden = true
@@ -372,7 +392,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         fileWatcher.watch(document?.url)
         split.isHidden = document == nil
         placeholder.isHidden = document != nil
-        previewButton.isHidden = document?.previewKind == nil
+        modeControl.isHidden = document?.previewKind == nil
         saveButton.isHidden = document == nil
         findButton.isHidden = document == nil
         if let document {
@@ -602,7 +622,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let language = SyntaxHighlighter.language(for: document.url)?.title ?? L("Texte")
         let endings = document.text.contains("\r\n") ? "CRLF" : "LF"
         let encoding = document.encoding == .utf8 ? "UTF-8" : "ISO Latin-1"
-        statusLeft.stringValue = L("\(language) · \(encoding) · \(endings) · Ligne \(line), colonne \(column)")
+        statusLeft.stringValue = switch mode(for: document) {
+        case .preview where document.previewKind == .markdown: L("Aperçu · \(document.url.lastPathComponent) · double-clic pour modifier à cet endroit")
+        case .preview: L("Aperçu · \(document.url.lastPathComponent)")
+        default: L("\(language) · \(encoding) · \(endings) · Ligne \(line), colonne \(column)")
+        }
         let root = document.gitRoot ?? nil
         statusRight.stringValue = root.map { document.isModified ? L("Git : \($0.lastPathComponent) · non enregistré") : L("Git : \($0.lastPathComponent)") } ?? (document.isModified ? L("Non enregistré") : "")
     }
@@ -710,25 +734,52 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         set { UserDefaults.standard.set(newValue, forKey: "editorPreviewVisible") }
     }
 
-    @objc private func togglePreview(_ sender: Any?) {
-        Self.previewVisible.toggle()
+    /// Mode d'affichage du document : celui choisi pour lui, sinon aperçu seul pour le Markdown,
+    /// et le dernier choix (texte seul ou côte à côte) pour les autres types.
+    private func mode(for document: Document?) -> EditorMode {
+        guard let document, let kind = document.previewKind else { return .source }
+        if let mode = document.mode { return mode }
+        if kind == .markdown { return .preview }
+        return Self.previewVisible ? .mixed : .source
+    }
+
+    /// Le document affiché a un aperçu : le sélecteur Aperçu / Mixte / Source s'applique.
+    var canChooseMode: Bool { current?.previewKind != nil && !split.isHidden }
+    var currentMode: EditorMode { mode(for: current) }
+
+    func setMode(_ mode: EditorMode) {
+        guard let document = current, let kind = document.previewKind else { return }
+        document.mode = mode
+        if kind != .markdown { Self.previewVisible = mode != .source }
         updatePreview(compileIfMissing: true)
+        updateStatus()
+        if mode != .preview { view.window?.makeFirstResponder(textView) }
+    }
+
+    @objc private func chooseMode(_ sender: NSSegmentedControl) {
+        setMode(EditorMode(rawValue: sender.selectedSegment) ?? .mixed)
     }
 
     /// Montre ou cache l'aperçu selon le fichier, puis le met à jour (sauf PDF compilé : seulement s'il manque).
     private func updatePreview(compileIfMissing: Bool = false) {
         guard isViewLoaded else { return }
         let kind = current?.previewKind
-        let visible = kind != nil && Self.previewVisible
-        previewButton.state = visible ? .on : .off
-        if preview.isHidden == visible {
+        let mode = mode(for: current)
+        let visible = mode != .source
+        modeControl.selectedSegment = mode.rawValue
+        let textHidden = mode == .preview
+        if preview.isHidden == visible || textScroll.isHidden != textHidden {
+            if textHidden, view.window?.firstResponder === textView { view.window?.makeFirstResponder(nil) }
             preview.isHidden = !visible
+            textScroll.isHidden = textHidden
             split.adjustSubviews()
-            if visible {
-                // Juste après l'installation de l'éditeur, la vue partagée n'a pas encore sa largeur.
-                DispatchQueue.main.async { [split] in split.setPosition(split.bounds.width / 2, ofDividerAt: 0) }
+            // Juste après l'installation de l'éditeur, la vue partagée n'a pas encore sa largeur.
+            DispatchQueue.main.async { [split] in
+                if mode == .mixed { split.setPosition(split.bounds.width / 2, ofDividerAt: 0) } else { split.adjustSubviews() }
             }
         }
+        wrapButton.isEnabled = !textHidden
+        findButton.isEnabled = !textHidden
         guard visible, let document = current, let kind else { return }
         let text = textView.string
         switch kind {
@@ -753,7 +804,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var compiling = false
 
     private func compile(_ document: Document) {
-        guard let kind = document.previewKind, kind.isCompiled, Self.previewVisible, !compiling else { return }
+        guard let kind = document.previewKind, kind.isCompiled, mode(for: document) != .source, !compiling else { return }
         let root = DocumentCompiler.root(for: document.url, text: document.text)
         compiling = true
         let start = Date()
@@ -794,7 +845,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     /// Montre dans l'aperçu l'endroit produit par le caractère `index` ; `false` si l'aperçu ne sait pas faire.
     @discardableResult
     private func forwardSync(at index: Int, flash: Bool) -> Bool {
-        guard let document = current, let kind = document.previewKind, Self.previewVisible else { return false }
+        guard let document = current, let kind = document.previewKind, mode(for: document) == .mixed else { return false }
         let line = lineNumber(at: index)
         switch kind {
         case .markdown:
@@ -839,7 +890,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     /// L'aperçu Markdown suit le défilement du texte.
     @objc private func textDidScroll() {
-        guard !followScrollPaused, !isLoading, current?.previewKind == .markdown, Self.previewVisible,
+        guard !followScrollPaused, !isLoading, current?.previewKind == .markdown, mode(for: current) == .mixed,
               let layout = textView.layoutManager, let container = textView.textContainer else { return }
         let visible = textView.visibleRect
         if visible.maxY >= textView.bounds.maxY - 2, visible.minY > 0 {
@@ -852,7 +903,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     func textView(_ view: NSTextView, menu: NSMenu, for event: NSEvent, at index: Int) -> NSMenu? {
-        guard let kind = current?.previewKind, kind == .markdown || kind == .latex, Self.previewVisible else { return menu }
+        guard let kind = current?.previewKind, kind == .markdown || kind == .latex, mode(for: current) == .mixed else { return menu }
         let item = NSMenuItem(title: kind == .latex ? L("Afficher dans le PDF") : L("Afficher dans l’aperçu"), action: #selector(showInPreview(_:)), keyEquivalent: "")
         item.target = self
         item.representedObject = index
@@ -866,6 +917,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func goToLine(_ line: Int) {
+        if mode(for: current) == .preview { setMode(.mixed) }
         let text = textView.string as NSString
         var location = 0
         for _ in 1..<max(1, line) {
@@ -949,6 +1001,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     /// ⌘F dans l'éditeur : barre de recherche du texte (et non la recherche du panneau).
     @objc func showSearch(_ sender: Any?) {
         guard current != nil else { return }
+        if mode(for: current) == .preview { setMode(.mixed) }
         view.window?.makeFirstResponder(textView)
         let item = NSMenuItem()
         item.tag = Int(NSTextFinder.Action.showFindInterface.rawValue)

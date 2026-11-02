@@ -27,7 +27,7 @@ Icons, details, list and columns in one window, with Finder tags and Git status.
 
 ### Editor with live preview
 
-In the single-panel layout, the editor opens next to the panel: live Markdown, CSV and JSON preview, LaTeX or Typst
+In the single-panel layout, the editor opens next to the panel. Markdown files open as a full preview (double-click to edit at that spot), then side by side with the text or text only (⌃⌘1 … ⌃⌘3): live Markdown, CSV and JSON preview, LaTeX or Typst
 builds with the PDF alongside, and syntax highlighting for more than seventy languages.
 
 ![Markdown editor with its live preview, next to the file panel](docs/images/en/editor.png)
