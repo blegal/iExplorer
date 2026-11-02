@@ -96,7 +96,8 @@ enum AnimationEffect: String, CaseIterable {
     case portal, spiral, hoverGlow, selectionRipple, iconPop, panelDim, flyingFiles, dropParticles
     case crumple, typewriter, stamps, fireworks, themeWave, sidebarBounce
     // Graphique d'occupation du disque (⌘5), joués par DiskUsageKit : mêmes noms que `DiskEffect`.
-    case growth, zoom, unfold, morph, crumble, liveScan, baobab, leaves
+    // Le baobab qui pousse en fin d'analyse n'est pas repris : trop envahissant dans un gestionnaire de fichiers.
+    case growth, zoom, unfold, morph, crumble, liveScan, leaves
 
     var level: AnimationMode {
         switch self {
@@ -136,7 +137,6 @@ enum AnimationEffect: String, CaseIterable {
         case .morph: L("Occupation du disque : les blocs glissent d’une représentation à l’autre")
         case .crumble: L("Occupation du disque : le bloc mis à la corbeille s’effrite")
         case .liveScan: L("Occupation du disque : les dossiers apparaissent pendant l’analyse")
-        case .baobab: L("Occupation du disque : un baobab pousse à la fin d’une analyse")
         case .leaves: L("Occupation du disque : pluie de feuilles après avoir libéré plus d’1 Go")
         }
     }
