@@ -381,6 +381,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             panel.navigate(to: url)
             panel.activate()
         }
+        sidebar.onOpenInNewTab = { [weak self] url in self?.activePanel.openTab(url) }
         sidebar.onConnect = { [weak self] connection in
             if let connection { self?.open(connection) } else { self?.showConnectionPanel(nil) }
         }

@@ -129,6 +129,8 @@ refuse la lecture, des dossiers standard), puis :
 
 Déposer des fichiers *sur* un favori les copie ou les déplace dans ce dossier.
 
+Favoris, récents et appareils s’ouvrent dans un nouvel onglet du panneau actif par ⌘-clic ou clic droit › Ouvrir dans un nouvel onglet.
+
 Section « Appareils » : chaque volume local affiche une jauge d’occupation (bleue, orange au-delà de 80 %,
 rouge au-delà de 92 %) et l’espace libre ; bouton d’éjection pour les volumes amovibles et les images disque ;
 clic droit › Analyser l’espace disque ou Éjecter. « Monter une image disque… » (ou clic droit sur un .dmg, .iso…

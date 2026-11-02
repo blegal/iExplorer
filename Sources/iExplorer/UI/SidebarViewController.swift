@@ -30,6 +30,8 @@ final class SidebarItem {
 /// Barre latérale : Favoris, Appareils, Réseau.
 final class SidebarViewController: NSViewController {
     var onNavigate: ((URL) -> Void)?
+    /// ⌘-clic ou menu contextuel : ouvrir l'emplacement dans un nouvel onglet du panneau actif.
+    var onOpenInNewTab: ((URL) -> Void)?
     /// `nil` : ouvrir le panneau de nouvelle connexion.
     var onConnect: ((ServerConnection?) -> Void)?
     var onEditConnection: ((ServerConnection) -> Void)?
@@ -289,7 +291,9 @@ final class SidebarViewController: NSViewController {
     @objc private func rowClicked(_ sender: Any?) {
         guard let item = outlineView.item(atRow: outlineView.clickedRow) as? SidebarItem else { return }
         switch item.kind {
-        case .location, .volume: if let url = item.url { onNavigate?(url) }
+        case .location, .volume:
+            guard let url = item.url else { return }
+            if NSApp.currentEvent?.modifierFlags.contains(.command) == true { onOpenInNewTab?(url) } else { onNavigate?(url) }
         case .connect: onConnect?(nil)
         case .finderAccess: FinderFavorites.showDiagnostic()
         case .tag: onShowTag?(item.title)
@@ -416,6 +420,10 @@ final class SidebarViewController: NSViewController {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Keychain.delete(connection.keychainAccount)
         SavedConnections.remove(connection)
+    }
+
+    @objc private func openInNewTab(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL { onOpenInNewTab?(url) }
     }
 
     @objc private func revealItem(_ sender: NSMenuItem) {
@@ -560,6 +568,13 @@ extension SidebarViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         guard let item = outlineView.item(atRow: outlineView.clickedRow) as? SidebarItem else { return }
+        if item.kind == .location || item.kind == .volume, let url = item.url {
+            let tab = NSMenuItem(title: L("Ouvrir dans un nouvel onglet"), action: #selector(openInNewTab(_:)), keyEquivalent: "")
+            tab.target = self
+            tab.representedObject = url
+            tab.image = NSImage(systemSymbolName: "plus.square.on.square", accessibilityDescription: nil)
+            menu.addItem(tab)
+        }
         if let url = item.url, url.isFileURL {
             let open = NSMenuItem(title: L("Afficher dans le Finder"), action: #selector(revealItem(_:)), keyEquivalent: "")
             open.target = self
