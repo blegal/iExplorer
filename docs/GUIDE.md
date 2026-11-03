@@ -129,6 +129,7 @@ refuse la lecture, des dossiers standard), puis :
 
 Déposer des fichiers *sur* un favori les copie ou les déplace dans ce dossier.
 
+La section Récents montre au moins huit dossiers, davantage quand la barre a de la place libre en dessous ; l’info-bulle de chaque élément donne son chemin complet.
 Favoris, récents et appareils s’ouvrent dans un nouvel onglet du panneau actif par ⌘-clic ou clic droit › Ouvrir dans un nouvel onglet.
 
 Section « Appareils » : chaque volume local affiche une jauge d’occupation (bleue, orange au-delà de 80 %,

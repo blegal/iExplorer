@@ -44,8 +44,10 @@ final class SidebarViewController: NSViewController {
     private var sections: [SidebarItem] = []
     private weak var favoritesSection: SidebarItem?
     private weak var recentsSection: SidebarItem?
-    /// Dossiers de l'historique affichés dans la barre latérale (le reste est dans Aller › Historique).
+    /// Dossiers de l'historique affichés dans la barre latérale (le reste est dans Aller › Historique) :
+    /// au moins huit, davantage quand la place libre sous les sections le permet.
     private static let recentCount = 8
+    private var recentLimit = recentCount
     private var isRebuilding = false
     private var isRestoringExpansion = false
 
@@ -247,20 +249,44 @@ final class SidebarViewController: NSViewController {
         }
         let recents = SidebarItem(kind: .section, title: L("Récents"))
         recentsSection = recents
-        recents.children = Self.recentItems()
+        recents.children = recentItems()
         sections = [favorites, recents, devices, network, tags]
         isRestoringExpansion = true
         outlineView.reloadData()
         let collapsed = Preferences.collapsedSidebarSections
         sections.filter { !collapsed.contains(AppLanguage.sourceText($0.title)) }.forEach { outlineView.expandItem($0) }
         isRestoringExpansion = false
+        fitRecents()
     }
 
-    private static func recentItems() -> [SidebarItem] {
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        fitRecents()
+    }
+
+    /// Ajuste le nombre de dossiers récents à la hauteur libre de la barre, sans jamais la faire défiler pour eux.
+    private func fitRecents() {
+        guard let recents = recentsSection, let clip = outlineView.enclosingScrollView?.contentView else { return }
+        var limit = Self.recentCount
+        let rows = outlineView.numberOfRows
+        if outlineView.isItemExpanded(recents), rows > 0 {
+            let sample = recents.children.first.map { outlineView.row(forItem: $0) } ?? -1
+            let rowHeight = sample >= 0 ? outlineView.rect(ofRow: sample).height : outlineView.rowHeight + outlineView.intercellSpacing.height
+            let extra = max(0, recents.children.count - Self.recentCount)
+            let base = outlineView.rect(ofRow: rows - 1).maxY - CGFloat(extra) * rowHeight
+            limit += max(0, Int((clip.bounds.height - base) / rowHeight))
+        }
+        guard limit != recentLimit else { return }
+        recentLimit = limit
+        // Hors du passage de mise en page en cours.
+        DispatchQueue.main.async { [weak self] in self?.rebuildRecents() }
+    }
+
+    private func recentItems() -> [SidebarItem] {
         // Les dossiers déjà en favoris n'y sont pas répétés.
         let favorites = Preferences.sidebarFavorites ?? []
         return RecentFolders.all.filter { url in url.isExistingDirectory && !favorites.contains { $0.isSameLocation(as: url) } }
-            .prefix(recentCount).map { url in
+            .prefix(recentLimit).map { url in
             let item = SidebarItem(kind: .location, title: BreadcrumbView.displayName(url), symbol: "clock", tint: .secondaryLabelColor, url: url)
             item.isRecent = true
             return item
@@ -271,7 +297,7 @@ final class SidebarViewController: NSViewController {
     private func rebuildRecents() {
         guard let recents = recentsSection else { return }
         let selected = (outlineView.item(atRow: outlineView.selectedRow) as? SidebarItem)?.url
-        recents.children = Self.recentItems()
+        recents.children = recentItems()
         outlineView.reloadItem(recents, reloadChildren: true)
         if let selected { highlight(selected) }
     }
@@ -449,8 +475,15 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
         (item as? SidebarItem)?.kind == .section
     }
 
-    func outlineViewItemDidCollapse(_ notification: Notification) { rememberExpansion(notification, collapsed: true) }
-    func outlineViewItemDidExpand(_ notification: Notification) { rememberExpansion(notification, collapsed: false) }
+    func outlineViewItemDidCollapse(_ notification: Notification) {
+        rememberExpansion(notification, collapsed: true)
+        fitRecents()
+    }
+
+    func outlineViewItemDidExpand(_ notification: Notification) {
+        rememberExpansion(notification, collapsed: false)
+        fitRecents()
+    }
 
     /// Une section repliée par l'utilisateur le reste d'un lancement à l'autre.
     private func rememberExpansion(_ notification: Notification, collapsed: Bool) {
@@ -719,7 +752,12 @@ private final class SidebarCell: NSTableCellView {
             trailing.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
             trailing.centerYAnchor.constraint(equalTo: centerYAnchor, constant: offset),
         ])
-        if let url = item.url { toolTip = url.isFileURL ? url.path : url.absoluteString }
+        // Chemin complet en info-bulle, aussi sur le nom et l'icône (qui sinon la masquent).
+        if let url = item.url {
+            toolTip = url.isFileURL ? url.path : url.absoluteString
+            field.toolTip = toolTip
+            icon.toolTip = toolTip
+        }
         if let capacity = item.capacity {
             let gauge = CapacityGauge(used: Double(capacity.total - capacity.available) / Double(capacity.total))
             gauge.translatesAutoresizingMaskIntoConstraints = false
@@ -732,6 +770,8 @@ private final class SidebarCell: NSTableCellView {
             ])
             let used = Double(capacity.total - capacity.available) / Double(capacity.total)
             toolTip = (toolTip.map { $0 + "\n" } ?? "") + L("\(Format.fileSize(capacity.available)) disponibles sur \(Format.fileSize(capacity.total)) (\(Int((used * 100).rounded())) % utilisés)")
+            field.toolTip = toolTip
+            icon.toolTip = toolTip
         }
     }
 
