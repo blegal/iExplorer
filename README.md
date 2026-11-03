@@ -63,7 +63,7 @@ is always honored.
 - Background copies and moves, with throughput, pause and optional verification.
 - Drag and drop between panels, with the Finder and other apps, in every view.
 - Batch rename, Finder tags, new documents from templates, sharing, undo (⌘Z).
-- Compression, checksums, encryption, splitting large files.
+- Compression, checksums, encryption, splitting large files; clean app uninstall, ~/Library leftovers included.
 - Inspector: highlighted code preview, PDF, images, video and audio, permissions (R/W/X, octal, owner).
 
 **For developers**

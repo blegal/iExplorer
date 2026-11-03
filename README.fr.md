@@ -63,7 +63,7 @@ animations » de macOS est toujours respecté.
 - Copies et déplacements en arrière-plan, avec débit, pause et vérification facultative des copies.
 - Glisser-déposer entre panneaux, avec le Finder et les autres apps, dans toutes les vues.
 - Renommage par lot, tags du Finder, nouveaux documents à partir de modèles, partage, annulation (⌘Z).
-- Compression, sommes de contrôle, chiffrement, découpage de gros fichiers.
+- Compression, sommes de contrôle, chiffrement, découpage de gros fichiers ; désinstallation propre d’une app avec ses fichiers dans ~/Library.
 - Inspecteur : aperçu du code avec coloration, PDF, images, vidéo et son, permissions (R/W/X, octal, propriétaire).
 
 **Pour les développeurs**

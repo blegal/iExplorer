@@ -1791,9 +1791,14 @@ final class PanelViewController: NSViewController {
         }
         group(nil, create)
 
+        var trash: [NSMenuItem] = []
         if shown(.trash), !selection.isEmpty {
-            group(nil, [tinted(L("Placer dans la corbeille"), #selector(moveToTrash(_:)), "trash", MenuTint.danger)])
+            trash.append(tinted(L("Placer dans la corbeille"), #selector(moveToTrash(_:)), "trash", MenuTint.danger))
         }
+        if shown(.uninstallApp), selection.count == 1, selection[0].url.pathExtension == "app", !currentURL.isRemote {
+            trash.append(tinted(L("Désinstaller l’app…"), #selector(uninstallApp(_:)), "xmark.app", MenuTint.danger))
+        }
+        group(nil, trash)
 
         var view: [NSMenuItem] = []
         if shown(.flatView), selection.isEmpty, isFlatView || canShowFlatView { view.append(flatViewMenuItem()) }

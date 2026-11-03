@@ -340,6 +340,15 @@ colonne la plus courte. Les dossiers et les fichiers sans aperçu gardent leur i
 pincement) change la largeur des colonnes ; sélection, coup d’œil, menu contextuel et glisser-déposer marchent comme
 en icônes.
 
+## Désinstaller une app
+
+Clic droit sur une app (.app) › Désinstaller l’app… : iExplorer cherche ce qu’elle a laissé dans `~/Library`
+(Application Support, Caches, Logs, Preferences, Containers, Group Containers, Saved Application State, HTTPStorages,
+WebKit, Cookies, LaunchAgents…) d’après son identifiant de bundle et son nom, puis liste l’app et ces éléments avec
+leur taille, chacun décochable. La confirmation les place dans la corbeille (⌘Z les remet en place) ; une app ouverte
+est d’abord quittée. Les apps d’Apple livrées avec macOS et iExplorer lui-même sont refusées ; les fichiers hors de
+votre bibliothèque (`/Library`) ne sont pas touchés.
+
 ## Taille des dossiers
 
 La colonne Taille affiche aussi la taille des dossiers, calculée en arrière-plan dès l’ouverture d’un dossier

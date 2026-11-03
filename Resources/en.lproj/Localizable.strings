@@ -211,6 +211,7 @@
 "Aucun" = "None";
 "Aucun commit pour cet élément." = "No commits for this item.";
 "Aucun fichier de favoris trouvé. Contenu du dossier : %@." = "No favorites file found. Folder contents: %@.";
+"Aucun fichier de l’app n’a été trouvé dans votre bibliothèque." = "No files from this app were found in your Library.";
 "Aucun historique" = "No history";
 "Aucun modèle" = "No Templates";
 "Aucune action disponible (outil manquant ou nombre de fichiers)" = "No actions available (missing tool or number of files)";
@@ -262,6 +263,7 @@
 "Ce fichier est vide." = "This file is empty.";
 "Ce fichier n’a pas été chiffré par iExplorer." = "This file was not encrypted by iExplorer.";
 "Ce fichier vient du projet %@ et peut exécuter n’importe quelle commande. Vérifiez son contenu ; il faudra l’approuver de nouveau s’il change." = "This file comes from the project %@ and can run any command. Check its contents; you’ll need to approve it again if it changes.";
+"Ce paquet n’est pas une application." = "This package is not an application.";
 "Certains éléments n’ont pas pu être supprimés." = "Some items could not be deleted.";
 "Certains éléments n’ont pas été renommés." = "Some items weren’t renamed.";
 "Ces outils sont facultatifs : sans eux, les fonctions concernées restent grisées. « Installer » lance Homebrew en arrière-plan ; le journal s’affiche en bas." = "These tools are optional: without them, the related features stay dimmed. “Install” runs Homebrew in the background; the log appears at the bottom.";
@@ -449,6 +451,9 @@
 "Dérivation de la clé impossible." = "Key derivation failed.";
 "Désindexer" = "Unstage";
 "Désindexé" = "Unstaged";
+"Désinstaller l’app" = "Uninstall App";
+"Désinstaller l’app…" = "Uninstall App…";
+"Désinstaller « %@ » ?" = "Uninstall “%@”?";
 "Désélectionner" = "Deselect";
 "Désélectionner selon un motif" = "Deselect by Pattern";
 "Désélectionner selon un motif…" = "Deselect by Pattern…";
@@ -561,6 +566,7 @@
 "Importer les favoris du Finder" = "Import Finder favorites";
 "Impossible de %@ « %@ » dans lui-même." = "Can’t %@ “%@” into itself.";
 "Impossible de copier « %@ » : %@." = "Can’t copy “%@”: %@.";
+"Impossible de désinstaller « %@ »" = "Cannot uninstall “%@”";
 "Impossible de lancer sftp : %@" = "Could not start sftp: %@";
 "Impossible de lire les permissions de « %@ »." = "Could not read the permissions of “%@”.";
 "Impossible de lire « %@ » : %@" = "Could not read “%@”: %@";
@@ -641,6 +647,7 @@
 "Lecture de l’archive" = "Reading the archive";
 "Lecture en cours…" = "Reading…";
 "Les actions personnalisées s’exécutent sur des dossiers locaux." = "Custom actions run on local folders only.";
+"Les applications d’Apple livrées avec macOS ne peuvent pas être désinstallées." = "Apple apps that come with macOS cannot be uninstalled.";
 "Les deux côtés sont identiques (%@ éléments)." = "Both sides are identical (%@ items).";
 "Les deux dossiers sont vides." = "Both folders are empty.";
 "Les deux mots de passe ne correspondent pas." = "The two passwords do not match.";
@@ -665,6 +672,8 @@
 "Liste détaillée" = "Detailed List";
 "Liste et soleil" = "List and sunburst";
 "Légère" = "Light";
+"L’app est ouverte : elle sera quittée d’abord." = "The app is open: it will be quit first.";
+"L’app et %@ éléments de votre bibliothèque (réglages, caches, données) seront placés dans la corbeille, %@ en tout. ⌘Z les remet en place." = "The app and %@ items from your Library (settings, caches, data) will be moved to the Trash, %@ in all. ⌘Z puts them back.";
 "L’application ne s’exécute pas depuis un paquet .app : installation impossible." = "The app isn’t running from an .app bundle, so it can’t be updated.";
 "L’icône choisie s’affiche dans le Dock quand iExplorer est ouvert ; le Finder garde l’icône d’origine." = "The chosen icon appears in the Dock while iExplorer is open; the Finder keeps the original icon.";
 "L’image disque ne contient pas l’application attendue." = "The disk image doesn’t contain the expected app.";
@@ -1113,6 +1122,7 @@
 "fin de ligne attendue" = "end of line expected";
 "git : état Git des fichiers, commit et push depuis l’éditeur" = "git: Git status of files, commit and push from the editor";
 "gzip sur tous les cœurs du processeur (tar.gz bien plus rapide)" = "gzip on all CPU cores (much faster tar.gz)";
+"iExplorer ne peut pas se désinstaller lui-même." = "iExplorer cannot uninstall itself.";
 "ignoré" = "ignored";
 "ko" = "KB";
 "libarchive (bsdtar de macOS)" = "libarchive (macOS bsdtar)";

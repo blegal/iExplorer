@@ -1155,5 +1155,15 @@
  "✓ %@ de %@": "✓ %@ of %@",
  "✓ %@ installé.\n": "✓ %@ installed.\n",
  "✗ Aucune correspondance": "✗ No match",
- "✗ L’installation a échoué (code %@).\n": "✗ Installation failed (code %@).\n"
+ "✗ L’installation a échoué (code %@).\n": "✗ Installation failed (code %@).\n",
+ "Aucun fichier de l’app n’a été trouvé dans votre bibliothèque.": "No files from this app were found in your Library.",
+ "Ce paquet n’est pas une application.": "This package is not an application.",
+ "Désinstaller l’app": "Uninstall App",
+ "Désinstaller l’app…": "Uninstall App…",
+ "Désinstaller « %@ » ?": "Uninstall “%@”?",
+ "iExplorer ne peut pas se désinstaller lui-même.": "iExplorer cannot uninstall itself.",
+ "Impossible de désinstaller « %@ »": "Cannot uninstall “%@”",
+ "Les applications d’Apple livrées avec macOS ne peuvent pas être désinstallées.": "Apple apps that come with macOS cannot be uninstalled.",
+ "L’app est ouverte : elle sera quittée d’abord.": "The app is open: it will be quit first.",
+ "L’app et %@ éléments de votre bibliothèque (réglages, caches, données) seront placés dans la corbeille, %@ en tout. ⌘Z les remet en place.": "The app and %@ items from your Library (settings, caches, data) will be moved to the Trash, %@ in all. ⌘Z puts them back."
 }

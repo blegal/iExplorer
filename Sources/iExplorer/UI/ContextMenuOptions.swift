@@ -38,7 +38,7 @@ enum ContextMenuEntry: String, CaseIterable {
     case compress, checksum, encrypt, split
     case tags, share
     case newFolder, newDocument, terminal, diskUsage
-    case trash
+    case trash, uninstallApp
     case flatView, grouping
 
     var group: ContextMenuGroup {
@@ -50,7 +50,7 @@ enum ContextMenuEntry: String, CaseIterable {
         case .newFolderWithSelection, .copyMoveTo, .links, .copyPath: .organize
         case .tags, .share: .share
         case .newFolder, .newDocument, .terminal, .diskUsage: .create
-        case .trash: .trash
+        case .trash, .uninstallApp: .trash
         case .flatView, .grouping: .view
         }
     }
@@ -80,6 +80,7 @@ enum ContextMenuEntry: String, CaseIterable {
         case .terminal: L("Ouvrir dans le Terminal")
         case .diskUsage: L("Occupation du disque")
         case .trash: L("Placer dans la corbeille")
+        case .uninstallApp: L("Désinstaller l’app…")
         case .flatView: L("Vue à plat")
         case .grouping: L("Regroupement")
         }
