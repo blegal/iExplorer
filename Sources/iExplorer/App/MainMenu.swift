@@ -83,6 +83,7 @@ enum MainMenu {
 
         submenu(L("Fichier"), [
             item(L("Nouvel onglet"), #selector(Panel.newTab(_:)), "t"),
+            item(L("Dupliquer l’onglet"), #selector(Panel.duplicateTab(_:)), ""),
             item(L("Nouveau dossier"), #selector(Panel.newFolder(_:)), "n", [.command, .shift]),
             {
                 let item = NSMenuItem(title: L("Nouveau document"), action: nil, keyEquivalent: "")

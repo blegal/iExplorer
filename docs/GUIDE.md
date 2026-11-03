@@ -190,8 +190,10 @@ macOS peut exiger l’« Accès complet au disque » pour lire leur liste.
 
 ## Onglets
 
-La zone des onglets est teintée par l’accent du thème. Clic droit sur un onglet : couleur de l’onglet
-(rouge, orange, jaune, vert, bleu, violet, gris), mémorisée avec la session.
+La zone des onglets est teintée par l’accent du thème. Clic droit sur un onglet : dupliquer l’onglet
+(même dossier, historique et sélection, aussi dans Fichier › Dupliquer l’onglet), couleur de l’onglet
+(rouge, orange, jaune, vert, bleu, violet, gris), mémorisée avec la session. Glisser un onglet change son
+ordre.
 
 ## Menu contextuel
 

@@ -526,6 +526,8 @@ final class PanelViewController: NSViewController {
         tabBar.onSelect = { [weak self] index in self?.selectTab(index); self?.activate() }
         tabBar.onClose = { [weak self] index in self?.closeTab(at: index) }
         tabBar.onSetColor = { [weak self] index, color in self?.setTabColor(color, at: index) }
+        tabBar.onDuplicate = { [weak self] index in self?.duplicateTab(at: index) }
+        tabBar.onMove = { [weak self] from, to in self?.moveTab(from: from, to: to) }
         tabBar.onAdd = { [weak self] in self?.newTab(nil) }
         searchBar.onChange = { [weak self] text, scope in self?.searchChanged(text, scope: scope) }
         searchBar.onClose = { [weak self] in self?.endSearch() }
@@ -1058,6 +1060,33 @@ final class PanelViewController: NSViewController {
         selectedTabIndex += 1
         showCurrentTab()
         activate()
+    }
+
+    @objc func duplicateTab(_ sender: Any?) { duplicateTab(at: selectedTabIndex) }
+
+    /// Copie de l'onglet (dossier, historique, sélection et couleur), placée juste après lui.
+    func duplicateTab(at index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        tab.selection = selectedURLs
+        let source = tabs[index]
+        let copy = TabState(url: source.url)
+        copy.back = source.back
+        copy.forward = source.forward
+        copy.selection = source.selection
+        copy.color = source.color
+        tabs.insert(copy, at: index + 1)
+        selectedTabIndex = index + 1
+        showCurrentTab()
+        activate()
+    }
+
+    /// Change l'ordre des onglets ; l'onglet affiché reste le même.
+    func moveTab(from: Int, to: Int) {
+        guard from != to, tabs.indices.contains(from), tabs.indices.contains(to) else { return }
+        let current = tab
+        tabs.insert(tabs.remove(at: from), at: to)
+        selectedTabIndex = tabs.firstIndex { $0 === current } ?? 0
+        updateTabBar()
     }
 
     @objc func closeTab(_ sender: Any?) { closeTab(at: selectedTabIndex) }

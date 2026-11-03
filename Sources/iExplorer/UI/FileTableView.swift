@@ -173,6 +173,9 @@ final class TabBarView: NSView {
     var onClose: ((Int) -> Void)?
     var onAdd: (() -> Void)?
     var onSetColor: ((Int, TabColor?) -> Void)?
+    var onDuplicate: ((Int) -> Void)?
+    /// Onglet glissé de la position `from` à la position `to`.
+    var onMove: ((Int, Int) -> Void)?
     private var isActivePanel = false
 
     private let stack = NSStackView()
@@ -218,7 +221,11 @@ final class TabBarView: NSView {
             item.tabColor = tab.color
             item.isSelected = index == selected
             item.isActivePanel = active
-            item.onSelect = { [weak self] in self?.onSelect?(index) }
+            item.onMouseDown = { [weak self, weak item] event in
+                guard let self, let item else { return }
+                self.track(item, from: index, event: event)
+            }
+            item.onDuplicate = { [weak self] in self?.onDuplicate?(index) }
             item.onClose = { [weak self] in self?.onClose?(index) }
             item.onSetColor = { [weak self] color in self?.onSetColor?(index, color) }
             stack.addArrangedSubview(item)
@@ -237,10 +244,52 @@ final class TabBarView: NSView {
     }
 
     @objc private func addTab() { onAdd?() }
+
+    /// Clic sur un onglet : simple clic, il est sélectionné ; glissé, il suit le pointeur et les autres
+    /// s'écartent, puis il prend sa nouvelle place au relâchement.
+    private func track(_ item: TabItemView, from index: Int, event: NSEvent) {
+        guard let window else { onSelect?(index); return }
+        let start = convert(event.locationInWindow, from: nil)
+        let grab = start.x - item.frame.minX
+        var dragging = false
+        var target = index
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            let point = convert(next.locationInWindow, from: nil)
+            if next.type == .leftMouseUp { break }
+            if !dragging {
+                guard abs(point.x - start.x) > 4, stack.arrangedSubviews.count > 1 else { continue }
+                dragging = true
+                item.layer?.zPosition = 1
+                item.isSelected = true
+            }
+            let slot = item.frame.width + stack.spacing
+            let center = point.x - grab + item.frame.width / 2 - stack.frame.minX
+            let wanted = min(max(0, Int(center / slot)), stack.arrangedSubviews.count - 1)
+            if wanted != target {
+                target = wanted
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.15
+                    context.allowsImplicitAnimation = true
+                    stack.removeArrangedSubview(item)
+                    stack.insertArrangedSubview(item, at: target)
+                    stack.layoutSubtreeIfNeeded()
+                }
+            }
+            // Le décalage se calcule après la mise en page : l'onglet reste sous le pointeur.
+            let offset = point.x - grab - convert(item.frame, from: stack).minX
+            item.layer?.setAffineTransform(CGAffineTransform(translationX: offset, y: 0))
+        }
+        guard dragging else { onSelect?(index); return }
+        item.layer?.setAffineTransform(.identity)
+        item.layer?.zPosition = 0
+        if target != index { onMove?(index, target) }
+        onSelect?(target)
+    }
 }
 
 private final class TabItemView: NSView {
-    var onSelect: (() -> Void)?
+    var onMouseDown: ((NSEvent) -> Void)?
+    var onDuplicate: (() -> Void)?
     var onClose: (() -> Void)?
     var onSetColor: ((TabColor?) -> Void)?
     var tabColor: TabColor? { didSet { refresh() } }
@@ -299,12 +348,17 @@ private final class TabItemView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    override func mouseDown(with event: NSEvent) { onSelect?() }
+    override func mouseDown(with event: NSEvent) { onMouseDown?(event) }
     override func otherMouseDown(with event: NSEvent) { onClose?() }
 
-    /// Clic droit : couleur de l'onglet.
+    /// Clic droit : dupliquer l'onglet, sa couleur, le fermer.
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
+        let duplicate = NSMenuItem(title: L("Dupliquer l’onglet"), action: #selector(duplicateTab), keyEquivalent: "")
+        duplicate.target = self
+        duplicate.image = NSImage(systemSymbolName: "plus.square.on.square", accessibilityDescription: nil)
+        menu.addItem(duplicate)
+        menu.addItem(.separator())
         let none = NSMenuItem(title: L("Aucune couleur"), action: #selector(pickColor(_:)), keyEquivalent: "")
         none.target = self
         none.tag = -1
@@ -332,6 +386,7 @@ private final class TabItemView: NSView {
     override func mouseEntered(with event: NSEvent) { hovering = true }
     override func mouseExited(with event: NSEvent) { hovering = false }
     @objc private func closeTab() { onClose?() }
+    @objc private func duplicateTab() { onDuplicate?() }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
