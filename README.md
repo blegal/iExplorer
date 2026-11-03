@@ -55,7 +55,7 @@ is always honored.
 **Navigation**
 - English or French interface: follows the system language by default, configurable in Settings › General.
 - 1, 2, 3 or 4 panels (8 layouts), each with colored tabs and its own status bar (selection, zoom).
-- Icon, list, details and column views; folders expand in place in lists; grouping by kind, date or size; flat view of a whole tree.
+- Icon, list, details and column views; folders expand in place in lists; grouping by kind, date or size; flat view of a whole tree; live folder sizes.
 - Synchronized navigation across panels, folder comparison and synchronization, search (name, content, tags).
 - Archives (zip, tar.gz, 7z, rar…) browsed like folders.
 

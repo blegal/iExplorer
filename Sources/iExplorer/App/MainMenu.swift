@@ -191,6 +191,7 @@ enum MainMenu {
             sortMenu,
             groupMenu,
             item(L("Vue à plat"), #selector(Panel.toggleFlatView(_:)), "b", [.command, .control]),
+            item(L("Taille des dossiers en direct"), #selector(Panel.toggleLiveFolderSizes(_:))),
             item(L("Calculer la taille des dossiers sélectionnés"), #selector(Panel.computeSelectedFolderSizes(_:)), " ", .option),
             item(L("Calculer la taille de tous les dossiers"), #selector(Panel.computeAllFolderSizes(_:)), " ", [.option, .shift]),
             themeMenu,

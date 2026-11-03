@@ -55,7 +55,7 @@ animations » de macOS est toujours respecté.
 **Navigation**
 - Interface en français ou en anglais : la langue du système par défaut, réglable dans Réglages › Général.
 - 1, 2, 3 ou 4 panneaux (8 dispositions), chacun avec ses onglets colorés et sa barre d’état (sélection, zoom).
-- Vues icônes, liste, détails et colonnes ; dossiers dépliables sur place dans les listes ; regroupement par type, date ou taille ; vue à plat de toute une arborescence.
+- Vues icônes, liste, détails et colonnes ; dossiers dépliables sur place dans les listes ; regroupement par type, date ou taille ; vue à plat de toute une arborescence ; taille des dossiers calculée en direct.
 - Navigation synchronisée entre panneaux, comparaison et synchronisation de dossiers, recherche (nom, contenu, tags).
 - Archives (zip, tar.gz, 7z, rar…) parcourues comme des dossiers.
 

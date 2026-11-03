@@ -36,6 +36,16 @@ enum Preferences {
         set { defaults.set(newValue, forKey: "commanderKeys") }
     }
 
+    /// Taille des dossiers calculée d'office en arrière-plan (sinon à la demande, ⌥Espace).
+    static var liveFolderSizes: Bool {
+        get { defaults.object(forKey: "liveFolderSizes") as? Bool ?? true }
+        set {
+            defaults.set(newValue, forKey: "liveFolderSizes")
+            NotificationCenter.default.post(name: liveFolderSizesChanged, object: nil)
+        }
+    }
+    static let liveFolderSizesChanged = Notification.Name("LiveFolderSizesChanged")
+
     static var showHiddenFiles: Bool {
         get { defaults.bool(forKey: "showHiddenFiles") }
         set {

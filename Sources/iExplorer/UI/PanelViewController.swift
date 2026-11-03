@@ -125,10 +125,11 @@ final class PanelViewController: NSViewController {
     var itemRows: [Int] = []
     var sortDescriptor = NSSortDescriptor(key: "name", ascending: true)
 
-    // Tailles de dossiers calculées à la demande (par chemin), valables pour le dossier affiché.
+    // Tailles de dossiers (par chemin), valables pour le dossier affiché.
     var folderSizes: [String: Int64] = [:]
     var computingFolders: Set<String> = []
     var folderSizeGeneration = 0
+    var folderSizesRefreshPending = false
 
     // Git
     private let gitLabel = NSTextField(labelWithString: "")
@@ -541,6 +542,10 @@ final class PanelViewController: NSViewController {
 
         let center = NotificationCenter.default
         center.addObserver(forName: Preferences.showHiddenChanged, object: nil, queue: .main) { [weak self] _ in self?.reload() }
+        center.addObserver(forName: Preferences.liveFolderSizesChanged, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            computeLiveFolderSizes(allItems)
+        }
         center.addObserver(forName: IconTheme.changed, object: nil, queue: .main) { [weak self] _ in self?.reload() }
         center.addObserver(forName: GitService.enabledChanged, object: nil, queue: .main) { [weak self] _ in self?.refreshGit() }
         center.addObserver(forName: ColorTheme.changed, object: nil, queue: .main) { [weak self] _ in self?.themeDidChange() }
@@ -708,6 +713,7 @@ final class PanelViewController: NSViewController {
         case .success(let list):
             allItems = list
             for item in list where item.isNavigableDirectory { item.folderSize = folderSizes[item.url.normalizedPath] }
+            computeLiveFolderSizes(list)
             let filter = isSearching && searchBar.scope == .folder ? Self.nameMatcher(for: searchBar.field.stringValue.trimmingCharacters(in: .whitespaces)) : nil
             items = filter.map { match in list.filter { item in match(item.name) { item.finderTags } } } ?? list
             updateFilterCount()
@@ -1882,6 +1888,9 @@ extension PanelViewController: NSMenuItemValidation {
             return true
         case #selector(toggleStatusBar(_:)):
             menuItem.title = PanelStatusBar.isVisible ? L("Masquer la barre d’état") : L("Afficher la barre d’état")
+            return true
+        case #selector(toggleLiveFolderSizes(_:)):
+            menuItem.state = Preferences.liveFolderSizes ? .on : .off
             return true
         case #selector(toggleFlatView(_:)):
             menuItem.state = isFlatView ? .on : .off

@@ -44,6 +44,7 @@ extension PanelViewController {
         expandedPaths.insert(item.url.normalizedPath)
         let children = (try? FileItem.contents(of: item.url, showHidden: Preferences.showHiddenFiles)) ?? []
         for child in children where child.isNavigableDirectory { child.folderSize = folderSizes[child.url.normalizedPath] }
+        computeLiveFolderSizes(children)
         let rows = Self.expandTree(Self.sorted(children, by: sortDescriptor), expanded: expandedPaths,
                                    showHidden: Preferences.showHiddenFiles, by: sortDescriptor, depth: item.depth + 1)
         items.insert(contentsOf: rows, at: index + 1)

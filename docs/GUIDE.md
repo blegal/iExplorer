@@ -331,6 +331,13 @@ GNOME ou KDE. Neuf modèles sont fournis au premier lancement (texte, Markdown, 
 scripts shell et Python, CSV) ; on en ajoute en déposant n’importe quel fichier dans ce dossier
 (« Ouvrir le dossier des modèles » en bas du menu). Le fichier créé passe en renommage ; ⌘Z annule.
 
+## Taille des dossiers
+
+La colonne Taille affiche aussi la taille des dossiers, calculée en arrière-plan dès l’ouverture d’un dossier
+(« … » pendant le calcul), le dossier affiché en dernier passant en premier. Les tailles sont gardées cinq minutes :
+revenir dans un dossier ne relance pas le calcul. Le calcul d’office se limite aux disques locaux (ni serveurs, ni
+archives) et se coupe dans Présentation › Taille des dossiers en direct ; ⌥Espace et ⇧⌥Espace restent disponibles.
+
 ## Regrouper, vue à plat
 
 - **Regrouper par** (Présentation, ou clic droit sur le fond d’une liste) : sections par type, date de
