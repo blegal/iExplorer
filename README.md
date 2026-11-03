@@ -87,6 +87,14 @@ is always honored.
 
 Requires **macOS 15** or later (the Liquid Glass look needs macOS 26).
 
+With [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask blegal/tap/iexplorer
+```
+
+Or by hand:
+
 1. Download `iExplorer-x.y.z.dmg` from the [Releases](https://github.com/blegal/iExplorer/releases/latest) page.
 2. Open the disk image and drag **iExplorer** to **Applications**.
 3. The app is not notarized by Apple: on first launch, **right-click › Open**, then confirm.

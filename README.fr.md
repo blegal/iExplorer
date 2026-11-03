@@ -87,6 +87,14 @@ animations » de macOS est toujours respecté.
 
 Nécessite **macOS 15** ou plus récent (l’apparence Liquid Glass demande macOS 26).
 
+Avec [Homebrew](https://brew.sh) :
+
+```bash
+brew install --cask blegal/tap/iexplorer
+```
+
+Ou à la main :
+
 1. Téléchargez `iExplorer-x.y.z.dmg` depuis la page [Releases](https://github.com/blegal/iExplorer/releases/latest).
 2. Ouvrez l’image disque et glissez **iExplorer** dans **Applications**.
 3. L’app n’est pas notarisée par Apple : au premier lancement, faites **clic droit › Ouvrir**, puis confirmez.
