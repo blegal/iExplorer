@@ -569,7 +569,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     static func viewModeMenu() -> NSMenu {
         let menu = NSMenu(title: L("Présentation"))
         for mode in PanelViewMode.allCases {
-            let item = NSMenuItem(title: mode.title, action: mode.action, keyEquivalent: "\(mode.rawValue + 1)")
+            let item = NSMenuItem(title: mode.title, action: mode.action, keyEquivalent: mode.keyEquivalent)
             item.image = mode.icon
             menu.addItem(item)
         }

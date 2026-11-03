@@ -87,6 +87,7 @@ Le script affiche la clé privée, à enregistrer dans le secret `UPDATE_SIGNING
 | Vue à plat (tous les fichiers des sous-dossiers) | ⌃⌘B |
 | Ajouter aux favoris | ⌃⌘T |
 | Occupation du disque (activer / quitter) | ⌘5 (Échap pour quitter) |
+| Galerie d’images en mosaïque | ⌘6 |
 | Zoom (icônes ou liste) | ⌘ + molette, pincement, ⌘+ / ⌘− |
 | Taille par défaut | ⌘0 |
 | Afficher / masquer les barres d’état | ⌘/ |
@@ -330,6 +331,14 @@ Clic droit › Nouveau document (ou Fichier › Nouveau document) : un modèle p
 GNOME ou KDE. Neuf modèles sont fournis au premier lancement (texte, Markdown, Typst, LaTeX, HTML, Makefile,
 scripts shell et Python, CSV) ; on en ajoute en déposant n’importe quel fichier dans ce dossier
 (« Ouvrir le dossier des modèles » en bas du menu). Le fichier créé passe en renommage ; ⌘Z annule.
+
+## Galerie
+
+Présentation › Galerie (⌘6) affiche le dossier en mosaïque, façon Pinterest : des colonnes de même largeur, chaque
+vignette à la proportion de son image (lue dans l’en-tête du fichier, orientation EXIF comprise), placée dans la
+colonne la plus courte. Les dossiers et les fichiers sans aperçu gardent leur icône et leur nom. Le zoom (⌘+ / ⌘−,
+pincement) change la largeur des colonnes ; sélection, coup d’œil, menu contextuel et glisser-déposer marchent comme
+en icônes.
 
 ## Taille des dossiers
 

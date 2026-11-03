@@ -180,6 +180,7 @@ enum MainMenu {
             item(L("Liste détaillée"), #selector(Panel.showAsDetails(_:)), "3"),
             item(L("Colonnes"), #selector(Panel.showAsColumns(_:)), "4"),
             item(L("Occupation du disque"), #selector(Panel.toggleDiskUsage(_:)), "5"),
+            item(L("Galerie"), #selector(Panel.showAsGallery(_:)), "6"),
             item(L("Agrandir"), #selector(Panel.increaseIconSize(_:)), "+"),
             item(L("Réduire"), #selector(Panel.decreaseIconSize(_:)), "-"),
             item(L("Taille par défaut"), #selector(Panel.resetZoom(_:)), "0"),

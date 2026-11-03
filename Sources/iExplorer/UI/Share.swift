@@ -15,7 +15,7 @@ extension PanelViewController {
         let picker = NSSharingServicePicker(items: urls)
         var anchor: NSView = focusView
         var rect = anchor.bounds
-        if viewMode == .icons, let index = selectionIndexes.first,
+        if viewMode.usesGrid, let index = selectionIndexes.first,
            let item = collectionView.item(at: IndexPath(item: index, section: 0)) {
             anchor = item.view
             rect = anchor.bounds

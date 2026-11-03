@@ -59,6 +59,7 @@ final class FileCollectionView: NSCollectionView {
     /// Met à jour l'accentuation de la sélection (active / inactive).
     func refreshSelectionStyle() {
         for case let item as ThumbnailItem in visibleItems() { item.refreshAppearance() }
+        for case let item as GalleryItem in visibleItems() { item.refreshAppearance() }
     }
 }
 

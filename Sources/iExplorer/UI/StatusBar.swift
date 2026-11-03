@@ -129,13 +129,13 @@ extension PanelViewController {
 
     /// Zoom en pourcentage de la taille par défaut (icônes de 80 points, lignes à l'échelle 1).
     var zoomPercent: Double {
-        viewMode == .icons ? Double(iconSize) / 80 * 100 : Double(listScale) * 100
+        viewMode.usesGrid ? Double(iconSize) / 80 * 100 : Double(listScale) * 100
     }
 
-    var zoomRange: ClosedRange<Double> { viewMode == .icons ? 40...320 : 75...200 }
+    var zoomRange: ClosedRange<Double> { viewMode.usesGrid ? 40...320 : 75...200 }
 
     func setZoomPercent(_ percent: Double) {
-        if viewMode == .icons { setIconSize(CGFloat(percent / 100 * 80)) } else { setListScale(CGFloat(percent / 100)) }
+        if viewMode.usesGrid { setIconSize(CGFloat(percent / 100 * 80)) } else { setListScale(CGFloat(percent / 100)) }
     }
 
     /// Texte de la barre d'état : le détail d'un élément sélectionné seul, sinon le résumé du panneau.

@@ -12,7 +12,13 @@ final class TabState {
 }
 
 enum PanelViewMode: Int, CaseIterable {
-    case icons, list, details, columns
+    case icons, list, details, columns, gallery
+
+    /// Icônes et galerie partagent la grille (sélection, menus, glisser-déposer) ; seule la mise en page change.
+    var usesGrid: Bool { self == .icons || self == .gallery }
+
+    /// Raccourci ⌘1…⌘4, ⌘6 pour la galerie (⌘5 est l'occupation du disque).
+    var keyEquivalent: String { self == .gallery ? "6" : "\(rawValue + 1)" }
 
     var title: String {
         switch self {
@@ -20,6 +26,7 @@ enum PanelViewMode: Int, CaseIterable {
         case .list: L("Liste")
         case .details: L("Liste détaillée")
         case .columns: L("Colonnes")
+        case .gallery: L("Galerie")
         }
     }
 
@@ -29,6 +36,7 @@ enum PanelViewMode: Int, CaseIterable {
         case .list: "list.bullet"
         case .details: "list.bullet.rectangle"
         case .columns: "rectangle.split.3x1"
+        case .gallery: "square.grid.3x3.topleft.filled"
         }
     }
 
@@ -38,6 +46,7 @@ enum PanelViewMode: Int, CaseIterable {
         case .list: #selector(PanelViewController.showAsList(_:))
         case .details: #selector(PanelViewController.showAsDetails(_:))
         case .columns: #selector(PanelViewController.showAsColumns(_:))
+        case .gallery: #selector(PanelViewController.showAsGallery(_:))
         }
     }
 
@@ -86,6 +95,8 @@ final class PanelViewController: NSViewController {
     let tableView = FileTableView()
     private let scrollView = NSScrollView()
     let collectionView = FileCollectionView()
+    var flowLayout = NSCollectionViewFlowLayout()
+    let galleryLayout = MasonryLayout()
     // Vue en colonnes
     let browser = FileBrowser()
     var browserCache: [String: [FileItem]] = [:]
@@ -111,7 +122,7 @@ final class PanelViewController: NSViewController {
     private var loadGeneration = 0
     private var loadError: String?
     var freeSpace: String?
-    private var cutPaths: Set<String> = []
+    private(set) var cutPaths: Set<String> = []
     private var renamingRow: Int?
     private var reloadDeferred = false
     /// Regroupement des vues en liste, et lignes de la table qui en découlent (voir Grouping.swift).
@@ -170,7 +181,7 @@ final class PanelViewController: NSViewController {
     /// Indices sélectionnés, quel que soit le mode d'affichage.
     var selectionIndexes: IndexSet {
         switch viewMode {
-        case .icons: IndexSet(collectionView.selectionIndexPaths.map(\.item))
+        case .icons, .gallery: IndexSet(collectionView.selectionIndexPaths.map(\.item))
         case .columns: browserSelection
         case .list, .details: isGrouped ? IndexSet(tableView.selectedRowIndexes.compactMap(itemIndex(forRow:))) : tableView.selectedRowIndexes
         }
@@ -180,7 +191,7 @@ final class PanelViewController: NSViewController {
     var focusView: NSView {
         if isShowingDiskUsage { return diskUsageView.focusView }
         return switch viewMode {
-        case .icons: collectionView
+        case .icons, .gallery: collectionView
         case .columns: browser
         case .list, .details: tableView
         }
@@ -363,12 +374,18 @@ final class PanelViewController: NSViewController {
     }
 
     private func configureGrid() {
+        galleryLayout.aspectRatio = { [weak self] index in
+            guard let self, items.indices.contains(index) else { return 1 }
+            return ImageRatios.shared.ratio(of: items[index].url) ?? 1
+        }
         let layout = NSCollectionViewFlowLayout()
         layout.minimumInteritemSpacing = 6
         layout.minimumLineSpacing = 10
         layout.sectionInset = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        flowLayout = layout
         collectionView.collectionViewLayout = layout
         collectionView.register(ThumbnailItem.self, forItemWithIdentifier: ThumbnailItem.identifier)
+        collectionView.register(GalleryItem.self, forItemWithIdentifier: GalleryItem.identifier)
         collectionView.isSelectable = true
         collectionView.allowsMultipleSelection = true
         collectionView.allowsEmptySelection = true
@@ -414,8 +431,8 @@ final class PanelViewController: NSViewController {
     }
 
     func applyViewMode() {
-        scrollView.isHidden = isShowingDiskUsage || viewMode == .icons || viewMode == .columns
-        gridScrollView.isHidden = isShowingDiskUsage || viewMode != .icons
+        scrollView.isHidden = isShowingDiskUsage || viewMode.usesGrid || viewMode == .columns
+        gridScrollView.isHidden = isShowingDiskUsage || !viewMode.usesGrid
         browser.isHidden = isShowingDiskUsage || viewMode != .columns
         diskUsageView.isHidden = !isShowingDiskUsage
         let compact = viewMode == .list
@@ -425,12 +442,12 @@ final class PanelViewController: NSViewController {
         }
         tableView.rowHeight = ((compact ? 22 : 24) * listScale).rounded()
         updateGridItemSize()
+        applyGridLayout()
         postStatusChange()
     }
 
     private func updateGridItemSize() {
-        guard let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout else { return }
-        layout.itemSize = NSSize(width: iconSize + 40, height: iconSize + 50)
+        flowLayout.itemSize = NSSize(width: iconSize + 40, height: iconSize + 50)
     }
 
     func setIconSize(_ size: CGFloat) {
@@ -438,6 +455,7 @@ final class PanelViewController: NSViewController {
         guard newSize != iconSize else { return }
         iconSize = newSize
         updateGridItemSize()
+        galleryLayout.columnWidth = galleryColumnWidth
         postStatusChange()
         // Seules les vignettes visibles sont reconfigurées (la mise en page suit seule).
         collectionView.reloadItems(at: collectionView.indexPathsForVisibleItems())
@@ -459,11 +477,11 @@ final class PanelViewController: NSViewController {
 
     /// ⌘ + molette, pincement, ⌘+ / ⌘− : agrandit ou réduit selon le mode d'affichage.
     func zoom(by factor: CGFloat) {
-        if viewMode == .icons { setIconSize(iconSize * factor) } else { setListScale(listScale * factor) }
+        if viewMode.usesGrid { setIconSize(iconSize * factor) } else { setListScale(listScale * factor) }
     }
 
     @objc func resetZoom(_ sender: Any?) {
-        if viewMode == .icons { setIconSize(80) } else { setListScale(1) }
+        if viewMode.usesGrid { setIconSize(80) } else { setListScale(1) }
     }
 
     /// La sélection des colonnes a changé de dossier : met à jour le panneau sans recharger les colonnes.
@@ -480,10 +498,11 @@ final class PanelViewController: NSViewController {
     }
 
     @objc func showAsIcons(_ sender: Any?) { setViewMode(.icons) }
+    @objc func showAsGallery(_ sender: Any?) { setViewMode(.gallery) }
     @objc func showAsList(_ sender: Any?) { setViewMode(.list) }
     @objc func showAsDetails(_ sender: Any?) { setViewMode(.details) }
-    @objc func increaseIconSize(_ sender: Any?) { zoom(by: viewMode == .icons ? 1.25 : 1.1) }
-    @objc func decreaseIconSize(_ sender: Any?) { zoom(by: viewMode == .icons ? 1 / 1.25 : 1 / 1.1) }
+    @objc func increaseIconSize(_ sender: Any?) { zoom(by: viewMode.usesGrid ? 1.25 : 1.1) }
+    @objc func decreaseIconSize(_ sender: Any?) { zoom(by: viewMode.usesGrid ? 1 / 1.25 : 1 / 1.1) }
 
     @objc func sortBy(_ sender: NSMenuItem) {
         let keys = ["name", "size", "date", "kind"]
@@ -491,13 +510,14 @@ final class PanelViewController: NSViewController {
         let key = keys[sender.tag]
         let ascending = sortDescriptor.key == key ? !sortDescriptor.ascending : (key == "name" || key == "kind")
         tableView.sortDescriptors = [NSSortDescriptor(key: key, ascending: ascending)]
-        if viewMode == .icons { tableView(tableView, sortDescriptorsDidChange: []) }
+        if viewMode.usesGrid { tableView(tableView, sortDescriptorsDidChange: []) }
     }
 
     func reloadViews() {
         rebuildGroups()
         tableView.reloadData()
         collectionView.reloadData()
+        if viewMode == .gallery { loadGalleryRatios() }
         reloadBrowserColumn()
     }
 
@@ -946,7 +966,7 @@ final class PanelViewController: NSViewController {
             tableView.reloadData(forRowIndexes: IndexSet(integersIn: visible.location..<NSMaxRange(visible)),
                                  columnIndexes: IndexSet(integer: max(0, tableView.column(withIdentifier: .name))))
         }
-        if viewMode == .icons {
+        if viewMode.usesGrid {
             collectionView.reloadData()
             collectionView.selectionIndexPaths = Set(selection.map { IndexPath(item: $0, section: 0) })
         }
@@ -1377,7 +1397,7 @@ final class PanelViewController: NSViewController {
         // Mode complet : les lignes s'effacent avant de partir à la corbeille.
         let rows: [NSView]
         switch viewMode {
-        case .icons: rows = selectionIndexes.compactMap { collectionView.item(at: IndexPath(item: $0, section: 0))?.view }
+        case .icons, .gallery: rows = selectionIndexes.compactMap { collectionView.item(at: IndexPath(item: $0, section: 0))?.view }
         case .columns:
             let table = browserColumn(showing: currentURL).flatMap(browserTable(column:))
             rows = selectionIndexes.compactMap { table?.rowView(atRow: $0, makeIfNecessary: false) }
@@ -1452,9 +1472,9 @@ final class PanelViewController: NSViewController {
 
     /// Glissement ou fondu du contenu, puis cascade des éléments visibles en mode complet.
     private func playNavigationAnimation(_ direction: NavigationDirection) {
-        let content: NSView = viewMode == .icons ? gridScrollView : (viewMode == .columns ? browser : scrollView)
+        let content: NSView = viewMode.usesGrid ? gridScrollView : (viewMode == .columns ? browser : scrollView)
         Effects.navigate(content, direction)
-        if viewMode == .icons {
+        if viewMode.usesGrid {
             Effects.cascade(collectionView.visibleItems().compactMap { $0.view }
                 .sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) })
         } else if viewMode != .columns {
@@ -1462,7 +1482,7 @@ final class PanelViewController: NSViewController {
             Effects.cascade((visible.location..<NSMaxRange(visible)).compactMap { tableView.rowView(atRow: $0, makeIfNecessary: false) })
         }
         // Whaouh+++ : les icônes du nouveau dossier font « pop » en spirale depuis le centre.
-        if Effects.isOn(.spiral), viewMode != .icons, viewMode != .columns {
+        if Effects.isOn(.spiral), !viewMode.usesGrid, viewMode != .columns {
             let visible = tableView.rows(in: tableView.visibleRect)
             let middle = visible.location + visible.length / 2
             for row in visible.location..<NSMaxRange(visible) {
@@ -1474,7 +1494,7 @@ final class PanelViewController: NSViewController {
     @objc func renameSelection(_ sender: Any?) {
         if selectionIndexes.count > 1 { batchRename(sender); return }
         guard selectionIndexes.count == 1, let row = selectionIndexes.first else { return }
-        if viewMode == .icons || viewMode == .columns { renameWithSheet(items[row]); return }
+        if viewMode.usesGrid || viewMode == .columns { renameWithSheet(items[row]); return }
         let column = tableView.column(withIdentifier: .name)
         tableView.scrollRowToVisible(tableRow(forItem: row))
         guard column >= 0,
@@ -1872,8 +1892,9 @@ extension PanelViewController: NSMenuItemValidation {
             return !selectionIndexes.isEmpty
         case #selector(batchRename(_:)):
             return !selectionIndexes.isEmpty
-        case #selector(showAsIcons(_:)), #selector(showAsList(_:)), #selector(showAsDetails(_:)), #selector(showAsColumns(_:)):
+        case #selector(showAsIcons(_:)), #selector(showAsList(_:)), #selector(showAsDetails(_:)), #selector(showAsColumns(_:)), #selector(showAsGallery(_:)):
             let mode: PanelViewMode = menuItem.action == #selector(showAsIcons(_:)) ? .icons
+                : menuItem.action == #selector(showAsGallery(_:)) ? .gallery
                 : menuItem.action == #selector(showAsList(_:)) ? .list
                 : menuItem.action == #selector(showAsColumns(_:)) ? .columns : .details
             if mode == .columns, currentURL.isRemote { return false }
@@ -2098,7 +2119,7 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
-        guard viewMode != .icons else { return }
+        guard !viewMode.usesGrid else { return }
         selectionDidChange()
     }
 
@@ -2205,6 +2226,7 @@ extension PanelViewController: NSCollectionViewDataSource, NSCollectionViewDeleg
     func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int { items.count }
 
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
+        if viewMode == .gallery { return galleryItem(at: indexPath) }
         let cell = collectionView.makeItem(withIdentifier: ThumbnailItem.identifier, for: indexPath)
         if let thumbnail = cell as? ThumbnailItem, items.indices.contains(indexPath.item) {
             let item = items[indexPath.item]
@@ -2215,11 +2237,11 @@ extension PanelViewController: NSCollectionViewDataSource, NSCollectionViewDeleg
     }
 
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
-        if viewMode == .icons { selectionDidChange() }
+        if viewMode.usesGrid { selectionDidChange() }
     }
 
     func collectionView(_ collectionView: NSCollectionView, didDeselectItemsAt indexPaths: Set<IndexPath>) {
-        if viewMode == .icons { selectionDidChange() }
+        if viewMode.usesGrid { selectionDidChange() }
     }
 
     func collectionView(_ collectionView: NSCollectionView, canDragItemsAt indexPaths: Set<IndexPath>, with event: NSEvent) -> Bool { true }
