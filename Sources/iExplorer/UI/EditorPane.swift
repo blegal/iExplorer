@@ -294,6 +294,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     func open(_ url: URL) {
         if let existing = documents.first(where: { $0.url == url }) {
+            // Déjà à l'écran : on n'y touche pas (le surveillant de fichier suit les changements sur le disque).
+            // Remplacer le texte pendant un clic dans l'éditeur faisait planter AppKit, et vidait l'historique d'annulation.
+            if existing === current, displayedURL == url { return }
             if !existing.isModified, let fresh = Self.load(url) { existing.text = fresh.text; existing.encoding = fresh.encoding }
             showDocument(existing)
             loadCommittedLines(existing)

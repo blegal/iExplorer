@@ -141,6 +141,8 @@ final class PanelViewController: NSViewController {
     var computingFolders: Set<String> = []
     var folderSizeGeneration = 0
     var folderSizesRefreshPending = false
+    /// Dossier et sélection signalés en dernier à la fenêtre (inspecteur, éditeur).
+    private var reportedSelection: [URL] = []
 
     // Git
     private let gitLabel = NSTextField(labelWithString: "")
@@ -539,6 +541,11 @@ final class PanelViewController: NSViewController {
     func selectionDidChange() {
         updateInfo()
         refreshQuickLook()
+        // Un rechargement (surveillance du dossier, tailles en direct) remet la même sélection : l'inspecteur
+        // et l'éditeur ne sont prévenus que d'un vrai changement, pour ne pas reconstruire ce qu'on est en train de cliquer.
+        let reported = [currentURL] + selectedURLs
+        guard reported != reportedSelection else { return }
+        reportedSelection = reported
         host?.panelSelectionDidChange(self)
     }
 
