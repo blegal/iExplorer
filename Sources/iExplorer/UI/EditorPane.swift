@@ -65,6 +65,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let modeControl = NSSegmentedControl()
     private let wrapButton = NSButton(title: L("Retour à la ligne"), target: nil, action: nil)
     private let split = NSSplitView()
+    private let splitGrip = SplitGripDelegate()
     private let preview = EditorPreviewView()
     private let textScroll = NSScrollView()
     private var ruler: LineNumberRuler?
@@ -156,6 +157,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         configureTextView()
         split.isVertical = true
         split.dividerStyle = .thin
+        split.delegate = splitGrip
         split.addArrangedSubview(textScroll)
         split.addArrangedSubview(preview)
         split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 0)

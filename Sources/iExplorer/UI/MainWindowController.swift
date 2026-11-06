@@ -294,7 +294,7 @@ final class PanelsViewController: NSViewController, PanelHost {
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate, NSMenuItemValidation {
     var onClose: ((MainWindowController) -> Void)?
 
-    private let splitController = NSSplitViewController()
+    private let splitController = GripSplitViewController()
     private let sidebar = SidebarViewController()
     private let panelsController: PanelsViewController
     private let sidebarItem: NSSplitViewItem
@@ -311,7 +311,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private weak var inspectorButton: NSButton?
     private weak var animationsItem: NSMenuToolbarItem?
     private weak var hiddenButton: NSButton?
-    private let workSplit = NSSplitViewController()
+    private let workSplit = GripSplitViewController()
     private let terminalController = TerminalPanelController()
     private let terminalItem: NSSplitViewItem
     private let restoredState: WindowState?
@@ -1175,10 +1175,41 @@ final class PanelSplitView: NSSplitView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
+/// Zone de saisie des séparateurs : le trait fin ne fait qu'un point, la souris l'attrape à quelques points autour.
+enum SplitGrip {
+    static let margin: CGFloat = 4
+
+    static func widen(_ rect: NSRect, in split: NSSplitView) -> NSRect {
+        split.isVertical ? rect.insetBy(dx: -margin, dy: 0) : rect.insetBy(dx: 0, dy: -margin)
+    }
+}
+
+/// Séparateurs des vues partagées faites à la main (éditeur : texte | aperçu).
+final class SplitGripDelegate: NSObject, NSSplitViewDelegate {
+    func splitView(_ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect, forDrawnRect drawnRect: NSRect,
+                   ofDividerAt dividerIndex: Int) -> NSRect {
+        SplitGrip.widen(proposedEffectiveRect, in: splitView)
+    }
+}
+
+/// Barre latérale | contenu | inspecteur, panneaux | terminal : séparateurs plus faciles à attraper.
+final class GripSplitViewController: NSSplitViewController {
+    override func splitView(_ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect, forDrawnRect drawnRect: NSRect,
+                            ofDividerAt dividerIndex: Int) -> NSRect {
+        SplitGrip.widen(super.splitView(splitView, effectiveRect: proposedEffectiveRect, forDrawnRect: drawnRect, ofDividerAt: dividerIndex),
+                        in: splitView)
+    }
+}
+
 private final class SplitLimits: NSObject, NSSplitViewDelegate {
     let minimum: CGFloat
 
     init(minimum: CGFloat) { self.minimum = minimum }
+
+    func splitView(_ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect, forDrawnRect drawnRect: NSRect,
+                   ofDividerAt dividerIndex: Int) -> NSRect {
+        SplitGrip.widen(proposedEffectiveRect, in: splitView)
+    }
 
     private func start(_ view: NSView, _ split: NSSplitView) -> CGFloat { split.isVertical ? view.frame.minX : view.frame.minY }
     private func end(_ view: NSView, _ split: NSSplitView) -> CGFloat { split.isVertical ? view.frame.maxX : view.frame.maxY }
