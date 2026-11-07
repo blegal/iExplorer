@@ -118,6 +118,10 @@ cd iExplorer
 open build/iExplorer.app
 ```
 
+Each build gets a new ad hoc signature, so macOS asks again for its permissions (Documents, Desktop, disks…).
+Run `Tools/make-local-cert.sh` once: it creates a personal signing certificate in your login keychain, and
+`build.sh` then signs every build with it, so permissions are kept from one build to the next.
+
 ## Essential shortcuts
 
 | Action | Shortcut |

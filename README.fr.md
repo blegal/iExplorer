@@ -118,6 +118,10 @@ cd iExplorer
 open build/iExplorer.app
 ```
 
+Chaque build reçoit une nouvelle signature ad hoc, et macOS redemande ses autorisations (Documents, Bureau, disques…).
+Lancez une fois `Tools/make-local-cert.sh` : il crée un certificat de signature personnel dans votre trousseau, et
+`build.sh` signe ensuite chaque build avec lui, si bien que les autorisations sont gardées d’un build à l’autre.
+
 ## Raccourcis essentiels
 
 | Action | Raccourci |

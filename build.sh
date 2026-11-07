@@ -41,5 +41,14 @@ cp -R Resources/AppIcons "$APP/Contents/Resources/"
 PLIST="$APP/Contents/Info.plist"
 [[ -n "${VERSION:-}" ]] && /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
 [[ -n "${BUILD_NUMBER:-}" ]] && /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
-codesign --force --timestamp=none --sign "${SIGN_IDENTITY:--}" "$APP" >/dev/null
+# Sans identité donnée : le certificat personnel créé par Tools/make-local-cert.sh s'il existe
+# (signature stable, macOS garde les autorisations d'un build à l'autre), sinon signature ad hoc.
+if [[ -z "${SIGN_IDENTITY:-}" ]] && security find-certificate -c "iExplorer Local" >/dev/null 2>&1; then
+    SIGN_IDENTITY="iExplorer Local"
+fi
+if ! codesign --force --timestamp=none --sign "${SIGN_IDENTITY:--}" "$APP" >/dev/null 2>&1; then
+    # Trousseau verrouillé (session SSH…) : signature ad hoc pour ne pas bloquer le build.
+    echo "Signature « ${SIGN_IDENTITY:--} » impossible, signature ad hoc." >&2
+    codesign --force --timestamp=none --sign - "$APP" >/dev/null
+fi
 echo "$APP"
