@@ -436,7 +436,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         isLoading = false
         let length = (fresh.text as NSString).length
         textView.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
-        textView.scroll(origin)
+        textView.restoreScroll(origin)
         updateGutter()
         updatePreview()
         updateState()

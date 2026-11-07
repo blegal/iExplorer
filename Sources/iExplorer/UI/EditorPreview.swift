@@ -192,7 +192,7 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
     /// Remplace le contenu sans recharger la page : la position de lecture est conservée.
     private func inject(_ html: String) {
         guard let data = try? JSONSerialization.data(withJSONObject: [html]), let literal = String(data: data, encoding: .utf8) else { return }
-        webView?.evaluateJavaScript("document.getElementById('content').innerHTML = \(literal)[0];")
+        webView?.evaluateJavaScript("var r = document.scrollingElement, y = r.scrollTop; document.getElementById('content').innerHTML = \(literal)[0]; r.scrollTop = y;")
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -384,9 +384,17 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
         }
         do {
             let object = try JSONSerialization.jsonObject(with: Data(text.utf8), options: [.fragmentsAllowed])
+            // Nouvelle version du fichier : mêmes nœuds dépliés, même défilement.
+            let expanded = expandedJSONPaths()
+            let origin = outlineScroll?.contentView.bounds.origin
             jsonRoot = JSONNode(key: L("racine"), value: object)
             outlineView?.reloadData()
             outlineView?.expandItem(jsonRoot)
+            if let jsonRoot, !expanded.isEmpty { expandJSON(jsonRoot, path: [], in: expanded) }
+            if let origin, let outlineScroll {
+                outlineScroll.contentView.scroll(to: origin)
+                outlineScroll.reflectScrolledClipView(outlineScroll.contentView)
+            }
             hideBanner()
         } catch {
             // Le dernier arbre valide reste affiché sous le bandeau.
@@ -398,6 +406,25 @@ final class EditorPreviewView: NSView, WKNavigationDelegate, WKScriptMessageHand
             }
         }
         activate(outlineScroll)
+    }
+
+    /// Chemins (suites de clés) des nœuds JSON dépliés.
+    private func expandedJSONPaths() -> Set<[String]> {
+        guard let outlineView, let jsonRoot else { return [] }
+        var paths = Set<[String]>()
+        func visit(_ node: JSONNode, _ path: [String]) {
+            guard outlineView.isItemExpanded(node) else { return }
+            paths.insert(path)
+            for child in node.children { visit(child, path + [child.key]) }
+        }
+        visit(jsonRoot, [])
+        return paths
+    }
+
+    private func expandJSON(_ node: JSONNode, path: [String], in paths: Set<[String]>) {
+        guard paths.contains(path) else { return }
+        outlineView?.expandItem(node)
+        for child in node.children { expandJSON(child, path: path + [child.key], in: paths) }
     }
 
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
@@ -992,6 +1019,20 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         target?.userContentController(controller, didReceive: message)
+    }
+}
+
+extension NSTextView {
+    /// Revient à `origin` après un remplacement du texte : la mise en page est faite jusque-là d'abord,
+    /// sinon le défilement est rogné à la partie déjà mise en page, puis recalé au tour suivant.
+    func restoreScroll(_ origin: NSPoint) {
+        guard let layoutManager, let container = textContainer, let clip = enclosingScrollView?.contentView else {
+            scroll(origin)
+            return
+        }
+        layoutManager.ensureLayout(forBoundingRect: NSRect(origin: origin, size: clip.bounds.size), in: container)
+        scroll(origin)
+        DispatchQueue.main.async { [weak self] in self?.scroll(origin) }
     }
 }
 

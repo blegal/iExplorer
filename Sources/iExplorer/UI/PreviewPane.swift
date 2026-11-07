@@ -19,6 +19,8 @@ final class PreviewPane: NSView {
     private var generation = 0
     /// Le fichier affiché est rechargé quand il change sur le disque, à la même position.
     private let watcher = FileChangeWatcher()
+    /// Fichier montré dans l'aperçu texte.
+    private var textURL: URL?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -81,7 +83,8 @@ final class PreviewPane: NSView {
             return true
         }
         if SyntaxHighlighter.language(for: url) != nil || type.conforms(to: .text) || type.conforms(to: .sourceCode) {
-            showText(url, type: type)
+            // Même fichier déjà affiché (rafraîchissement du panneau) : on garde la position.
+            showText(url, type: type, keepPosition: textScroll?.isHidden == false && textURL == url)
             watch(url) { [weak self] in self?.showText(url, type: type, keepPosition: true) }
             return true
         }
@@ -110,6 +113,7 @@ final class PreviewPane: NSView {
         let origin = scroll.contentView.bounds.origin
         activate(.text)
         if !keepPosition { textView.string = "" }
+        textURL = url
         let current = generation
         let dark = Theme.isDark(effectiveAppearance)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -122,7 +126,7 @@ final class PreviewPane: NSView {
             DispatchQueue.main.async {
                 guard let self, current == self.generation else { return }
                 textView.textStorage?.setAttributedString(highlighted)
-                textView.scroll(keepPosition ? origin : .zero)
+                if keepPosition { textView.restoreScroll(origin) } else { textView.scroll(.zero) }
             }
         }
     }
