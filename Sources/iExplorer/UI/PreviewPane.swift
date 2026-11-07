@@ -62,7 +62,12 @@ final class PreviewPane: NSView {
         watcher.watch(nil)
         if type.conforms(to: .pdf) {
             let view = pdfView ?? makePDFView()
-            view.document = PDFDocument(url: url)
+            // Même PDF déjà affiché (rafraîchissement du panneau) : on garde la position.
+            if !view.isHidden, view.document?.documentURL == url, let document = PDFDocument(url: url) {
+                view.replaceDocument(document)
+            } else {
+                view.document = PDFDocument(url: url)
+            }
             activate(.pdf)
             watch(url) { [weak self] in
                 if let document = PDFDocument(url: url) { self?.pdfView?.replaceDocument(document) }

@@ -352,7 +352,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 place(viewer)
                 pdfViewer = viewer
             }
-            pdfViewer?.document = document
+            if let viewer = pdfViewer, !viewer.isHidden, viewer.document?.documentURL == url {
+                viewer.replaceDocument(document)
+            } else {
+                pdfViewer?.document = document
+            }
             pdfViewer?.isHidden = false
             quickLook?.isHidden = true
             quickLook?.previewItem = nil

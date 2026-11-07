@@ -996,15 +996,47 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
 }
 
 extension PDFView {
-    /// Remplace le document (nouvelle version du même fichier) en gardant la page, le point et le zoom.
+    /// Remplace le document (nouvelle version du même fichier) en gardant la page, le point visible en haut à gauche et le zoom.
     func replaceDocument(_ document: PDFDocument) {
-        var restore: (page: Int, point: NSPoint, scale: CGFloat, auto: Bool)?
-        if let old = self.document, let destination = currentDestination, let page = destination.page {
-            restore = (old.index(for: page), destination.point, scaleFactor, autoScales)
-        }
+        guard let old = self.document, old.pageCount > 0 else { self.document = document; return }
+        let corner = NSPoint(x: bounds.minX + 1, y: isFlipped ? bounds.minY + 1 : bounds.maxY - 1)
+        guard let oldPage = page(for: corner, nearest: true) else { self.document = document; return }
+        let index = old.index(for: oldPage)
+        let point = convert(corner, to: oldPage)
+        let auto = autoScales, scale = scaleFactor
         self.document = document
-        guard let restore, document.pageCount > 0, let page = document.page(at: min(restore.page, document.pageCount - 1)) else { return }
-        if !restore.auto { scaleFactor = restore.scale }
-        go(to: PDFDestination(page: page, at: restore.point))
+        guard document.pageCount > 0, let page = document.page(at: min(index, document.pageCount - 1)) else { return }
+        if auto { autoScales = true } else { scaleFactor = scale }
+        layoutDocumentView()
+        align(page, point, at: corner)
+        // PDFKit refait parfois sa mise en page au tour suivant et remonte en haut : on recale alors.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.document === document else { return }
+            self.align(page, point, at: corner)
+        }
+    }
+
+    /// Fait défiler pour que `point` de `page` revienne sous `corner` (coordonnées de la vue).
+    private func align(_ page: PDFPage, _ point: NSPoint, at corner: NSPoint) {
+        guard let scroll = Self.scrollView(in: self) else {
+            go(to: PDFDestination(page: page, at: point))
+            return
+        }
+        let clip = scroll.contentView
+        let now = clip.convert(convert(point, from: page), from: self)
+        let target = clip.convert(corner, from: self)
+        var bounds = clip.bounds
+        bounds.origin.x += now.x - target.x
+        bounds.origin.y += now.y - target.y
+        clip.scroll(to: clip.constrainBoundsRect(bounds).origin)
+        scroll.reflectScrolledClipView(clip)
+    }
+
+    private static func scrollView(in view: NSView) -> NSScrollView? {
+        for subview in view.subviews {
+            if let scroll = subview as? NSScrollView { return scroll }
+            if let scroll = scrollView(in: subview) { return scroll }
+        }
+        return nil
     }
 }
