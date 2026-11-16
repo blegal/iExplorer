@@ -43,8 +43,9 @@ PLIST="$APP/Contents/Info.plist"
 [[ -n "${BUILD_NUMBER:-}" ]] && /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
 # Sans identité donnée : le certificat personnel créé par Tools/make-local-cert.sh s'il existe
 # (signature stable, macOS garde les autorisations d'un build à l'autre), sinon signature ad hoc.
-if [[ -z "${SIGN_IDENTITY:-}" ]] && security find-certificate -c "iExplorer Local" >/dev/null 2>&1; then
-    SIGN_IDENTITY="iExplorer Local"
+# Nom partagé par toutes les apps : un seul certificat par Mac, quel que soit le dépôt qui l'a créé.
+if [[ -z "${SIGN_IDENTITY:-}" ]] && security find-certificate -c "Local Code Signing" >/dev/null 2>&1; then
+    SIGN_IDENTITY="Local Code Signing"
 fi
 if ! codesign --force --timestamp=none --sign "${SIGN_IDENTITY:--}" "$APP" >/dev/null 2>&1; then
     # Trousseau verrouillé (session SSH…) : signature ad hoc pour ne pas bloquer le build.

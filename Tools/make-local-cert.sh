@@ -1,14 +1,17 @@
 #!/bin/zsh
-# Crée, une seule fois, un certificat de signature personnel « iExplorer Local » dans le trousseau de session.
+# Crée, une seule fois par Mac, le certificat de signature personnel « Local Code Signing » dans le trousseau de session.
+# Le nom est partagé : toutes les apps (iExplorer, iBaobab, iRessources, GitWatch, iStats, TaskBoard…) cherchent
+# ce même certificat et l'utilisent s'il existe, quel que soit le dépôt qui l'a créé.
 # build.sh signe ensuite chaque build avec lui : la signature reste la même d'un build à l'autre,
 # et macOS garde les autorisations accordées (Documents, Bureau, disques, automatisation…)
 # au lieu de les redemander après chaque compilation.
 #
 # Le certificat ne sert que sur ce Mac : il ne remplace pas un certificat Apple Developer
 # (les autres Mac affichent toujours l'avertissement de première ouverture).
-# Pour l'enlever : Trousseaux d'accès › session › Mes certificats › « iExplorer Local » › Supprimer.
+# Chaque app garde sa propre identité pour macOS (l'identifiant de bundle fait partie de l'exigence de signature).
+# Pour l'enlever : Trousseaux d'accès › session › Mes certificats › « Local Code Signing » › Supprimer.
 set -euo pipefail
-NAME=${1:-iExplorer Local}
+NAME=${1:-Local Code Signing}
 KEYCHAIN=$HOME/Library/Keychains/login.keychain-db
 
 if security find-certificate -c "$NAME" "$KEYCHAIN" >/dev/null 2>&1; then
