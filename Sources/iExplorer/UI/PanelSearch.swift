@@ -235,7 +235,7 @@ extension PanelViewController {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var found: [URL] = []
             let options: FileManager.DirectoryEnumerationOptions = showHidden ? [.skipsPackageDescendants] : [.skipsHiddenFiles, .skipsPackageDescendants]
-            let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: FileItem.resourceKeys,
+            let enumerator = FileManager.default.enumerator(at: root.enumerationRoot, includingPropertiesForKeys: FileItem.resourceKeys,
                                                             options: options, errorHandler: { _, _ in true })
             var visited = 0
             while let url = enumerator?.nextObject() as? URL {

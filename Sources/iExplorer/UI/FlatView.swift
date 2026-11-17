@@ -9,7 +9,7 @@ extension FileItem {
     static func flatContents(of directory: URL, showHidden: Bool) -> [FileItem] {
         var options: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
         if !showHidden { options.insert(.skipsHiddenFiles) }
-        let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: resourceKeys,
+        let enumerator = FileManager.default.enumerator(at: directory.enumerationRoot, includingPropertiesForKeys: resourceKeys,
                                                         options: options, errorHandler: { _, _ in true })
         var found: [FileItem] = []
         while let url = enumerator?.nextObject() as? URL {

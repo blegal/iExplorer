@@ -77,13 +77,26 @@ final class FileItem: NSObject {
     }
 
     static func contents(of directory: URL, showHidden: Bool) throws -> [FileItem] {
+        // contentsOfDirectory ne suit pas un lien symbolique vers un dossier (~/Dropbox, ~/OneDrive…
+        // → ~/Library/CloudStorage) : on lit la cible, et les éléments gardent le chemin du lien.
+        let isLink = directory.isSymbolicLink
         let urls = try FileManager.default.contentsOfDirectory(
-            at: directory,
+            at: directory.enumerationRoot,
             includingPropertiesForKeys: resourceKeys,
             options: showHidden ? [] : [.skipsHiddenFiles]
         )
-        return urls.map(FileItem.init)
+        guard isLink else { return urls.map(FileItem.init) }
+        return urls.map { FileItem(url: directory.appendingPathComponent($0.lastPathComponent)) }
     }
+}
+
+extension URL {
+    /// Vrai si le dernier élément du chemin est un lien symbolique.
+    var isSymbolicLink: Bool { (try? resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true }
+
+    /// Dossier à parcourir : la cible quand l'URL est un lien symbolique, que contentsOfDirectory
+    /// et enumerator(at:) ne suivent pas (~/Dropbox → ~/Library/CloudStorage/Dropbox).
+    var enumerationRoot: URL { isSymbolicLink ? resolvingSymlinksInPath() : self }
 }
 
 extension Format {
